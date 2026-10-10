@@ -18,10 +18,11 @@ global.window = { addEventListener: noop };
 global.localStorage = { getItem: () => null, setItem: noop };
 global.performance = { now: () => Date.now() };
 global.requestAnimationFrame = noop;
+const REAL = { setTimeout, setInterval, clearInterval };   // (the headless bot stubs timers; --watch needs the real ones)
 global.setTimeout = () => {}; global.setInterval = () => 0; global.clearInterval = noop;
 
 const args = process.argv.slice(2);
-const KNOWN = ['max-sector', 'attempts', 'time', 'assist', 'seed', 'why', 'form', 'start', 'up', 'help'], ALIAS = { max: 'max-sector', levels: 'max-sector', sectors: 'max-sector' };
+const KNOWN = ['max-sector', 'attempts', 'time', 'assist', 'seed', 'why', 'form', 'start', 'up', 'help', 'watch', 'speed', 'mute', 'chrome', 'port', 'size', 'shot', 'shot-after', 'headless', 'verbose'], ALIAS = { max: 'max-sector', levels: 'max-sector', sectors: 'max-sector' };
 if (args.includes('--help') || args.includes('-h')) {
   console.log(`usage: node tests/bot.js [options]
   --max-sector N   stop after clearing sector N (default 100; aliases --max, --levels)
@@ -32,9 +33,12 @@ if (args.includes('--help') || args.includes('-h')) {
   --seed N         random seed (default 11)
   --form F         free | v | col | wall (default v)
   --assist         keep the game's "machines get weaker after a loss" help (off by default)
+  --watch          play it in a Chrome window instead (same bot, same rules); with --speed N (1-16, default 1 = normal game speed),
+                   --mute, --chrome PATH, --size W,H. In the window: ] faster, [ slower, H hides the panel
   --why            print what killed the squad or what a timed-out run was stuck on`); process.exit(0);
 }
 for (const a of args) if (a.startsWith('--')) { const k = ALIAS[a.slice(2)] || a.slice(2); if (!KNOWN.includes(k)) { console.error('unknown option ' + a + ' (try --help)'); process.exit(2); } }
+if (args.includes('--watch')) { Object.assign(global, REAL); require('../tools/watch.js')(args); return; }   // the same bot, drawn in a Chrome window
 const opt = (k, d) => { let i = args.indexOf('--' + k); if (i < 0) for (const a in ALIAS) if (ALIAS[a] === k && args.indexOf('--' + a) >= 0) i = args.indexOf('--' + a); return i < 0 ? d : (typeof d === 'boolean' ? true : +args[i + 1]); };
 const WHY = opt('why', false), MAXLV = opt('max-sector', 100), ATT = opt('attempts', 3), BUDGET = opt('time', 0) > 0 ? opt('time', 0) * 1000 : Infinity, ASSIST = opt('assist', false);
 const FORM = (args.indexOf('--form') >= 0 ? args[args.indexOf('--form') + 1] : 'v');
@@ -46,84 +50,9 @@ eval(src); const t = globalThis.__t, save = t.save;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const LANE = 205;
 
-// ------------------------------------------------------------------ the pilot
-function gateValue(o, n) {
-  switch (o.k) {
-    case 'add': return o.v >= 0 ? o.v : o.v - Math.floor(n * .1);
-    case 'mul': return n * (o.v - 1);
-    case 'wpn': return 14 + n * .35;
-    case 'rate': return 6 + n * .25;
-    case 'dmg': return 6 + n * .3;
-    case 'cls': return o.v + 6;
-    default: return 0;
-  }
-}
-function pilot(G) {
-  const half = t.squadHalf(), xs = []; for (let x = -.88; x <= .881; x += .04) xs.push(+x.toFixed(3));
-  const cost = new Array(xs.length).fill(0), add = (fn) => { for (let i = 0; i < xs.length; i++) cost[i] += fn(xs[i]); };
-  const near = (x, c, w) => Math.abs(x - c) < w;
-  // enemy fire: where each bolt will land, and when
-  for (const b of G.bolts) { const tl = b.rz / 170, xl = b.x + b.vx * tl; if (tl > 1.7) continue; const wgt = (b.dmg || 1) * (tl < .9 ? 9 : 4); add(x => near(x, xl, half + .12) ? wgt : 0); }
-  for (const s of G.strikes) { if (s.fire) continue; const w = s.r + half + .06, wgt = 12 * (s.dmg || 1); add(x => near(x, s.x, w) ? wgt : 0); }
-  for (const h of G.haz) { if (h.dead) continue; const rel = h.wz - G.dist; if (rel > 190 || rel < -25) continue; const w = h.hw + half + .07, wgt = h.k === 'mine' ? 11 : 8; add(x => near(x, h.x, w) ? wgt : 0); }
-  for (const o of G.obs) {
-    if (o.dead) continue; const rel = o.wz - G.dist; if (rel > 280 || rel < -30) continue;
-    if (o.k === 'cable') { if (!o.sq) add(x => near(x, o.x, o.hw + half) ? 7 : 0); }
-    else if (o.k === 'overpass') { if (o.st === 1) for (let i = 0; i < 3; i++) if (i !== o.open) add(x => near(x, (i - 1) * .6, .3 + half) ? 16 : 0); }
-    else if (o.k === 'rubble' || o.k === 'jersey' || o.k === 'slab') add(x => near(x, o.x, o.hw + half) ? (o.k === 'rubble' ? 2.2 : 3) : 0);
-    else if (o.k === 'truck' || o.k === 'sandbag') add(x => near(x, o.x, o.hw + half) ? 2 : 0);
-  }
-  // machines that will reach the squad
-  let tgt = null, tgtScore = -1e9;
-  for (const e of G.en) {
-    if (e.dead) continue; const d = t.ET[e.t], rel = e.wz - G.dist;
-    if (rel > 800) continue;
-    if (!d.hold && rel < 260 && rel > -10) { const w = d.hw * e.sc + half + .1, wgt = rel < 130 ? 9 : 4; add(x => near(x, e.x, w) ? wgt : 0); }   // walkers, crawlers, drones, blades
-    if (d.grab && (e.gs === 'aim' || e.gs === 'lock' || e.gs === 'slam')) add(x => near(x, e.tx, .22 + half) ? 14 : 0);
-    if (rel < 40) continue;
-    const big = t.bigFoe(e) || e.boss, sc = (e.boss && !t.bossShielded(e) ? 400 : big ? 200 : 40) - rel * .3 - (e.t === 't1000' ? 0 : 0);
-    if (sc > tgtScore) { tgtScore = sc; tgt = e; }
-  }
-  // what to head for: the better side of the next gate, otherwise the target, crates and scrap
-  let want = null, ww = 0;
-  const gate = G.gates.filter(g => !g.used && g.wz - G.dist > -5).sort((a, b) => a.wz - b.wz)[0];
-  if (gate && gate.wz - G.dist < 900) {
-    const lv = gateValue(gate.L, G.n), rv = gateValue(gate.R, G.n);
-    want = (lv >= rv ? -1 : 1) * (.42 + Math.min(.2, half)); ww = 1.6;
-    if (gate.wz - G.dist < 120) ww = 3;   // commit
-  }
-  if (!want && tgt) { want = tgt.x; ww = tgt.boss ? .9 : .5; }
-  const blockWz = Math.min(1e9, ...G.en.filter(e => !e.dead && (t.ET[e.t].block || e.boss)).map(e => e.wz - t.ET[e.t].hold - 60 + G.dist * 0));   // a crate behind a machine that stops the squad cannot be reached
-  const pu = G.pups.filter(p => p.wz - G.dist > 30 && p.wz - G.dist < 520 && p.wz < blockWz - 10).sort((a, b) => a.wz - b.wz)[0];
-  if (pu && (!gate || gate.wz > pu.wz) && !G.sweep) { want = pu.x; ww = 1.1; }
-  if (!want) { const sc = G.scr.filter(c => c.wz - G.dist > 0 && c.wz - G.dist < 360).sort((a, b) => a.wz - b.wz)[0]; if (sc) { want = sc.x; ww = .3; } }
-  let best = 0, bc = 1e9;
-  for (let i = 0; i < xs.length; i++) {
-    let c = cost[i] + .12 * Math.abs(xs[i] - G.px) * 6 + .02 * Math.abs(xs[i]);
-    if (want !== null) c += ww * 3 * Math.abs(xs[i] - want);
-    if (c < bc) { bc = c; best = i; }
-  }
-  G.tx = xs[best]; DBG = `want ${want === null ? '-' : want.toFixed(2)} w${ww} tgt ${tgt ? tgt.t + (tgt.boss ? '*' : '') : '-'} cost ${bc.toFixed(1)} tx ${G.tx}`;
-}
-let DBG = '';
-
-let lastItem = -9;
-function useItems(G) {
-  const it = G.item; if (!it || G.t - lastItem < .9 || G.over) return;
-  const us = G.en.filter(e => !e.dead && e.wz - G.dist > 30 && e.wz - G.dist < 800);
-  const big = us.filter(e => t.bigFoe(e) && !t.ET[e.t].fly), cnt = (r) => us.filter(e => e.wz - G.dist < r).length;
-  const boss = us.find(e => e.boss), lane = us.filter(e => Math.abs(e.x - G.px) < .22);
-  let go = false;
-  switch (it.k) {
-    case 'pulse': go = big.some(e => e.wz - G.dist < 360) || cnt(300) >= 5 || (G.n < G.peak * .4 && cnt(300) >= 2); break;
-    case 'c4': { const armed = G.c4.filter(c => c.stuck && !c.dead); if (armed.length) { go = armed[0].fuse < 2.6; } else go = big.some(e => e.wz - G.dist < 520 && !t.bossShielded(e)); break; }
-    case 'flare': go = us.filter(e => e.wz - G.dist > 160).length >= 5 || big.length >= 1 && us.length >= 3; break;
-    case 'spike': go = !(G.guard && !G.guard.dead) && us.some(e => (e.t === 'grunt' || e.t === 'gunner') && e.wz - G.dist > 60 && e.wz - G.dist < 500); break;
-    case 'cannon': go = lane.length >= 3 || lane.some(e => t.bigFoe(e) || e.boss); break;
-    case 'nuke': { const zone = us.filter(e => e.wz - G.dist > 380 && e.wz - G.dist < 760); go = zone.length >= 8 || (boss && zone.some(e => e.boss) && big.length >= 1); break; }   // it lands 400+ px ahead and reaches about 340 px around that point
-  }
-  if (go && t.useItem()) lastItem = G.t;
-}
+// ------------------------------------------------------------------ the pilot (tools/botlib.js)
+const bot = require('../tools/botlib.js')(t);
+const pilot = bot.pilot, useItems = bot.useItems; let DBG = ''; const dbgNow = () => bot.dbg();
 
 // ------------------------------------------------------------------ one attempt at a sector
 const ORDER = Object.keys(t.UPS);   // every upgrade path, in the Armory's order
@@ -137,7 +66,7 @@ function attempt(lv) {
     if (WHY && G.n < pn - 2) { const g = G.gates.find(g => !g.used); drops.push(`f${f} -${pn - G.n} dist ${G.dist.toFixed(0)} gate ${g ? Math.round(g.wz - G.dist) : '-'} near ${G.en.filter(e => !e.dead).sort((a, b) => a.wz - b.wz).slice(0, 2).map(e => e.t + '@' + Math.round(e.wz - G.dist)).join(',')}`); } pn = G.n;
     if (f % 4 === 0 && !G.sweep && !G.over) { pilot(G); useItems(G); }
     t.update(1 / 60);
-    if (WHY && f % 1200 === 0) { const b = G.en.find(e => e.boss && !e.dead && e.wz - G.dist < 800); if (b) console.log(`    boss t=${(f / 60) | 0}s hp ${(b.hp / b.max * 100).toFixed(0)}% plate ${b.plateMax ? (b.plate / b.plateMax * 100).toFixed(0) : '-'}% x ${b.x.toFixed(2)} px ${G.px.toFixed(2)} n ${G.n} dbg[${DBG}] bolts ${G.bolts.length} strikes ${G.strikes.length} en ${G.en.length}`); }
+    if (WHY && f % 1200 === 0) { const b = G.en.find(e => e.boss && !e.dead && e.wz - G.dist < 800); if (b) console.log(`    boss t=${(f / 60) | 0}s hp ${(b.hp / b.max * 100).toFixed(0)}% plate ${b.plateMax ? (b.plate / b.plateMax * 100).toFixed(0) : '-'}% x ${b.x.toFixed(2)} px ${G.px.toFixed(2)} n ${G.n} dbg[${dbgNow()}] bolts ${G.bolts.length} strikes ${G.strikes.length} en ${G.en.length}`); }
   }
   G = t.G;
   if (WHY && !G.won) { console.log('    drops: ' + drops.slice(-5).join(' | ')); if (t.state === 'play') console.log('    stuck: dist ' + G.dist.toFixed(0) + '/' + G.L + ' spd ' + G.spd.toFixed(1) + ' en ' + G.en.filter(e => !e.dead).sort((a, b) => a.wz - b.wz).slice(0, 4).map(e => `${e.t}${e.boss ? '*' : ''}@${Math.round(e.wz - G.dist)} hp${Math.round(e.hp)}/${Math.round(e.max)}${e.form ? ' ' + e.form : ''}${e.stun > 0 ? ' stun' : ''}`).join(', ') + ' | gates ' + G.gates.filter(g => !g.used).length + ' | boss ' + G.en.filter(e => e.boss && !e.dead).map(e => `${e.t}@${Math.round(e.wz - G.dist)} hp${Math.round(e.hp)}/${Math.round(e.max)} plate${Math.round(e.plate || 0)}/${Math.round(e.plateMax || 0)} shielded ${t.bossShielded(e)} gl${e.gl} stun${e.stun || 0}`).join(';')); }

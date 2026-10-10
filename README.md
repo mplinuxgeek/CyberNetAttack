@@ -18,7 +18,7 @@ Endless Survival (main menu) chains sectors until the squad is lost. Scores are 
 | `assets/sprites/<unit>/` | painted sprites, one folder per unit; `manifest.js` is generated |
 | `tests/` | `npm test` (unit tests, seconds) and `npm run sim` (long randomised simulations and balance bots) |
 
-The progression bot (`node tests/bot.js --help` lists every option; `--max-sector N` sets the cap, default 100; `tests/soak.js` also takes `--max-sector`, `--runs`, `--seed`): `node tests/bot.js` plays sector after sector with no upgrades, and buys one level of every upgrade only after a sector has beaten it three times (`--attempts`, `--max-sector`, `--seed`, `--time`, `--assist`, `--why` for loss diagnostics, `--start N --up L` to test a late sector at a given power level).
+Watch the bot play in a Chrome window: `node tests/bot.js --watch` (add `--speed 4` to fast-forward, `--mute`, `--max-sector N`; in the window `]` / `[` change the speed). The progression bot (`node tests/bot.js --help` lists every option; `--max-sector N` sets the cap, default 100; `tests/soak.js` also takes `--max-sector`, `--runs`, `--seed`): `node tests/bot.js` plays sector after sector with no upgrades, and buys one level of every upgrade only after a sector has beaten it three times (`--attempts`, `--max-sector`, `--seed`, `--time`, `--assist`, `--why` for loss diagnostics, `--start N --up L` to test a late sector at a given power level).
 | `tools/` | sprite import/clean/optimise scripts (`assets/README.md`), `render3d` (3D model to sprites), static server |
 | `docs/` | `prompt_builder.html` (image-generator prompts per unit), `sprite_demo.html` (sprite viewer), `reference/` |
 | `deploy.sh` | rsync + start a Python server on another machine (`npm run deploy`) |
