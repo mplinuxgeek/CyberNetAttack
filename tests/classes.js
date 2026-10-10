@@ -9,7 +9,7 @@ global.performance={now:()=>Date.now()};
 let rafcb;global.requestAnimationFrame=f=>{rafcb=f};
 global.setTimeout=(f)=>{f()};
 let src=fs.readFileSync((process.argv[2]||require('path').join(__dirname,'..','game.js')),'utf8')+`
-;globalThis.__t={setPause,showSettings,sanitizeSave,endRun,activateBuff,dropCrate,bossShielded,hurtEnemy,useItem,fireEMP,render,airStrike,hurt0:0,armoryBuy,armoryDown,UPS,showArmory,activateGuard,buzz,mk,update,ET,keys,kill,startLevel,applyGate,volley,showSquad,genLevel,CLS,CLASS,airStrike,clsTotal,hurt,ITEMS,get save(){return save},get G(){return G}};`;
+;globalThis.__t={setPause,showSettings,sanitizeSave,endRun,activateBuff,dropCrate,bossShielded,hurtEnemy,useItem,fireEMP,render,airStrike,hurt0:0,armoryBuy,armoryDown,UPS,showArmory,activateGuard,buzz,mk,update,ET,keys,kill,startLevel,applyGate,volley,showSquad,genLevel,CLS,CLASS,airStrike,clsTotal,hurt,ITEMS,cycleForm,FORMS,slotOf,squadHalf,explodeAt,enemyShoot,get save(){return save},get G(){return G}};`;
 eval(src); const t=globalThis.__t; let pass=0,fail=0;
 const check=(n,c,i)=>{ if(c){pass++;console.log('PASS',n)} else {fail++;console.log('FAIL',n,i||'')} };
 function fresh(lv,loadout){ t.save.loadout=loadout; t.save.unlocked={heavy:1,tech:1,medic:1,shot:1,mark:1,officer:1,signal:1}; t.startLevel(lv); return t.G; }
@@ -280,4 +280,24 @@ const arena=(lv,...en)=>{ const G=fresh(lv,[]); G.n=40; G.gates=[]; G.en=[]; G.p
 // rendering must survive anything behind the squad (the perspective flips sign there: a negative radius throws in a real canvas)
 { const G=arena(4); G.obs=[]; for(const k of ['jersey','rubble','trap','cable','overpass','slab']) G.obs.push({k,x:0,hw:.3,wz:G.dist-200,len:40,hp:100,dead:false,st:k==='overpass'?1:0,t:1,open:1,fall:1,sd:1}); G.fallout.push({x:0,wz:G.dist-200,r:.3,t:5,t0:10,sd:1}); G.flares.push({x:0,wz:G.dist-200,life:3,t0:3});
   let err=null; try{ t.render(); }catch(e){ err=e.message; } check('obstacles far behind the squad do not break rendering', err===null, err); }
+// ---- phase 4: classes and formations
+{ for(const k of ['gren','hack','sniper','demo','medic']) check('class '+k+' exists with a sprite and a price', t.CLASS[k] && t.CLASS[k].spr && t.CLASS[k].cost>=0);
+  t.save.unlocked={heavy:1,tech:1,gren:1,hack:1,sniper:1,demo:1}; t.save.loadout=['gren','hack','demo','sniper']; t.sanitizeSave(); check('a loadout keeps at most three unlocked classes', t.save.loadout.length===3 && t.save.loadout[0]==='gren'); }
+{ const gr=t.mk('grunt',1,0,1); const G=arena(3,gr); G.cls.gren=2; gr.wz=G.dist+300; gr.hp=gr.max=1; G.px=0; G.tx=0; G.n=40; G.peak=40; let crawled=false; for(let i=0;i<60*4;i++){ G.n=40; G.fcd=1e9; t.update(1/60); if(gr.t==='runner') crawled=true; }
+  check('grenades take the legs off an endoskeleton...', crawled, gr.t); check('...and then finish it', gr.dead, ''); }
+{ const G=fresh(3,[]); G.n=40; G.gates=[]; G.en=[]; G.cls.hack=0; const e=t.mk('gunner',G.dist+300,0,1); let off0=0,off1=0; const N=600;
+  for(let i=0;i<N;i++){ G.bolts.length=0; e.x=0; t.enemyShoot(e,1); const b=G.bolts[0]; if(b&&Math.abs(b.x+b.vx*((e.wz-G.dist)/170)-G.px)>.3) off0++; }
+  G.cls.hack=1; for(let i=0;i<N;i++){ G.bolts.length=0; e.x=0; t.enemyShoot(e,1); const b=G.bolts[0]; if(b&&Math.abs(b.x+b.vx*((e.wz-G.dist)/170)-G.px)>.3) off1++; }
+  check('without a hacker enemy bolts aim true', off0===0, off0); check('one hacker makes about 15% of bolts miss', off1/N>.09 && off1/N<.22, off1/N); }
+{ const G=arena(3); G.cls.medic=2; G.n=20; G.peak=20; G.px=0; G.tx=0; run(G,.2); G.n=5; for(let i=0;i<5;i++) t.update(1/60); G.n=5; const kit=G.pups.find(p=>p.k==='nanite');
+  check('a field medic drops a nanite kit when the squad is nearly gone', !!kit); if(kit){ kit.x=0; kit.wz=G.dist+10; G.n=5; run(G,.3); }
+  check('collecting it restores soldiers', G.n>=5 && !G.pups.some(p=>p.k==='nanite') ? true : false, G.n); }
+{ const mkT=()=>{ const tk=t.mk('tank',1,0,1); tk.hp=tk.max=1e6; tk.armor=0; return tk; }; const a=mkT(), b=mkT(); const G=arena(3,a); const w={name:'s',pierce:false,splash:0,col:'#fff'};
+  const shot=(e,crit)=>{ const bl={x:e.x,dmg:100,w,hit:[],d:0,src:'px',zo:0,rx:0,pen:true,wz:e.wz-9,pz:e.wz-9}; if(crit) bl.crit=crit; G.bullets.push(bl); G.n=40; G.fcd=1e9; t.update(1/60); };
+  a.wz=G.dist+400; shot(a,0); const d0=a.max-a.hp; G.en=[b]; b.wz=G.dist+400; shot(b,2.5); const d1=b.max-b.hp; check('scout sniper crits hit machines for 2.5x', d0>0 && Math.abs(d1/d0-2.5)<.2, d1/d0); }
+{ const mkT=()=>{ const tk=t.mk('tank',1,0,1); tk.hp=tk.max=1e6; tk.armor=0; tk.plate=0; tk.plateMax=0; return tk; }; const G=arena(3); const a=mkT(); a.wz=G.dist+300; G.en=[a]; t.explodeAt(0,a.wz,100,a); const d0=a.max-a.hp; G.cls.demo=1; const b=mkT(); b.wz=G.dist+300; G.en=[b]; t.explodeAt(0,b.wz,100,b); const d1=b.max-b.hp;
+  check('demolitions raise explosion damage 35%', Math.abs(d1/d0-1.35)<.02, d1/d0); const c=mkT(); c.wz=G.dist+300+75; c.x=.0; G.en=[c]; t.explodeAt(0,G.dist+300,100,null); check('...and blast radius', c.hp<c.max); G.cls.demo=0; const c2=mkT(); c2.wz=G.dist+375; G.en=[c2]; t.explodeAt(0,G.dist+300,100,null); check('(no demolitions: out of range)', c2.hp===c2.max); }
+{ const G=fresh(3,[]); G.form='free'; const seq=[]; for(let i=0;i<4;i++){ t.cycleForm(); seq.push(G.form); } check('formations cycle V, column, wall, free', seq.join()==='v,col,wall,free', seq.join());
+  G.n=30; const hw={}; for(const f of ['free','v','col','wall']){ G.form=f; hw[f]=t.squadHalf(); } check('a wall is wide, a column narrow', hw.wall>hw.free && hw.col<hw.free && hw.v>=hw.free, JSON.stringify(hw));
+  const ext=f=>{ G.form=f; let mn=9,mx=-9; for(let i=0;i<30;i++){ const o=t.slotOf(i,30).ox; mn=Math.min(mn,o); mx=Math.max(mx,o); } return mx-mn; }; check('slot layouts match: wall wider than column', ext('wall')>ext('col')*2, ext('wall')+' '+ext('col')); }
 console.log(pass+' passed, '+fail+' failed');

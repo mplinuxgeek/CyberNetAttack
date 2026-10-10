@@ -55,12 +55,24 @@ const ET = {
 const CLASS = {   // special squad classes: pick up to 3 before a sector (unlock with scrap); gates then grow only your picks
   heavy:  { name: 'ORDNANCE',  col: '#ff9a4a', gate: 'rgba(255,140,40,.6)', spr: 'resistance_heavy', cost: 0,   desc: 'Homing rockets (splash) at armoured machines and bosses' },
   tech:   { name: 'TECH OP',   col: '#6ff3ff', gate: 'rgba(40,215,230,.6)', spr: 'resistance_tech',     cost: 0,   desc: 'Supply crates drop more often, wider scrap and gate pickup' },
-  medic:  { name: 'SCAVENGER', col: '#6dffb5', gate: 'rgba(50,215,120,.6)', spr: 'resistance_medic',     cost: 120, desc: 'Revives fallen soldiers and repairs the reprogrammed unit' },
+  medic:  { name: 'FIELD MEDIC', col: '#6dffb5', gate: 'rgba(50,215,120,.6)', spr: 'resistance_medic',     cost: 120, desc: 'Revives fallen soldiers, repairs the reprogrammed unit, drops nanite repair kits when the squad is nearly gone' },
   shot:   { name: 'SHOTGUNNER', col: '#ffd27a', gate: 'rgba(255,200,90,.6)', spr: 'resistance_shotgunner',  cost: 150, desc: 'Close-range pellet bursts: huge damage up close' },
   mark:   { name: 'MARKSMAN',  col: '#b9a8ff', gate: 'rgba(160,140,255,.6)', spr: 'resistance_goggles', cost: 220, desc: 'Armour-piercing shots that punch through the whole line' },
   officer:{ name: 'OFFICER',   col: '#ff8f8f', gate: 'rgba(255,110,110,.6)', spr: 'resistance_captain', cost: 300, desc: 'Squad fires faster: +5% fire rate per officer (max +30%)' },
+  gren:   { name: 'GRENADIER', col: '#c9d94a', gate: 'rgba(190,210,60,.6)', spr: 'resistance_heavy', cost: 260, desc: '40mm grenades that blow endoskeletons apart: they keep coming as crawlers' },
+  hack:   { name: 'TECH-COM HACKER', col: '#4dffb0', gate: 'rgba(60,255,170,.6)', spr: 'resistance_tech', cost: 350, desc: 'Corrupts machine targeting: 15% of enemy plasma bolts miss, more with extra hackers' },
+  sniper: { name: 'SCOUT SNIPER', col: '#ff9ad0', gate: 'rgba(255,140,200,.6)', spr: 'resistance_goggles', cost: 450, desc: 'Thermal scope: aimed shots hit machine and boss weak points for 2.5x critical damage' },
+  demo:   { name: 'DEMOLITIONS', col: '#ffb347', gate: 'rgba(255,170,60,.6)', spr: 'resistance_captain', cost: 500, desc: 'All splash damage and C4 / mini-nuke blast radius +35%' },
   signal: { name: 'SIGNALLER', col: '#8fe8ff', gate: 'rgba(110,220,255,.6)', spr: 'resistance_signaller', cost: 400, desc: 'Calls air strikes on the machines ahead' },
 };
+const FORMS = {   // tactical formations: hitbox width, how wide the fire pattern is, how far rounds curve toward targets, scrap / gate pickup width
+  free:  { name: 'FREE',   half: 1,    spread: 1,   cone: 1,   pick: 1 },
+  v:     { name: 'V-SHAPE', half: 1.05, spread: 1,   cone: 1.6, pick: 1 },
+  col:   { name: 'COLUMN', half: .55,  spread: .35, cone: .55, pick: .75 },
+  wall:  { name: 'WALL',   half: 1.5,  spread: 1.8, cone: .8,  pick: 1.35 },
+};
+const FORM_ORDER = ['free', 'v', 'col', 'wall'];
+const formK = () => FORMS[(G && G.form) || 'free'] || FORMS.free;
 const CLS = Object.keys(CLASS);        // display / sprite order
 const MAXPICK = 3;
 const SQUAD_CONE = .22;   // how far off its own line (in lane widths) a squad round will curve toward a machine
@@ -74,7 +86,7 @@ function sanitizeSave() { // a hand-edited, corrupted or older save can never br
   for (const k of Object.keys(save.unlocked)) if (!CLASS[k]) delete save.unlocked[k]; save.unlocked.heavy = 1; save.unlocked.tech = 1;
   save.loadout = (Array.isArray(save.loadout) ? save.loadout : []).filter((k, i, a) => CLASS[k] && save.unlocked[k] && a.indexOf(k) === i).slice(0, MAXPICK);
   for (const k of Object.keys(save.stars)) save.stars[k] = n(save.stars[k], 0, 3, 0);
-  save.mute = !!save.mute; save.crt = !!save.crt; save.v = 2;
+  save.mute = !!save.mute; save.crt = !!save.crt; save.v = 2; if (!FORMS[save.form]) save.form = 'free';
 }
 sanitizeSave();
 const clsTotal = () => CLS.reduce((a, k) => a + (G.cls[k] || 0), 0);
@@ -237,6 +249,7 @@ const sfx = {   // gritty, low and heavy: filtered noise and saturated low tones
   hurt() { tn(0, 110, 36, .2, 'sawtooth', .5); nz(0, .13, { type: 'lowpass', f0: 1200, f1: 160, g: .4 }); },
   emp() { tn(0, 70, 1400, .35, 'sawtooth', .16); nz(.28, .7, { f0: 2200, f1: 120, q: .6, g: .6 }); tn(.28, 70, 22, .7, 'sawtooth', .5); tn(.28, 48, 20, .8, 'sine', .8); },   // charge up then a deep concussive burst
   cannon() { tn(0, 1400, 70, .5, 'sawtooth', .3); nz(0, .6, { f0: 3500, f1: 250, q: .7, g: .55 }); tn(.05, 60, 30, .8, 'sine', .8); tn(0, 200, 900, .25, 'square', .1); },   // a heavy plasma discharge
+  thump() { tn(0, 190, 60, .14, 'square', .3); nz(0, .07, { type: 'lowpass', f0: 900, f1: 200, g: .35 }); },   // a 40mm launcher
   arc() { nz(0, .2, { f0: 3200, f1: 700, q: 2, g: .4 }); tn(0, 1900, 160, .14, 'square', .14); },   // live cable discharge
   ping() { if (ok('png', 60)) { tn(0, rnd(300, 480), 220, .16, 'square', .12); nz(0, .03, { f0: 1600, q: 1.5, g: .2 }); } },   // a clang on the reprogrammed unit
   mg() { for (let i = 0; i < 3; i++) { nz(i * .055, .045, { f0: 1500, q: .9, g: .45 }); tn(i * .055, 100, 55, .06, 'sawtooth', .25); } },   // enemy minigun burst
@@ -389,7 +402,7 @@ function startLevel(lv) {
     dist: 0, spd: 0, px: 0, tx: 0,
     n: 6 + 2 * save.up.squad, tier: save.up.weapon, rateG: 1, dmgG: 1,
     fcd: .3, bullets: [], bolts: [], parts: [], texts: [],
-    scrap: 0, kills: 0, item: { k: 'pulse', n: 2 }, c4: [], flares: [], fallout: [], beam: null, shake: 0, flash: 0, hurtFlash: 0,
+    form: save.form, scrap: 0, kills: 0, item: { k: 'pulse', n: 2 }, c4: [], flares: [], fallout: [], beam: null, shake: 0, flash: 0, hurtFlash: 0,
     guard: null, gx: 0, pups: [], pupPlan: lvl.pups.map(p => ({ k: p.k, x: p.x, wz: p.wz, done: false })),
     cls: Object.fromEntries(CLS.map(k => [k, 0])), sig: 7, scr: [], haz: lvl.haz, obs: lvl.obs, slow: 1, rockets: [], strikes: [], lt: [], warn: null, mz: 0, rcd: 2, peak: 6 + 2 * save.up.squad,
     ts: 1, t: 0, later: [], deaths: [], waves: [], alert: null, over: false, won: false, endT: 0, paused: false,
@@ -413,7 +426,16 @@ function squadPos() { const q = P(G.px, G.adv || 0); return q; }
 function gateWait(e) { const g = gateBefore(e); return !!g && G.dist < g.wz - 380; }   // still frozen behind a gate
 function gateBefore(e) { let best = null; for (const g of G.gates) if (!g.used && g.wz < e.wz && g.wz > G.dist - 5 && (!best || g.wz > best.wz)) best = g; return best; }
 function clAt(ci) { let c = ci; for (const k of CLS) { if (c < G.cls[k]) return k; c -= G.cls[k]; } return null; }   // which class the ci-th special soldier belongs to
-function squadHalf() { return .04 * Math.sqrt(Math.min(G.n, 40)) + .035; }
+function slotOf(i, shown) { // where the i-th soldier stands: x offset in lane units, z offset in world px
+  const f = (G && G.form) || 'free';
+  if (f === 'v') { const r = Math.ceil(i / 2), sd = i % 2 ? 1 : -1; return { ox: i === 0 ? 0 : sd * r * .03, oz: -r * 3.4 + 24 }; }
+  if (f === 'col') return { ox: (i % 4 - 1.5) * .03, oz: -Math.floor(i / 4) * 5 + 22 };
+  if (f === 'wall') return { ox: (i % 10 - 4.5) * .06, oz: -Math.floor(i / 10) * 5 + 8 };
+  const r = Math.sqrt(i + .5); return { ox: r * Math.cos(i * 2.39996) * .052, oz: r * Math.sin(i * 2.39996) * 4.6 };
+}
+function cycleForm() { if (!G || G.over || G.paused) return; const i = (FORM_ORDER.indexOf(G.form) + 1) % FORM_ORDER.length; G.form = FORM_ORDER[i]; save.form = G.form; persist(); const q = squadPos(); addText(q.x, q.y - 100, FORMS[G.form].name + ' FORMATION', '#cfe8ff'); sfx.tick(); }
+function squadHalf() { return (.04 * Math.sqrt(Math.min(G.n, 40)) + .035) * formK().half; }
+const demoK = () => (G && G.cls.demo > 0 ? 1.35 : 1);   // demolitions: splash damage and blast radius
 
 const BUFF = { rapid: { name: 'OVERDRIVE', col: '#ffb03a', desc: 'fire rate x1.8 for 7 s' }, shield: { name: 'ARMOUR PLATING', col: '#8fd0ff', desc: 'blocks the next 4 hits' } };
 function activateBuff(k) {
@@ -437,6 +459,7 @@ function rollItem(lv) {
   for (const k of ks) { r -= ITEMS[k].w; if (r <= 0) return k; }
   return ks[0];
 }
+function takeNanite() { const q = squadPos(), k = Math.max(3, Math.ceil(G.peak * .35)); G.n = Math.min(G.peak, G.n + k); addText(q.x, q.y - 100, '+' + k + ' NANITE REPAIR', '#6dffb5'); addParts(q.x, q.y - 30, 24, '#6dffb5', 200, .7); addLight(q.x, q.y - 40, 130, 'rgba(110,255,180,', .4); G.flash = Math.max(G.flash, .15); sfx.gate(); buzz(30); }
 function takeItem(k) {
   const d = ITEMS[k], q = squadPos();
   if (G.item && G.item.k === k) G.item.n = Math.min(Math.max(d.n, 2) * 2, G.item.n + d.n); else G.item = { k, n: d.n };
@@ -495,11 +518,12 @@ function hurt(amt, bx, quiet) {
 const bigFoe = e => { const d = ET[e.t]; return !!(d.block || d.fly || d.tracked); };
 const bossShielded = e => !!e.boss && G.en.some(o => !o.dead && !o.boss && o.wz < e.wz && bigFoe(o));   // the boss cannot be hurt while a large machine still stands in front of it
 const armorOf = e => (e.armor !== undefined ? e.armor : (ET[e.t].armor || 0));
+let SURE_BLAST = false;   // grenade splash: endoskeletons killed by it always come back as crawlers
 function hurtEnemy(e, dmg, o) { // front plating soaks fire first; flanking (squad well off to one side) bypasses it
   o = o || {};
   if (bossShielded(e)) return 'plate';   // shots glance off until the pre-boss is destroyed
   const raw = dmg * (o.ignoreArmor ? 1 : 1 - armorOf(e)); if (bigFoe(e) || e.boss) e.dmgAcc = (e.dmgAcc || 0) + raw; const flank = Math.abs(G.px - e.x) > .32;
-  e.plateHit = 0; if (o.explosive) e.blast = true;
+  e.plateHit = 0; if (o.explosive) { e.blast = true; if (SURE_BLAST) e.sure = true; }
   if (e.plate > 0 && !flank) {
     e.plate -= raw * (o.plateMul || 1);
     if (e.plate <= 0) {
@@ -518,7 +542,7 @@ function spawnScrap(x, wz, sc) {
 
 function kill(e) {
   if (e.dead) return;
-  if (!e.revived && (e.t === 'grunt' || e.t === 'gunner') && e.blast && Math.random() < .75) { // only a blast (rocket, grenade, air strike, crashing flyer) takes the legs off: it keeps coming as a slow crawler
+  if (!e.revived && (e.t === 'grunt' || e.t === 'gunner') && e.blast && (e.sure || Math.random() < .75)) { // only a blast (rocket, grenade, air strike, crashing flyer) takes the legs off: it keeps coming as a slow crawler
     e.revived = true; const q0 = P(e.x, e.wz - G.dist);
     e.t = 'runner'; e.hp = e.max = Math.max(ET.runner.hp * (1 + .2 * (G.lv - 1)) * 2.2, (e.max || 0) * .3); e.flash = .12; e.crawl = true;
     addSparks(q0.x, q0.y - 22 * q0.s, 10, q0.y, true); addParts(q0.x, q0.y - 20 * q0.s, 8, '#9aa4ae', 160, .5);
@@ -605,7 +629,7 @@ function empStep(dt) {
 function c4Blow(c) {
   if (c.dead) return; c.dead = true; const e = c.e;
   explodeAt(e.x, e.wz, 40, null); obsBlast(e.x, e.wz, 300);
-  const dmg = (260 + 40 * G.lv) * ipow() + e.max * (e.boss ? .07 : .25);
+  const dmg = ((260 + 40 * G.lv) * ipow() + e.max * (e.boss ? .07 : .25)) * demoK();
   hurtEnemy(e, dmg, { ignoreArmor: true, plateMul: 2, explosive: true }); e.flash = .3;
   const q = P(e.x, e.wz - G.dist); addText(q.x, q.y - (HITH[e.t] || 60) * q.s * e.sc - 30, 'C4', '#ffb03a'); G.flash = Math.max(G.flash, .25); G.shake = Math.max(G.shake, 10);
   if (e.hp <= 0) kill(e);
@@ -613,8 +637,8 @@ function c4Blow(c) {
 const USE = {
   pulse() { G.flash = .3; G.shake = 8; sfx.emp(); launchWave('pulse', PULSE_RANGE); addText(W / 2, 330, 'PULSE GRENADE', ITEMS.pulse.col); return true; },
   nuke() {
-    G.flash = 1; G.shake = 22; sfx.emp(); sfx.boom(); launchWave('nuke', NUKE_RANGE); for (const o of G.obs) { if (o.dead) continue; if (o.k === 'overpass') collapseStart(o); else if (o.wz - G.dist < NUKE_RANGE) obsBlast(o.x, o.wz, 1e4); } addText(W / 2, 330, 'M-38 DETONATION', ITEMS.nuke.col); buzz([200, 60, 200]);
-    for (let i = 0; i < 8; i++) G.fallout.push({ x: clamp(G.px + rnd(-.25, .25), -.8, .8), wz: G.dist + 160 + i * 105, r: .26 + rnd(0, .08), t: 14 + rnd(0, 3), t0: 17, sd: Math.random() * 99 });
+    G.flash = 1; G.shake = 22; sfx.emp(); sfx.boom(); launchWave('nuke', NUKE_RANGE * demoK()); for (const o of G.obs) { if (o.dead) continue; if (o.k === 'overpass') collapseStart(o); else if (o.wz - G.dist < NUKE_RANGE) obsBlast(o.x, o.wz, 1e4); } addText(W / 2, 330, 'M-38 DETONATION', ITEMS.nuke.col); buzz([200, 60, 200]);
+    for (let i = 0; i < 8; i++) G.fallout.push({ x: clamp(G.px + rnd(-.25, .25), -.8, .8), wz: G.dist + 160 + i * 105, r: (.26 + rnd(0, .08)) * demoK(), t: 14 + rnd(0, 3), t0: 17, sd: Math.random() * 99 });
     return true;
   },
   c4() {
@@ -767,7 +791,8 @@ function squadDps() {
   const extra = Math.min(4, G.cls.mark) * 2.6 * base + Math.min(18, 3 * G.cls.shot) * .55 * base * Math.max(1, Math.min(2.5, 1 + G.n / 40)) * .6;   // marksman rounds + shotgun pellets (bosses hold at pellet range, so ~60%)
   const rate = (1 + .06 * save.up.rate) * G.rateG * (1 + Math.min(.3, .05 * G.cls.officer));
   const strike = G.cls.signal > 0 ? 90 * (1 + .1 * save.up.dmg) * G.dmgG * (1 + .25 * Math.min(4, G.cls.signal)) / Math.max(7, 16 - 2 * G.cls.signal) : 0;   // air strike dps on one target
-  return (total + extra) / (w.int / rate) + strike;
+  const gr = G.cls.gren > 0 ? Math.min(4, G.cls.gren) * 55 * (1 + .1 * save.up.dmg) * G.dmgG * rate / 1.7 : 0, sn = G.cls.sniper > 0 ? Math.min(4, G.cls.sniper) * base * 3.2 * rate / 1.5 : 0;
+  return (total + extra) / (w.int / rate) + strike + gr + sn;
 }
 
 function aimTarget(x0, zo, cone, pick) { // a machine ahead of a shooter, inside a diagonal cone (default wide; the squad uses a narrow one so steering still matters)
@@ -794,9 +819,9 @@ function volley() {
   const each = total / B;
   const shown = Math.min(G.n, 40);
   for (let i = 0; i < B; i++) {
-    const k = Math.floor(Math.random() * shown), r = Math.sqrt(k + .5), ox = r * Math.cos(k * 2.39996) * .052;   // a random fighter of the formation takes this shot, from his own spot
+    const k = Math.floor(Math.random() * shown), ox = slotOf(k, shown).ox;   // a random fighter of the formation takes this shot, from his own spot
     const x = clamp(G.px + ox + rnd(-w.spread, w.spread), -.95, .95);
-    pushShot({ x, dmg: each, w, hit: [], vx: 0, tg: aimTarget(x, 8, SQUAD_CONE, true) }, 'px', 8);   // soldiers lean their shots toward a machine just off their line, but still have to be steered at the rest
+    pushShot({ x, dmg: each, w, hit: [], vx: 0, tg: aimTarget(x, 8, SQUAD_CONE * formK().cone, true) }, 'px', 8);   // soldiers lean their shots toward a machine just off their line, but still have to be steered at the rest
   }
   const base = w.dmg * (1 + .1 * save.up.dmg) * G.dmgG;
   if (G.cls.shot > 0) { // shotgunners: a spread of short-range pellets, brutal up close
@@ -818,6 +843,7 @@ function volley() {
 }
 
 function explodeAt(x, wz, dmg, main) {
+  const dk = demoK(); dmg *= dk;
   const rel = wz - G.dist, q = P(x, rel);
   addParts(q.x, q.y - 28 * q.s, 26, '#ff9a2a', 300, .6); addParts(q.x, q.y - 28 * q.s, 14, '#3a3f48', 220, .9, 120);
   addSparks(q.x, q.y - 28 * q.s, 10, q.y, true);
@@ -825,7 +851,7 @@ function explodeAt(x, wz, dmg, main) {
   G.shake = Math.max(G.shake, 5); sfx.boom();
   for (const o of G.en.slice()) {
     if (o.dead) continue;
-    if (Math.abs(o.x - x) > .3 + ET[o.t].hw * o.sc * .5 || Math.abs(o.wz - wz) > 60) continue;
+    if (Math.abs(o.x - x) > (.3 + ET[o.t].hw * o.sc * .5) * dk || Math.abs(o.wz - wz) > 60 * dk) continue;
     hurtEnemy(o, o === main ? dmg : dmg * .6, { ignoreArmor: true, plateMul: 1.5, explosive: true });
     if (o.hp <= 0) kill(o);
   }
@@ -864,6 +890,22 @@ function fireRockets() {
   return true;
 }
 
+function fireGrenades() { // grenadiers lob 40mm rounds at the nearest endoskeletons
+  const gn = Math.min(4, G.cls.gren); let n = 0;
+  const c = G.en.filter(e => !e.dead && e.wz - G.dist > 50 && e.wz - G.dist < 700 && !ET[e.t].fly).sort((a, b) => ((BIPED.has(a.t) ? 0 : 400) + a.wz) - ((BIPED.has(b.t) ? 0 : 400) + b.wz));
+  if (!c.length) return false;
+  const dmg = 55 * (1 + .1 * save.up.dmg) * G.dmgG;
+  for (let i = 0; i < gn; i++) { const tgt = c[Math.min(c.length - 1, i % Math.min(3, c.length))]; G.rockets.push({ x: G.px + (i - (gn - 1) / 2) * .06, wz: G.dist + 12, pz: G.dist + 12, dmg, tgt, delay: i * .14, gren: true }); n++; }
+  sfx.thump(); return n > 0;
+}
+function fireSnipers() { // scout snipers: a thermal-scoped round at the weak point of the biggest machine in range
+  const sn = Math.min(4, G.cls.sniper); let tg = null, bs = -1;
+  for (const e of G.en) { if (e.dead || bossShielded(e)) continue; const rel = e.wz - G.dist; if (rel < 60 || rel > 900 || Math.abs(e.x - G.px) > .9) continue; const sc = (e.boss ? 3 : bigFoe(e) ? 2 : ET[e.t].armor ? 1 : 0) * 1000 - rel; if (sc > bs) { bs = sc; tg = e; } }
+  G.snTg = tg; if (!tg) return false;
+  const base = WEAPONS[G.tier].dmg * (1 + .1 * save.up.dmg) * G.dmgG, w = { name: 'sniper', pierce: false, splash: 0, col: '#ff9ad0', spread: 0 };
+  for (let i = 0; i < sn; i++) pushShot({ x: G.px + (i - (sn - 1) / 2) * .04, dmg: base * 3.2, w, pen: true, crit: 2.5, hit: [], tg, vx: 0 }, 'px', 8);
+  sfx.sniper(); return true;
+}
 function harvestGrab(e) {
   const q = squadPos();
   if (Math.abs(G.px - e.tx) < .17 + squadHalf() * .5 && G.n > 1) {
@@ -886,7 +928,9 @@ function enemyShoot(e, sideSign) { // bolts leave the weapon's muzzle (not the m
     if (e.vm) { mox = e.vm[0] * (e.vf || 1); mh = e.vm[1] + (e.lf || 0); sd = 1; }   // flying machines: the muzzle rides on the hover height   // muzzle position supplied with the sprite view
     const ox = mox * sd * e.sc / LANE, h0 = mh * e.sc, bx = e.x + ox;
     const rz = rel + (mg ? i * 16 : 0);   // minigun rounds follow each other down the lane
-    G.bolts.push({ rz, rz0: rz, h0, big: !mg && !!(d.volley || d.block), mg, x: bx, vx: (aimX + off - bx) / tt, dmg });
+    let ax = aimX + off;
+    if (G.cls.hack > 0 && Math.random() < Math.min(.4, .15 + .04 * (G.cls.hack - 1))) { ax = aimX + (Math.random() < .5 ? -1 : 1) * rnd(.4, .7); if (Math.random() < .25) { const sq = squadPos(); addText(sq.x + rnd(-40, 40), sq.y - 110, 'JAMMED', '#4dffb0'); } }   // the hacker has corrupted this round's targeting
+    G.bolts.push({ rz, rz0: rz, h0, big: !mg && !!(d.volley || d.block), mg, x: bx, vx: (ax - bx) / tt, dmg });
     const q = P(bx, rel), my = q.y - h0 * q.s;   // muzzle flash right at the barrel
     addParts(q.x, my, 5, mg ? '#ffd27a' : '#e0c8ff', 110, .16, 0); addLight(q.x, my, (d.block ? 38 : 24) * q.s + 7, mg ? 'rgba(255,190,90,' : 'rgba(190,140,255,', .12, false);
     G.parts.push({ x: q.x, y: my, vx: 0, vy: 0, life: .09, max: .09, fl: mg ? '255,210,120' : '200,160,255', r: Math.max(5, 12 * q.s * e.sc), g: 0, sd: Math.random() * 99 });
@@ -959,6 +1003,8 @@ function update(dt) {
     while (G.fcd <= 0 && guard++ < 5) { volley(); G.fcd += iv; }
     if (G.cls.signal > 0) { G.sig -= dt; if (G.sig <= 0) G.sig = airStrike() ? Math.max(7, 16 - 2 * G.cls.signal) : 1.5; }
     G.rcd -= dt;
+    if (G.cls.gren > 0) { G.gcd = (G.gcd || 0) - dt; if (G.gcd <= 0) G.gcd = fireGrenades() ? 1.7 / ((1 + .06 * save.up.rate) * G.rateG) : .4; }
+    if (G.cls.sniper > 0) { G.scd = (G.scd || 0) - dt; if (G.scd <= 0) G.scd = fireSnipers() ? 1.5 / ((1 + .06 * save.up.rate) * G.rateG) : .4; } else G.snTg = null;
     if (G.rcd <= 0 && G.cls.heavy > 0) G.rcd = fireRockets() ? 2.4 / ((1 + .06 * save.up.rate) * G.rateG) : .4;
   }
   G.gflash = Math.max(0, (G.gflash || 0) - dt);
@@ -992,13 +1038,14 @@ function update(dt) {
       if (e.wz + 10 < b.pz || e.wz - 10 > b.wz) continue;
       if (Math.abs(e.x - b.x) > ET[e.t].hw * e.sc + .025) continue;
       b.hit.push(e);
-      const res = hurtEnemy(e, b.dmg, b.pen ? { ignoreArmor: true } : undefined), rel = e.wz - G.dist, q = P(b.x, rel), hy = q.y - (HITH[e.t] || 40) * q.s * e.sc;
+      const crit = b.crit && (e.boss || bigFoe(e)) ? b.crit : 1, res = hurtEnemy(e, b.dmg * crit, b.pen ? { ignoreArmor: true } : undefined), rel = e.wz - G.dist, q = P(b.x, rel), hy = q.y - (HITH[e.t] || 40) * q.s * e.sc;
       addSparks(q.x, hy, res === 'plate' ? 7 : 4, q.y - 2, res === 'plate'); sfx.impact(res, G.tier, b.w.name);
+      if (crit > 1 && res !== 'plate') { addText(q.x, hy - 30, 'CRITICAL', '#ff9ad0'); addSparks(q.x, hy, 10, q.y - 2, true); }
       if (G.lt.length < 20) addLight(q.x, hy, 24, 'rgba(255,170,60,', .07);
       if (b.w.splash) {
         for (const o of G.en) {
-          if (o === e || o.dead || Math.abs(o.x - e.x) > b.w.splash || Math.abs(o.wz - e.wz) > 50) continue;
-          hurtEnemy(o, b.dmg * .5); if (o.hp <= 0) kill(o);
+          if (o === e || o.dead || Math.abs(o.x - e.x) > b.w.splash * demoK() || Math.abs(o.wz - e.wz) > 50 * demoK()) continue;
+          hurtEnemy(o, b.dmg * .5 * demoK()); if (o.hp <= 0) kill(o);
         }
         addParts(q.x, hy, 8, '#6dffb5', 180, .3);
       }
@@ -1011,14 +1058,14 @@ function update(dt) {
   // rockets from ordnance gunners
   for (const r of G.rockets) {
     if (r.delay > 0) { r.delay -= dt; continue; }
-    r.pz = r.wz; r.wz += 520 * dt;
+    r.pz = r.wz; r.wz += (r.gren ? 430 : 520) * dt;
     if (r.tgt && !r.tgt.dead) r.x += clamp(r.tgt.x - r.x, -1, 1) * dt * 1.4;
     const rq = P(r.x, r.wz - G.dist);
     if (G.parts.length < 400) G.parts.push({ x: rq.x + rnd(-1, 1), y: rq.y - 30 * rq.s, vx: rnd(-10, 10), vy: rnd(-10, 10), life: .5, max: .5, col: Math.random() < .5 ? '#5a626e' : '#ffb02e', r: 2.4, g: -10 });
     if (r.wz - G.dist > 900) { r.dead = true; continue; }
     for (const e of G.en) {
       if (e.dead || e.wz + 12 < r.pz || e.wz - 12 > r.wz || Math.abs(e.x - r.x) > ET[e.t].hw * e.sc + .08) continue;
-      r.dead = true; explodeAt(r.x, e.wz, r.dmg, e); break;
+      r.dead = true; SURE_BLAST = !!r.gren; explodeAt(r.x, e.wz, r.dmg, e); SURE_BLAST = false; break;
     }
   }
   G.rockets = G.rockets.filter(r => !r.dead);
@@ -1155,6 +1202,11 @@ function update(dt) {
   }
   G.haz = G.haz.filter(h => !h.dead && h.wz - G.dist > -120);
 
+  // field medic: when the squad is nearly gone a nanite repair kit drops ahead of it
+  if (G.cls.medic > 0 && !G.over) {
+    G.kitCd = (G.kitCd || 0) - dt;
+    if (G.kitCd <= 0 && G.n <= G.peak * .3 && !G.pups.some(p => p.k === 'nanite')) { G.pups.push({ k: 'nanite', x: clamp(G.px + rnd(-.35, .35), -.8, .8), wz: G.dist + 240 }); G.kitCd = 24; addText(W / 2, 300, 'NANITE KIT DROPPED', '#6dffb5'); sfx.gate(); }
+  }
   // power-up crates: only one is ever on the road, and none while a unit is active
   for (const pl of G.pupPlan) {
     if (pl.done) continue;
@@ -1166,7 +1218,7 @@ function update(dt) {
   // steer the squad onto a crate to bring the reprogrammed unit online
   for (const pu of G.pups) {
     const rel = pu.wz - G.dist;
-    if (rel <= 22 && rel > -26 && Math.abs(pu.x - G.px) < .3 + squadHalf() * .45 + .04 * G.cls.tech && !G.over) { pu.got = true; if (pu.k === 'guard') activateGuard(); else if (ITEMS[pu.k]) takeItem(pu.k); else activateBuff(pu.k); }
+    if (rel <= 22 && rel > -26 && Math.abs(pu.x - G.px) < .3 + squadHalf() * .45 + .04 * G.cls.tech && !G.over) { pu.got = true; if (pu.k === 'guard') activateGuard(); else if (pu.k === 'nanite') takeNanite(); else if (ITEMS[pu.k]) takeItem(pu.k); else activateBuff(pu.k); }
     if (rel < -30) pu.got = true;
   }
   G.pups = G.pups.filter(pu => !pu.got);
@@ -1183,12 +1235,12 @@ function update(dt) {
   }
   const ADV = G.adv || 0;
   // scrap chunks: the squad vacuums them up as it runs past
-  const tw = .04 * G.cls.tech;
+  const tw = .04 * G.cls.tech, fp = formK().pick;
   for (const c of G.scr) {
     const rel = c.wz - G.dist - ADV, dx = G.px - c.x;
     if (rel < 140 && Math.abs(dx) < (G.sweep ? 1.4 : .5 + tw)) {   // during the victory march the whole lane's scrap is pulled in
       c.x += clamp(dx, -1, 1) * dt * 1.4; c.wz -= 60 * dt; }
-    if (rel <= 25 && rel > -20 && Math.abs(c.x - G.px) < (G.sweep ? 1.4 : .28 + squadHalf() * .3 + tw) && (!G.over || G.won)) {
+    if (rel <= 25 && rel > -20 && Math.abs(c.x - G.px) < (G.sweep ? 1.4 : (.28 + squadHalf() * .3 + tw) * fp) && (!G.over || G.won)) {
       c.got = true; G.scrap += Math.round(c.v); sfx.clink(); const q = squadPos();
       addText(q.x + rnd(-14, 14), q.y - 60, '+' + Math.round(c.v), '#ffd24a'); addParts(q.x + dx * LANE * .2, q.y - 20, 4, '#ffd24a', 120, .3);
       if (G.cls.medic > 0 && G.guard && !G.guard.dead && G.guard.hp < G.guard.max && Math.random() < Math.min(.5, .12 * G.cls.medic)) { G.guard.hp = Math.min(G.guard.max, G.guard.hp + 2); const gq = P(G.gx, GZ); addText(gq.x, gq.y - 100 * gq.s, '+REPAIR', '#6ff3ff'); }
@@ -1412,7 +1464,8 @@ cv.addEventListener('pointerdown', e => {
   const r = cv.getBoundingClientRect();
   const mx = (e.clientX - r.left) / r.width * W, my = (e.clientY - r.top) / r.height * H;
   if (Math.hypot(mx - (W - 26), my - 26) < 24) { setPause(!G.paused); return; }
-  if (!G.paused && Math.hypot(mx - (W - 56), my - (H - 70)) < 38) { useItem(); return; }   // the item slot is a button
+  if (!G.paused && Math.hypot(mx - (W - 56), my - (H - 70)) < 38) { useItem(); return; }
+  if (!G.paused && Math.hypot(mx - (W - 118), my - (H - 52)) < 26) { cycleForm(); return; }   // formation button   // the item slot is a button
   { const n = performance.now(), L = G.lastTap; if (L && n - L.t < 330 && Math.hypot(mx - L.x, my - L.y) < 60) { G.lastTap = null; useItem(); return; } G.lastTap = { t: n, x: mx, y: my }; }   // a quick second tap or click anywhere = EMP
   try { cv.setPointerCapture(e.pointerId); } catch (x) {}
   setTarget(e);
@@ -1420,6 +1473,7 @@ cv.addEventListener('pointerdown', e => {
 window.addEventListener('keydown', e => {
   keys[e.key] = true;
   if (e.key === ' ' || e.key === 'e' || e.key === 'E') { useItem(); e.preventDefault(); }
+  if (e.key === 'f' || e.key === 'F') cycleForm();
   if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') { if (G) setPause(!G.paused); }
 });
 window.addEventListener('keyup', e => { keys[e.key] = false; });
@@ -1812,6 +1866,7 @@ function drawEnemy(e) {
     if (V.beam) lightBeams(e, q, rel, ss, V.beam[0], V.beam[1], V.beam[2], V.beam[3]);
     if (e.t === 'gunship') { const ls = e.vl; if (ls) for (const l of ls) { const lx = l[0] * (e.vf || 1), d = lx < 0 ? -1 : 1, gp = P(e.x + d * .1, rel - 110); drawBeam(q.x + lx * ss, q.y - (l[1] + lift) * ss, gp.x, gp.y, 20 * gp.s + 6, .24); } }
   }
+  if (G.snTg === e && !e.dead) { const ry = q.y - (HITH[e.t] || 40) * ss * 1.1, rr = 13 * ss + 5, pl = .6 + .4 * Math.sin(G.t * 9); cx.strokeStyle = `rgba(255,140,200,${.5 + .4 * pl})`; cx.lineWidth = Math.max(1.2, 1.6 * s); cx.beginPath(); cx.arc(q.x, ry, rr, 0, 7); cx.moveTo(q.x - rr * 1.4, ry); cx.lineTo(q.x - rr * .5, ry); cx.moveTo(q.x + rr * .5, ry); cx.lineTo(q.x + rr * 1.4, ry); cx.moveTo(q.x, ry - rr * 1.4); cx.lineTo(q.x, ry - rr * .5); cx.moveTo(q.x, ry + rr * .5); cx.lineTo(q.x, ry + rr * 1.4); cx.stroke(); }
   if (e.stun > 0) drawStun(e, q, ss, sh);
   e.sh0 = sh || { heavy: 150, tank: 100, gunship: 160, harvester: 200, ogre: 165 }[e.t] || 120;
   if (e.boss || ET[e.t].block || ET[e.t].fly || ET[e.t].tracked) drawDamageFX(e, q, ss, sh);   // every big machine, flyers included, smoulders then burns as it is shot up
@@ -2013,15 +2068,16 @@ function drawHaz(h) {
 
 function drawPowerup(pu) {
   const rel = pu.wz - G.dist, q = P(pu.x, rel), s = q.s * 1.5, bob = Math.sin(G.t * 3 + pu.x * 4) * 2 * s;
-  cx.save(); cx.globalCompositeOperation = 'lighter'; cx.fillStyle = pu.k === 'rapid' ? 'rgba(255,170,60,.16)' : pu.k === 'shield' ? 'rgba(120,200,255,.16)' : ITEMS[pu.k] ? 'rgba(255,255,255,.14)' : 'rgba(110,230,255,.16)'; cx.fillRect(q.x - 6 * s, 0, 12 * s, q.y); cx.fillStyle = pu.k === 'rapid' ? 'rgba(255,220,160,.22)' : 'rgba(190,245,255,.22)'; cx.fillRect(q.x - 2.4 * s, 0, 4.8 * s, q.y); cx.restore();   // beacon
+  cx.save(); cx.globalCompositeOperation = 'lighter'; cx.fillStyle = pu.k === 'rapid' ? 'rgba(255,170,60,.16)' : pu.k === 'shield' ? 'rgba(120,200,255,.16)' : ITEMS[pu.k] ? 'rgba(255,255,255,.14)' : pu.k === 'nanite' ? 'rgba(110,255,180,.2)' : 'rgba(110,230,255,.16)'; cx.fillRect(q.x - 6 * s, 0, 12 * s, q.y); cx.fillStyle = pu.k === 'rapid' ? 'rgba(255,220,160,.22)' : 'rgba(190,245,255,.22)'; cx.fillRect(q.x - 2.4 * s, 0, 4.8 * s, q.y); cx.restore();   // beacon
   cx.fillStyle = 'rgba(0,0,0,.35)'; cx.beginPath(); cx.ellipse(q.x, q.y, 16 * s, 4 * s, 0, 0, 7); cx.fill();
   cx.save(); cx.translate(q.x, q.y - 14 * s + bob); cx.scale(s, s);
-  const bc = pu.k === 'rapid' ? '#ffb03a' : pu.k === 'shield' ? '#8fd0ff' : ITEMS[pu.k] ? ITEMS[pu.k].col : '#6ff3ff';
+  const bc = pu.k === 'rapid' ? '#ffb03a' : pu.k === 'shield' ? '#8fd0ff' : ITEMS[pu.k] ? ITEMS[pu.k].col : pu.k === 'nanite' ? '#6dffb5' : '#6ff3ff';
   cx.fillStyle = '#0b1218'; cx.fillRect(-13, -14, 26, 24); cx.fillStyle = '#2a3a4a'; cx.fillRect(-12, -13, 24, 22); cx.fillStyle = '#4a6a86'; cx.fillRect(-12, -13, 24, 3);
   cx.strokeStyle = bc; cx.lineWidth = 1.4; cx.strokeRect(-12, -13, 24, 22);
   cx.fillStyle = bc; cx.fillRect(-12, -4, 24, 1.4); cx.fillRect(-12, 3, 24, 1.4);
   if (pu.k === 'rapid') { cx.fillStyle = '#0b1218'; cx.fillRect(-7, -12, 14, 18); cx.fillStyle = bc; cx.beginPath(); cx.moveTo(2, -11); cx.lineTo(-5, 0); cx.lineTo(0, 0); cx.lineTo(-2, 8); cx.lineTo(6, -3); cx.lineTo(1, -3); cx.closePath(); cx.fill(); }   // lightning bolt
   else if (pu.k === 'shield') { cx.fillStyle = '#0b1218'; cx.fillRect(-7, -12, 14, 18); cx.fillStyle = bc; cx.beginPath(); cx.moveTo(0, -11); cx.lineTo(6, -8); cx.lineTo(5, 0); cx.lineTo(0, 6); cx.lineTo(-5, 0); cx.lineTo(-6, -8); cx.closePath(); cx.fill(); cx.fillStyle = '#0b1218'; cx.fillRect(-1, -7, 2, 9); }   // shield
+  else if (pu.k === 'nanite') { cx.fillStyle = '#0b1218'; cx.fillRect(-9, -12, 18, 18); cx.fillStyle = bc; cx.fillRect(-2, -10, 4, 14); cx.fillRect(-7, -5, 14, 4); }
   else if (ITEMS[pu.k]) { cx.fillStyle = '#0b1218'; cx.fillRect(-9, -12, 18, 18); cx.fillStyle = bc; cx.font = '9px ' + FONT; cx.textAlign = 'center'; cx.fillText(ITEMS[pu.k].g, 0, -1); }
   else { cx.fillStyle = '#0b1218'; cx.beginPath(); cx.arc(0, -3, 6, 0, 7); cx.fill(); cx.fillStyle = '#c8d6e4'; cx.beginPath(); cx.arc(0, -4, 4.6, Math.PI, 0); cx.lineTo(3.4, 0); cx.lineTo(-3.4, 0); cx.fill();   // skull icon
     cx.fillStyle = '#4dffd0'; cx.fillRect(-3, -4.6, 2, 1.6); cx.fillRect(1, -4.6, 2, 1.6); }
@@ -2130,6 +2186,7 @@ function drawScrapChunk(c) {
 function drawRocket(r) {
   if (r.delay > 0) return;
   const rel = r.wz - G.dist, q = P(r.x, rel), s = q.s * 2;
+  if (r.gren) { const h = 30 + Math.sin(clamp(rel / 600, 0, 1) * Math.PI) * 26; cx.fillStyle = '#4a5330'; cx.beginPath(); cx.arc(q.x, q.y - h * q.s, 3.2 * q.s * 1.6 + 1, 0, 7); cx.fill(); cx.fillStyle = '#c9d94a'; cx.fillRect(q.x - 1, q.y - h * q.s - 1, 2, 2); return; }
   cx.save(); cx.translate(q.x, q.y - 32 * q.s);
   cx.fillStyle = 'rgba(255,170,60,.85)'; cx.beginPath(); cx.moveTo(-2.4 * s, 4 * s); cx.lineTo(0, 14 * s + rnd(0, 3 * s)); cx.lineTo(2.4 * s, 4 * s); cx.fill();
   cx.fillStyle = '#ffe9a0'; cx.beginPath(); cx.moveTo(-1.2 * s, 4 * s); cx.lineTo(0, 9 * s); cx.lineTo(1.2 * s, 4 * s); cx.fill();
@@ -2366,7 +2423,7 @@ function render() {
   } });
   const shown = Math.min(G.n, 40);
   if (!G.over || G.won) for (let i = 0; i < shown; i++) {
-    const r = Math.sqrt(i + .5), th = i * 2.39996, ox = r * Math.cos(th) * .052, oz = r * Math.sin(th) * 4.6;
+    const { ox, oz } = slotOf(i, shown);
     const ci = shown - 1 - i, cl = clAt(ci);
     items.push({ z: oz + (G.adv || 0), f: () => {   // the Meshy soldiers (rifle3 rifleman, rifle2 cap, rifle1 goggles, rifle0 bandana, rifle4 radio; all views + run cycle) are used for now; class soldiers reuse them
       const q = P(G.px + ox, oz + (G.adv || 0)), nm = cl && sprReady(CLASS[cl].spr) ? CLASS[cl].spr : 'resistance_rifleman', fc = ox < -.02 ? -1 : 1;
@@ -2446,6 +2503,11 @@ function drawHUD() {
   // specialist squad members
   cx.textAlign = 'left'; cx.font = `11px ${FONT}`; let cxp = 14;
   for (const k of CLS) { if (!G.cls[k]) continue; const t = CLASS[k].name + ' x' + G.cls[k]; cx.fillStyle = CLASS[k].col; cx.fillText(t, cxp, H - 40); cxp += cx.measureText(t).width + 10; }
+  // formation button
+  { const fx = W - 118, fy = H - 52; cx.fillStyle = 'rgba(0,0,0,.55)'; cx.beginPath(); cx.arc(fx, fy, 24, 0, 7); cx.fill(); cx.strokeStyle = '#8fb4d8'; cx.lineWidth = 2; cx.beginPath(); cx.arc(fx, fy, 21, 0, 7); cx.stroke();
+    cx.fillStyle = '#cfe8ff'; const f = G.form || 'free', dot = (x, y) => cx.fillRect(fx + x - 2, fy + y - 2, 4, 4);
+    if (f === 'free') { dot(-6, -4); dot(5, -6); dot(0, 0); dot(-5, 6); dot(6, 4); } else if (f === 'v') { dot(0, -8); dot(-5, -1); dot(5, -1); dot(-10, 6); dot(10, 6); } else if (f === 'col') { for (let i = 0; i < 4; i++) { dot(-3, -9 + i * 6); dot(3, -9 + i * 6); } } else { for (let i = 0; i < 5; i++) { dot(-12 + i * 6, -3); dot(-12 + i * 6, 5); } }
+    cx.textAlign = 'center'; cx.font = `8px ${FONT}`; cx.fillStyle = '#7fa0c0'; cx.fillText(FORMS[f].name, fx, fy + 36); }
   // tactical item slot
   { const ex = W - 56, ey = H - 70, it = G.item, d = it && ITEMS[it.k], col = d ? d.col : '#3a6b8a';
     cx.fillStyle = 'rgba(0,0,0,.55)'; cx.beginPath(); cx.arc(ex, ey, 34, 0, 7); cx.fill();

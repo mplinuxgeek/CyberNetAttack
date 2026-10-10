@@ -25,12 +25,12 @@
 - [ ] **T-400 Maintenance Endo**: Weak, rusty maintenance droids spawned in industrial sectors that carry explosive fuel cells.
 
 ## Phase 4: Squad Classes & Tactical Synergies
-- [ ] **Heavy Gunner / Grenadier Class**: Fires 40mm anti-armor grenade rounds that pop incoming Endoskeletons into crawlers.
-- [ ] **Tech-Com Hacker Class**: Passively corrupts machine targeting systems, causing 15% of enemy plasma bolts to miss.
-- [ ] **Field Medic / Combat Surgeon**: Drops automated nanite repair kits when squad health drops below 30%.
-- [ ] **Resistance Sniper / Scout**: Equipped with thermal scopes to target structural weak points on bosses for 2.5x critical damage.
-- [ ] **Demolitions Specialist**: Passively increases all splash damage and C4/Mini-Nuke blast radius by +35%.
-- [ ] **Squad Formation Formations**: Add toggleable tactical formations (V-Shape, Tight Column, Wide Wall) to alter hitboxes and firing spreads on the fly.
+- [x] **Heavy Gunner / Grenadier Class**: Fires 40mm anti-armor grenade rounds that pop incoming Endoskeletons into crawlers.
+- [x] **Tech-Com Hacker Class**: Passively corrupts machine targeting systems, causing 15% of enemy plasma bolts to miss.
+- [x] **Field Medic / Combat Surgeon**: Drops automated nanite repair kits when squad health drops below 30%.
+- [x] **Resistance Sniper / Scout**: Equipped with thermal scopes to target structural weak points on bosses for 2.5x critical damage.
+- [x] **Demolitions Specialist**: Passively increases all splash damage and C4/Mini-Nuke blast radius by +35%.
+- [x] **Squad Formation Formations**: Add toggleable tactical formations (V-Shape, Tight Column, Wide Wall) to alter hitboxes and firing spreads on the fly.
 
 ## Phase 5: Gameplay & Quality-of-Life Enhancements
 - [ ] **Dynamic Dismemberment System**: Blowing off Endoskeleton arms reduces their weapon output, while leg damage forces them into crawling stances.
