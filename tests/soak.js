@@ -15,7 +15,7 @@ let seed=+process.argv[3]||777; const R=()=>{ seed=(seed*1664525+1013904223)>>>0
 Math.random=R;
 const bad=[]; const report=(m)=>{ if(bad.length<25) bad.push(m); };
 const stats={runs:0,won:0,lost:0,timeout:0,maxBul:0,maxEn:0,maxParts:0};
-const fin=x=>Number.isFinite(x);
+const fin=x=>Number.isFinite(x); let stuck=0; const ET0={};
 for(let run=0;run<+(process.argv[4]||40);run++){
   const lv=1+Math.floor(R()*12); t.save.unlocked={heavy:1,tech:1,medic:1,shot:1,mark:1,officer:1,signal:1};
   t.save.loadout=t.CLS.filter(()=>R()<.45).slice(0,3); t.save.up={squad:Math.floor(R()*16),dmg:Math.floor(R()*21),rate:Math.floor(R()*21),weapon:Math.floor(R()*5),emp:Math.floor(R()*11),guard:Math.floor(R()*11)};
@@ -30,6 +30,7 @@ for(let run=0;run<+(process.argv[4]||40);run++){
       if(R()<.0015&&!G.over&&G.pups.length) t.activateGuard();
       t.update(1/60); if(i%4===0) t.render();
       // invariants
+      if(G.spd<2&&!G.over&&G.en.every(e=>e.dead||e.wz-G.dist>600||ET0[e.t]&&0)){ stuck=(stuck||0)+1; if(stuck===300) report(`run ${run} lv${lv} STUCK at dist ${G.dist.toFixed(0)} px ${G.px.toFixed(2)} slow ${G.slow} obs ${G.obs.filter(o=>Math.abs(o.wz-G.dist)<150).map(o=>o.k+'@'+Math.round(o.wz-G.dist)+'x'+o.x.toFixed(2)).join(',')} gates ${G.gates.filter(g=>!g.used).slice(0,1).map(g=>Math.round(g.wz-G.dist))}`); } else stuck=0;
       if(!fin(G.n)||G.n<0||G.n>999) report(`run ${run} lv${lv} n=${G.n}`);
       if(!fin(G.px)||!fin(G.dist)||!fin(G.spd)||!fin(G.ts)) report(`run ${run} nonfinite px/dist/spd/ts ${G.px} ${G.dist} ${G.spd} ${G.ts}`);
       if(G.cls){ let tot=0; for(const k of t.CLS){ if(G.cls[k]<0||!fin(G.cls[k])) report(`run ${run} cls ${k}=${G.cls[k]}`); tot+=G.cls[k]; } if(tot>G.n+1e-9) report(`run ${run} cls total ${tot} > n ${G.n}`); }

@@ -715,7 +715,7 @@ function obsStep(dt) {
     }
     if (k === 'slab' && o.fall < 1) o.fall = Math.min(1, o.fall + dt * 4);
   }
-  G.obs = G.obs.filter(o => !o.dead && o.wz - G.dist > -200);
+  G.obs = G.obs.filter(o => !o.dead && o.wz - G.dist > -120);
 }
 function drawEmpWave(w) { // the ring on the ground, in perspective, with a faint trailing echo
   const r = waveSpeed(w) * w.t, fade = clamp(1 - r / (w.range + 80), 0, 1), nk = w.kind === 'nuke';
@@ -2337,7 +2337,7 @@ function render() {
   for (const g of G.gates) { const z = g.wz - G.dist; if (!g.used && z < 1500 && z > -30) items.push({ z, f: () => drawGate(g) }); }
   for (const e of G.en) { const z = e.wz - G.dist; if (z < 1500 && z > -120 && !e.dead) items.push({ z, f: () => drawEnemy(e) }); }
   for (const Dh of G.deaths) items.push({ z: Dh.e.wz - G.dist, f: () => drawBossDeath(Dh) });
-  for (const o of G.obs) { const z = o.wz - G.dist; if (z < 1500 && z > -260) items.push({ z: o.k === 'overpass' ? z + 40 : z, f: () => drawObs(o) }); }
+  for (const o of G.obs) { const z = o.wz - G.dist; if (z < 1500 && z > -90) items.push({ z: o.k === 'overpass' ? z + 40 : z, f: () => drawObs(o) }); }   // (behind the squad the projection flips sign: never draw there) }
   for (const w of G.waves) items.push({ z: 1e6, f: () => drawEmpWave(w) });
   if (G.beam) items.push({ z: 1e6, f: () => drawBeam(G.beam) });
   for (const f of G.fallout) { const z = f.wz - G.dist; if (z < 1500 && z > -100) items.push({ z: z + 1, f: () => drawFallout(f) }); }
@@ -2485,6 +2485,9 @@ function drawHUD() {
 // ---------------------------------------------------------------- loop
 let acc = 0;
 function frame(ts) {
+  try { frame0(ts); } catch (err) { console.error(err); last = ts; acc = 0; requestAnimationFrame(frame); }   // one bad frame must never freeze the game
+}
+function frame0(ts) {
   const dt = Math.min(.1, (ts - last) / 1000 || 0); last = ts; T += dt;
   if (state === 'play' && G && !G.paused) { // fixed 60 Hz simulation: game speed no longer depends on the display's frame rate (a 30 fps phone plays at the same pace, just choppier)
     acc += dt; let n = 0; while (acc >= 1 / 60 && n < 6) { update(1 / 60); acc -= 1 / 60; n++; } if (n === 6) acc = 0;

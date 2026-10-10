@@ -1,6 +1,6 @@
 const fs=require('fs');
 const noop=()=>{};
-const ctx=new Proxy({}, {get:(t,k)=>(k==='createLinearGradient'||k==='createRadialGradient')?()=>({addColorStop:noop}):k==='getImageData'?()=>({data:new Uint8ClampedArray(336*560*4)}):(k==='measureText'?()=>({width:20}):(k in t?t[k]:noop)), set:(t,k,v)=>{t[k]=v;return true}});
+const ctx=new Proxy({}, {get:(t,k)=>(k==='createLinearGradient'||k==='createRadialGradient')?()=>({addColorStop:noop}):k==='getImageData'?()=>({data:new Uint8ClampedArray(336*560*4)}):(k==='measureText'?()=>({width:20}):(k==='ellipse'?(...a)=>{ if(a[2]<0||a[3]<0) throw new Error('negative ellipse radius'); }:k==='arc'?(...a)=>{ if(a[2]<0) throw new Error('negative arc radius'); }:(k in t?t[k]:noop))), set:(t,k,v)=>{t[k]=v;return true}});
 const el=()=>({getContext:()=>ctx,addEventListener:noop,style:{},set innerHTML(v){},getBoundingClientRect:()=>({left:0,top:0,width:480,height:800}),setPointerCapture:noop});
 global.document={getElementById:el,addEventListener:noop,hidden:false,querySelectorAll:()=>[]};
 global.window={addEventListener:noop};
@@ -277,4 +277,7 @@ const arena=(lv,...en)=>{ const G=fresh(lv,[]); G.n=40; G.gates=[]; G.en=[]; G.p
 { const ov=()=>({k:'overpass',x:0,hw:1.1,wz:0,len:60,hp:1e9,dead:false,st:0,t:0,open:0}); const tk=t.mk('tank',1,-.6,1); const G=arena(4,tk); const o=ov(); o.wz=G.dist+400; G.obs=[o]; tk.wz=G.dist+400; tk.x=-.6; tk.hp=tk.max=1000; G.en.push(tk); tk.active=true; G.px=.6; G.tx=.6; G.n=40;
   run(G,.5); check('an overpass stands until something sets it off', o.st===0 && G.obs.length===1); const open=1; o.open=2;
   const arty=t.G; G.item={k:'flare',n:1}; for(const e of G.en) e.wz=G.dist+400; t.useItem(); let st1=false, slabs=0; for(let i=0;i<60*8;i++){ G.n=40; G.fcd=1e9; t.update(1/60); if(o.st===1) st1=true; slabs=Math.max(slabs,G.obs.filter(q=>q.k==='slab').length); } check('shelling an overpass starts a warned collapse', st1 && o.st===2); check('it drops slabs across exactly two of three lanes', slabs===2, slabs); }
+// rendering must survive anything behind the squad (the perspective flips sign there: a negative radius throws in a real canvas)
+{ const G=arena(4); G.obs=[]; for(const k of ['jersey','rubble','trap','cable','overpass','slab']) G.obs.push({k,x:0,hw:.3,wz:G.dist-200,len:40,hp:100,dead:false,st:k==='overpass'?1:0,t:1,open:1,fall:1,sd:1}); G.fallout.push({x:0,wz:G.dist-200,r:.3,t:5,t0:10,sd:1}); G.flares.push({x:0,wz:G.dist-200,life:3,t0:3});
+  let err=null; try{ t.render(); }catch(e){ err=e.message; } check('obstacles far behind the squad do not break rendering', err===null, err); }
 console.log(pass+' passed, '+fail+' failed');
