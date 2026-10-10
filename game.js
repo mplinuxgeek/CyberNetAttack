@@ -276,7 +276,8 @@ const sfx = {   // gritty, low and heavy: filtered noise and saturated low tones
   emp() { tn(0, 70, 1400, .35, 'sawtooth', .16); nz(.28, .7, { f0: 2200, f1: 120, q: .6, g: .6 }); tn(.28, 70, 22, .7, 'sawtooth', .5); tn(.28, 48, 20, .8, 'sine', .8); },   // charge up then a deep concussive burst
   cannon() { tn(0, 1400, 70, .5, 'sawtooth', .3); nz(0, .6, { f0: 3500, f1: 250, q: .7, g: .55 }); tn(.05, 60, 30, .8, 'sine', .8); tn(0, 200, 900, .25, 'square', .1); },   // a heavy plasma discharge
   thump() { tn(0, 190, 60, .14, 'square', .3); nz(0, .07, { type: 'lowpass', f0: 900, f1: 200, g: .35 }); },   // a 40mm launcher
-  squelch() { nz(0, .09, { f0: 2400, f1: 1200, q: .8, g: .18 }); },   // radio key-up before a bark
+  squelch() { nz(0, .014, { f0: 3500, q: 3, g: .4 }); nz(.02, .11, { f0: 2400, f1: 1300, q: .6, g: .3 }); },   // radio key-up: a click and a burst of hiss
+  squelchEnd() { nz(0, .016, { f0: 2800, q: 3, g: .38 }); nz(.03, .05, { f0: 1800, q: .7, g: .2 }); },   // key-down click
   geiger() { if (ok('gg', 70)) nz(0, .012, { f0: 3200, q: 3, g: .16 }); },
   arc() { nz(0, .2, { f0: 3200, f1: 700, q: 2, g: .4 }); tn(0, 1900, 160, .14, 'square', .14); },   // live cable discharge
   ping() { if (ok('png', 60)) { tn(0, rnd(300, 480), 220, .16, 'square', .12); nz(0, .03, { f0: 1600, q: 1.5, g: .2 }); } },   // a clang on the reprogrammed unit
@@ -486,7 +487,24 @@ function bark(key, txt, gap) {
   const n = (typeof performance !== 'undefined' ? performance.now() : Date.now());
   if (n - (BK.last || -1e9) < 3200 || n - (BK[key] === undefined ? -1e9 : BK[key]) < (gap || 14000)) return;
   BK.last = n; BK[key] = n;
-  try { const u = new SpeechSynthesisUtterance(txt); u.rate = 1.12; u.pitch = .7; u.volume = clamp((save.vol === undefined ? 1 : save.vol) * .9, 0, 1); sfx.squelch(); speechSynthesis.speak(u); } catch (e) {}
+  try {   // frantic, a little shouted, over a bed of radio static: key-up click, hiss and crackle while the voice runs, key-down click after
+    const say = txt + (Math.random() < .35 && /!/.test(txt) ? ' ' + txt.split('!')[0] + '!' : '');
+    const u = new SpeechSynthesisUtterance(say); u.rate = 1.32 + Math.random() * .2; u.pitch = .8 + Math.random() * .3; u.volume = clamp(save.vol === undefined ? 1 : save.vol, 0, 1);
+    let on = false; const start = () => { if (!on) { on = true; radioBed(true); } }, stop = () => { if (on) { on = false; radioBed(false); } };
+    u.onstart = start; u.onend = stop; u.onerror = stop;
+    sfx.squelch(); setTimeout(start, 120); setTimeout(stop, 700 + say.length * 85);   // (timers are the fallback where start / end events never arrive)
+    speechSynthesis.speak(u);
+  } catch (e) {}
+}
+let BED = null;
+function radioBed(on) { // white-noise hiss with random crackle under a radio voice
+  const a = audio(); if (!a) return;
+  if (!on) { if (BED) { try { BED.g.gain.setTargetAtTime(.0001, a.currentTime, .03); BED.s.stop(a.currentTime + .2); } catch (e) {} clearInterval(BED.t); BED = null; sfx.squelchEnd(); } return; }
+  if (BED) return;
+  const s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
+  s.buffer = NB; s.loop = true; f.type = 'bandpass'; f.frequency.value = 2100; f.Q.value = .6; g.gain.value = .075 * clamp(save.vol === undefined ? 1 : save.vol, 0, 1) * 1.5;
+  s.connect(f); f.connect(g); g.connect(OUT); s.start();
+  BED = { s, g, t: setInterval(() => { if (Math.random() < .6) nz(0, .012 + Math.random() * .02, { f0: 1500 + Math.random() * 3000, q: 2, g: .22 }); }, 90) };
 }
 function activateBuff(k) {
   const q = squadPos(), B = BUFF[k];
