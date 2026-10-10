@@ -66,7 +66,7 @@ const ET = {
   gunner:   { hp: 30,  spd: 17,  hw: .09, scrap: 9,   emp: 6,  chase: .1, hold: 300, shoot: 2.2, dmg: 1, name: 'T-800 Infiltrator' },
   aerostat: { hp: 220, armor: .05, weave: .55, spd: 40,  hw: .09, scrap: 45,  emp: 15, chase: .06, hold: 270, shoot: 2.1, dmg: 1, fly: 1, name: 'Aerostat' },
   gunship:  { hp: 1000, armor: .25, weave: .3, spd: 30,  hw: .48,  scrap: 150,  emp: 30, chase: .05, hold: 320, shoot: 2.1, dmg: 1, volley: 3, fly: 1, name: 'HK-Aerial' },
-  behemoth: { tracked: 1, mg: 1, hp: 900,  spd: 16, hw: .2,  scrap: 120, emp: 45, chase: .06, weave: .3, hold: 170, shoot: 2.7, dmg: 1, block: 1, burst: 1, armor: .35, name: 'T-1' },
+  behemoth: { tracked: 1, mg: 1, hp: 500,  spd: 16, hw: .2,  scrap: 120, emp: 45, chase: .06, weave: .3, hold: 170, shoot: 2.7, dmg: 1, block: 1, burst: 1, armor: .05, soft: .7, name: 'T-1' },   // an early pre-war machine: a thin-skinned tracked minigun carrier, nothing like the later HK armour
   harvester:{ plate: .35, hp: 700, spd: 14, hw: .16, scrap: 400, emp: 0,  chase: .06, weave: .3, hold: 270, shoot: 3.0, dmg: 2, block: 1, armor: .2, grab: 1, name: 'Harvester' },
   heavy:    { hp: 650, armor: .25, plate: .5, spd: 18,  hw: .2,  scrap: 70,  emp: 25, chase: .1, weave: .35, hold: 110, shoot: 2.6, dmg: 2, block: 1, name: 'T-47' },
   tank:     { tracked: 1, hp: 1800, spd: 15, hw: .26, scrap: 240, emp: 50, chase: .05, weave: .3, hold: 190, shoot: 2.2, dmg: 2, block: 1, volley: 4, armor: .3, name: 'HK-Tank' },
@@ -1247,7 +1247,7 @@ function update(dt) {
       if (e.boss) { // boss health is sized from your actual damage output: the fight lasts ~25s + 3s per sector whatever your power level
         const base = e.hp; e.base0 = base;   // total (health + plating) takes roughly T seconds of accurate fire
         const fr = e.max > 0 ? clamp(e.hp / e.max, 0, 1) : 1; e.hp = e.max = bossSize(e, d, base); e.hp *= fr;   // keep whatever damage it already has
-      } else { const k = clamp(Math.pow(squadDps() / 150, .7), .4, 6); e.hp *= k; e.max *= k; }
+      } else { const k = clamp(Math.pow(squadDps() / 150, .7), .4, 6) * (d.soft || 1); e.hp *= k; e.max *= k; }
       if (e.boss) e.str = clamp(1 + G.n / 160, 1, 1.8);   // and hit harder / fire faster / call more reinforcements against a big squad
       if (d.plate) { const pf = e.plateMax ? e.plate / e.plateMax : 1; e.plateMax = e.max * d.plate; e.plate = e.plateMax * pf; }
       if (e.boss) { bark('boss', 'Boss contact! Hit it with everything!', 60000); G.warn = { t: 2.6, name: e.name || d.name || 'BOSS' }; G.shake = Math.max(G.shake, 14); G.flash = Math.max(G.flash, .35); sfx.siren(); }
