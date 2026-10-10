@@ -33,16 +33,16 @@
 - [x] **Squad Formation Formations**: Add toggleable tactical formations (V-Shape, Tight Column, Wide Wall) to alter hitboxes and firing spreads on the fly.
 
 ## Phase 5: Gameplay & Quality-of-Life Enhancements
-- [ ] **Dynamic Dismemberment System**: Blowing off Endoskeleton arms reduces their weapon output, while leg damage forces them into crawling stances.
-- [ ] **Laser Target Designators**: Show visible red/cyan laser targeting lines from HK-Tanks and Sky Hunters 1.5 seconds before volleys are unleashed.
-- [ ] **Boss Armor Component Destruction**: Bosses (HK-Tank, Harvester, Ogre) feature targetable subsystems (left turret, shoulder launcher, track pods) that can be destroyed individually.
-- [ ] **Sector Environmental Hazards**: Burning plasma storms in Foundry sectors, night-vision dark zones in Metro sectors, and radioactive rain in Salt Flats.
-- [ ] **Customizable Armory Loadout Presets**: Allow saving up to 3 custom squad class & weapon loadout setups for instant deployment.
-- [ ] **Endless Resistance Survival Mode**: A wave-based endless mode with escalating Skynet assault waves and global leaderboards.
-- [ ] **Interactive Audio Chatter**: Voice/radio barks from Resistance squad members ("T-800 incoming!", "Drop the C4!", "Clear the lane!").
-- [ ] **Destructible Cover Objects**: Abandoned Resistance pickup trucks and sandbag bunkers that squad members can hide behind to soak incoming plasma bolts until the cover breaks.
-- [ ] **Gate Sightline & Projectile Occlusion**: Squad bullets, heavy rockets, and enemy plasma bolts are blocked by active gates, preventing shooting across gate barriers; enemies positioned beyond a gate hold their fire until the squad passes through the gate.
-- [ ] **Low-Health Boss Glitch & Degradation**: As bosses take heavy damage (below 50% and 25% HP), dynamically reduce their forward/weave speed and weapon fire rate while introducing erratic glitching/twitching steering and blue electrical arc FX (reusing EMP stun arc particles).
+- [x] **Dynamic Dismemberment System**: Blowing off Endoskeleton arms reduces their weapon output, while leg damage forces them into crawling stances.
+- [x] **Laser Target Designators**: Show visible red/cyan laser targeting lines from HK-Tanks and Sky Hunters 1.5 seconds before volleys are unleashed.
+- [x] **Boss Armor Component Destruction**: Bosses (HK-Tank, Harvester, Ogre) feature targetable subsystems (left turret, shoulder launcher, track pods) that can be destroyed individually.
+- [x] **Sector Environmental Hazards**: Burning plasma storms in Foundry sectors, night-vision dark zones in Metro sectors, and radioactive rain in Salt Flats.
+- [x] **Customizable Armory Loadout Presets**: Allow saving up to 3 custom squad class & weapon loadout setups for instant deployment.
+- [x] **Endless Resistance Survival Mode**: A wave-based endless mode with escalating Skynet assault waves and global leaderboards.
+- [x] **Interactive Audio Chatter**: Voice/radio barks from Resistance squad members ("T-800 incoming!", "Drop the C4!", "Clear the lane!").
+- [x] **Destructible Cover Objects**: Abandoned Resistance pickup trucks and sandbag bunkers that squad members can hide behind to soak incoming plasma bolts until the cover breaks.
+- [x] **Gate Sightline & Projectile Occlusion**: Squad bullets, heavy rockets, and enemy plasma bolts are blocked by active gates, preventing shooting across gate barriers; enemies positioned beyond a gate hold their fire until the squad passes through the gate.
+- [x] **Low-Health Boss Glitch & Degradation**: As bosses take heavy damage (below 50% and 25% HP), dynamically reduce their forward/weave speed and weapon fire rate while introducing erratic glitching/twitching steering and blue electrical arc FX (reusing EMP stun arc particles).
 
 ## Phase 6: Bug Fixes & Engine Optimizations
 - [ ] **Gate Clashing Hitbox Overlap Fix**: Prevent simultaneous gate triggers when squad size spans wider than a single lane width.

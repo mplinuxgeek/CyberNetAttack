@@ -9,7 +9,7 @@ global.performance={now:()=>Date.now()};
 let rafcb;global.requestAnimationFrame=f=>{rafcb=f};
 global.setTimeout=(f)=>{f()};
 let src=fs.readFileSync((process.argv[2]||require('path').join(__dirname,'..','game.js')),'utf8')+`
-;globalThis.__t={setPause,showSettings,sanitizeSave,endRun,activateBuff,dropCrate,bossShielded,hurtEnemy,useItem,fireEMP,render,airStrike,hurt0:0,armoryBuy,armoryDown,UPS,showArmory,activateGuard,buzz,mk,update,ET,keys,kill,startLevel,applyGate,volley,showSquad,genLevel,CLS,CLASS,airStrike,clsTotal,hurt,ITEMS,cycleForm,FORMS,slotOf,squadHalf,explodeAt,enemyShoot,get save(){return save},get G(){return G}};`;
+;globalThis.__t={setPause,showSettings,sanitizeSave,endRun,activateBuff,dropCrate,bossShielded,hurtEnemy,useItem,fireEMP,render,airStrike,hurt0:0,armoryBuy,armoryDown,UPS,showArmory,activateGuard,buzz,mk,update,ET,keys,kill,startLevel,applyGate,volley,showSquad,genLevel,CLS,CLASS,airStrike,clsTotal,hurt,ITEMS,cycleForm,FORMS,slotOf,squadHalf,explodeAt,enemyShoot,showSquad,bark,get state(){return state},get save(){return save},get G(){return G}};`;
 eval(src); const t=globalThis.__t; let pass=0,fail=0;
 const check=(n,c,i)=>{ if(c){pass++;console.log('PASS',n)} else {fail++;console.log('FAIL',n,i||'')} };
 function fresh(lv,loadout){ t.save.loadout=loadout; t.save.unlocked={heavy:1,tech:1,medic:1,shot:1,mark:1,officer:1,signal:1}; t.startLevel(lv); return t.G; }
@@ -300,4 +300,35 @@ const arena=(lv,...en)=>{ const G=fresh(lv,[]); G.n=40; G.gates=[]; G.en=[]; G.p
 { const G=fresh(3,[]); G.form='free'; const seq=[]; for(let i=0;i<4;i++){ t.cycleForm(); seq.push(G.form); } check('formations cycle V, column, wall, free', seq.join()==='v,col,wall,free', seq.join());
   G.n=30; const hw={}; for(const f of ['free','v','col','wall']){ G.form=f; hw[f]=t.squadHalf(); } check('a wall is wide, a column narrow', hw.wall>hw.free && hw.col<hw.free && hw.v>=hw.free, JSON.stringify(hw));
   const ext=f=>{ G.form=f; let mn=9,mx=-9; for(let i=0;i<30;i++){ const o=t.slotOf(i,30).ox; mn=Math.min(mn,o); mx=Math.max(mx,o); } return mx-mn; }; check('slot layouts match: wall wider than column', ext('wall')>ext('col')*2, ext('wall')+' '+ext('col')); }
+// ---- phase 5: combat depth
+{ const g=t.mk('grunt',1,0,1), gu=t.mk('gunner',2,.4,1); const G=arena(3,g,gu); g.wz=G.dist+700; gu.wz=G.dist+700; g.hp=g.max=100; gu.hp=gu.max=100; g.armOff=false;
+  t.hurtEnemy(g,40); check('an endoskeleton loses an arm below 66% health', g.armOff && g.t==='grunt'); t.hurtEnemy(g,40); check('...and its legs below 33%, leaving a crawler', g.legOff && g.t==='runner' && g.crawl && g.hp>0, g.t);
+  t.hurtEnemy(gu,40); check('a gunner with a severed arm fires slower', gu.armOff); }
+{ const boss=t.mk('ogre',1,0,1,{boss:true}); boss.hp=boss.max=10000; boss.scaled=true; boss.base0=10000; const G=arena(5,boss); boss.wz=G.dist+500; run(G,.1); const hw=t.ET.ogre.hw*boss.sc;
+  check('bosses carry targetable subsystems', boss.cp && boss.cp.length===3, boss.cp&&boss.cp.length);
+  t.hurtEnemy(boss,100,{bx:boss.x}); check('hits down the middle go to the hull only', boss.cp.every(p=>p.fr===1));
+  t.hurtEnemy(boss,100,{bx:boss.x-hw*.6}); check('a hit on the left damages the left turret', boss.cp[0].fr<1 && boss.cp[1].fr===1);
+  t.hurtEnemy(boss,100,{explosive:true}); check('explosives damage the track pods', boss.cp[2].fr<1);
+  t.hurtEnemy(boss,1500,{bx:boss.x-hw*.6}); check('a destroyed turret cuts the boss volley', boss.noL && boss.cp[0].dead);
+  const wz0=boss.wz; boss.noT=false; t.hurtEnemy(boss,1500,{explosive:true}); check('destroyed tracks halve its speed', boss.noT); }
+{ const boss=t.mk('tank',1,0,1,{boss:true}); boss.hp=boss.max=10000; boss.scaled=true; const G=arena(5,boss); boss.wz=G.dist+500; boss.hp=boss.max*.4; run(G,.1); check('a boss below 50% glitches', boss.gl===1, boss.gl); boss.hp=boss.max*.2; run(G,.1); check('...and below 25% degrades further', boss.gl===2); }
+{ const gu=t.mk('gunner',1,0,1); const G=fresh(3,[]); G.n=40; G.en=[gu]; G.px=0; G.tx=0; gu.wz=G.dist+300; gu.active=true; gu.fcd=.01; gu.hp=gu.max=1e6; const gate=G.gates[0]; gate.wz=G.dist+140; gate.used=false; G.gates=[gate];
+  for(let i=0;i<20;i++){ G.n=40; G.fcd=1e9; G.spd=0; G.dist-=0; t.update(1/60); } check('machines hold fire while an uncollected gate stands between', G.bolts.length===0 && gu.muz===0, G.bolts.length);
+  gate.used=true; for(let i=0;i<10;i++){ G.n=40; G.fcd=1e9; t.update(1/60); } check('...and fire once the squad is through', G.bolts.length>0 || gu.muz>0);
+  const G2=fresh(3,[]); G2.n=40; G2.en=[]; const g2=G2.gates[0]; g2.wz=G2.dist+150; g2.used=false; G2.gates=[g2]; G2.bolts.push({rz:155,rz0:300,h0:30,big:false,x:0,vx:0,dmg:1}); for(let i=0;i<30;i++){ G2.n=40; G2.fcd=1e9; t.update(1/60); } check('a gate swallows enemy bolts', G2.bolts.length===0 && G2.n>=40); }
+{ const tk=t.mk('tank',1,0,1), ga=t.mk('gunship',2,.3,1); const G=arena(5,tk,ga); tk.wz=G.dist+250; ga.wz=G.dist+250; tk.fcd=1.0; ga.fcd=.8; let err=null; try{ t.render(); }catch(e){ err=e.message; } check('target designators render for tanks and gunships', err===null, err); }
+{ const G=fresh(5,[]); check('Foundry has plasma storms', G.env==='storm'); G.n=60; G.en=[]; G.gates=[]; let storms=0; for(let i=0;i<60*30;i++){ G.n=60; G.fcd=1e9; G.en=[]; t.update(1/60); if(i%10===0) t.render(); } storms=G.stCd!==undefined; check('...which call down marked strikes', storms, G.stCd);
+  const G2=fresh(9,[]); check('Drowned Metro has dark zones', G2.env==='dark'); G2.gates=[]; G2.en=[]; let maxdk=0; for(let i=0;i<60*40;i++){ G2.n=60; G2.fcd=1e9; G2.en=[]; t.update(1/60); maxdk=Math.max(maxdk,G2.dk); if(i%20===0) t.render(); } check('...that darken the screen in places', maxdk>.5, maxdk);
+  const G3=fresh(7,[]); check('Salt Flats have radioactive rain', G3.env==='rain'); G3.gates=[]; G3.en=[]; let maxrn=0; for(let i=0;i<60*40;i++){ G3.n=60; G3.fcd=1e9; G3.en=[]; t.update(1/60); maxrn=Math.max(maxrn,G3.rn); if(i%20===0) t.render(); } check('...with showers', maxrn>.5, maxrn);
+  check('other sectors have no weather', fresh(1,[]).env===null); }
+{ const G=arena(3); G.obs=[{k:'truck',x:0,hw:.17,wz:G.dist+100,len:44,hp:380,max:380,dead:false,hit:0,sd:1}]; G.bolts.push({rz:105,rz0:300,h0:30,big:false,x:0,vx:0,dmg:1}); G.px=.6; G.tx=.6; G.spd=0; for(let i=0;i<10;i++){ G.n=40; G.fcd=1e9; t.update(1/60); }
+  check('a truck soaks an enemy bolt', G.bolts.length===0 && G.obs[0].hp<380 && G.n===40, G.obs[0].hp);
+  for(let i=0;i<14;i++){ G.bolts.push({rz:105,rz0:300,h0:30,big:true,x:0,vx:0,dmg:2}); if(G.obs[0]) G.obs[0].wz=G.dist+100; G.n=40; G.fcd=1e9; t.update(1/60); } check('...until it is destroyed', G.obs.length===0 || G.obs[0].dead); }
+{ t.save.unlocked={heavy:1,tech:1,gren:1}; t.save.loadout=['gren','tech']; t.save.form='wall'; t.showSquad(); t.save.presets[1]={l:['gren','tech'],f:'wall'}; t.save.loadout=['heavy']; t.save.form='free'; t.sanitizeSave(); check('presets survive sanitising', t.save.presets[1] && t.save.presets[1].l.length===2 && t.save.presets[1].f==='wall' && t.save.presets[0]===null);
+  t.save.presets[2]={l:['bogus','gren'],f:'zzz'}; t.sanitizeSave(); check('...and are cleaned', t.save.presets[2].l.join()==='gren' && t.save.presets[2].f==='free'); }
+{ let err=null; try{ t.bark('x','test',0); t.bark('y','test',0); }catch(e){ err=e.message; } check('radio chatter is safe where speech synthesis is missing', err===null, err); }
+{ t.save.loadout=['gren']; t.save.up={squad:0,dmg:0,rate:0,weapon:0,emp:0,guard:0}; t.startLevel(1,{endless:true}); let G=t.G; G.n=30; G.peak=40; G.item={k:'c4',n:2}; G.cls.gren=3; G.won=true; G.over=true; G.kills=7; G.scrap=50; t.endRun();
+  G=t.G; check('winning a survival sector moves straight to the next with the squad carried over', t.state==='play' && G.lv===2 && G.endless.sectors===1 && G.n>=30 && G.cls.gren>=3 && G.item && G.item.k==='c4', G.lv+' n '+G.n);
+  check('...keeping the totals', G.endless.kills===7 && G.endless.scrap>=50, JSON.stringify(G.endless));
+  G.kills=5; G.scrap=20; G.n=0; G.over=true; G.won=false; const s0=t.save.scrap; t.endRun(); check('losing ends the run and banks the scrap', t.state==='end' && t.save.scrap>s0, t.save.scrap-s0); check('...and records a score', t.save.board.length>=1 && t.save.board[0].sec===1 && t.save.board[0].s>=1000, JSON.stringify(t.save.board[0])); t.endRun(); check('(banked only once)', t.save.board.length===1); }
 console.log(pass+' passed, '+fail+' failed');

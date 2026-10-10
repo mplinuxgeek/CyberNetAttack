@@ -87,6 +87,11 @@ function sanitizeSave() { // a hand-edited, corrupted or older save can never br
   save.loadout = (Array.isArray(save.loadout) ? save.loadout : []).filter((k, i, a) => CLASS[k] && save.unlocked[k] && a.indexOf(k) === i).slice(0, MAXPICK);
   for (const k of Object.keys(save.stars)) save.stars[k] = n(save.stars[k], 0, 3, 0);
   save.mute = !!save.mute; save.crt = !!save.crt; save.v = 2; if (!FORMS[save.form]) save.form = 'free';
+  if (!Array.isArray(save.presets)) save.presets = [];
+  save.presets = [0, 1, 2].map(i => { const p = save.presets[i]; if (!p || !Array.isArray(p.l)) return null; return { l: p.l.filter((k, j, a) => CLASS[k] && a.indexOf(k) === j).slice(0, MAXPICK), f: FORMS[p.f] ? p.f : 'free' }; });
+  save.chat = save.chat !== false;
+  save.name = (typeof save.name === 'string' ? save.name : '').replace(/[^A-Za-z0-9 _.\-]/g, '').slice(0, 14).trim() || 'RESISTANCE';
+  save.board = (Array.isArray(save.board) ? save.board : []).filter(b => b && Number.isFinite(+b.s)).map(b => ({ n: String(b.n || 'RESISTANCE').slice(0, 14), s: n(b.s, 0, 1e7, 0), sec: n(b.sec, 0, 500, 0), k: n(b.k, 0, 1e5, 0) })).sort((a, b) => b.s - a.s).slice(0, 10);
 }
 sanitizeSave();
 const clsTotal = () => CLS.reduce((a, k) => a + (G.cls[k] || 0), 0);
@@ -250,6 +255,8 @@ const sfx = {   // gritty, low and heavy: filtered noise and saturated low tones
   emp() { tn(0, 70, 1400, .35, 'sawtooth', .16); nz(.28, .7, { f0: 2200, f1: 120, q: .6, g: .6 }); tn(.28, 70, 22, .7, 'sawtooth', .5); tn(.28, 48, 20, .8, 'sine', .8); },   // charge up then a deep concussive burst
   cannon() { tn(0, 1400, 70, .5, 'sawtooth', .3); nz(0, .6, { f0: 3500, f1: 250, q: .7, g: .55 }); tn(.05, 60, 30, .8, 'sine', .8); tn(0, 200, 900, .25, 'square', .1); },   // a heavy plasma discharge
   thump() { tn(0, 190, 60, .14, 'square', .3); nz(0, .07, { type: 'lowpass', f0: 900, f1: 200, g: .35 }); },   // a 40mm launcher
+  squelch() { nz(0, .09, { f0: 2400, f1: 1200, q: .8, g: .18 }); },   // radio key-up before a bark
+  geiger() { if (ok('gg', 70)) nz(0, .012, { f0: 3200, q: 3, g: .16 }); },
   arc() { nz(0, .2, { f0: 3200, f1: 700, q: 2, g: .4 }); tn(0, 1900, 160, .14, 'square', .14); },   // live cable discharge
   ping() { if (ok('png', 60)) { tn(0, rnd(300, 480), 220, .16, 'square', .12); nz(0, .03, { f0: 1600, q: 1.5, g: .2 }); } },   // a clang on the reprogrammed unit
   mg() { for (let i = 0; i < 3; i++) { nz(i * .055, .045, { f0: 1500, q: .9, g: .45 }); tn(i * .055, 100, 55, .06, 'sawtooth', .25); } },   // enemy minigun burst
@@ -317,7 +324,7 @@ function addHazards(haz, z, lv) {
 // ---- terrain obstacles: concrete barriers, rubble, tank traps, live cables and collapsing overpasses. Every one leaves a way through.
 function addObstacles(obs, gates, en, L, lv) {
   const gap = () => rnd(-.55, .55), side = () => (Math.random() < .5 ? -1 : 1);
-  const pool = ['jersey', 'rubble']; if (lv >= 2) pool.push('trap', 'cable'); if (lv >= 3) pool.push('overpass');
+  const pool = ['jersey', 'rubble']; if (lv >= 2) pool.push('trap', 'cable', 'truck', 'sandbag'); if (lv >= 3) pool.push('overpass');
   let over = 0;
   for (const g of gates) {   // one candidate slot in the stretch behind each gate, clear of every gate approach
     const z = g.wz + rnd(280, 400);
@@ -327,6 +334,8 @@ function addObstacles(obs, gates, en, L, lv) {
       if (k === 'jersey' || k === 'trap') { // a broken line of blocks with one gap
         const g = gap(), hw = k === 'jersey' ? .1 : .085;
         for (let x = -.85; x <= .85; x += hw * 2.2) if (Math.abs(x - g) > .3) obs.push({ k, x, hw, wz: z + rnd(-5, 5), len: k === 'jersey' ? 28 : 24, hp: k === 'jersey' ? 120 : 260, dead: false });
+      } else if (k === 'truck' || k === 'sandbag') {   // abandoned cover: it soaks enemy fire until it breaks
+        const hp = k === 'truck' ? 380 : 240; obs.push({ k, x: rnd(-.65, .65), hw: k === 'truck' ? .17 : .22, wz: z, len: k === 'truck' ? 44 : 30, hp, max: hp, dead: false, hit: 0, sd: Math.random() * 99 });
       } else if (k === 'rubble') {
         obs.push({ k, x: rnd(-.6, .6), hw: rnd(.28, .45), wz: z, len: 90, hp: 80, dead: false, sd: Math.random() * 99 });
       } else if (k === 'cable') {
@@ -391,10 +400,10 @@ function makeCity(minW, maxW, minH, maxH, winP) { // ruined skyline layer: colum
 const CITY = [makeCity(26, 70, 80, 160, .01), makeCity(22, 60, 60, 125, .035), makeCity(18, 52, 40, 95, .07)];
 let decor = [], decorNext = 0, wallNext = 0;
 
-function startLevel(lv) {
+function startLevel(lv, opt) {
   lv = Math.max(1, Math.min(999, Math.floor(lv) || 1));
   const lvl = genLevel(lv);
-  const fails = save.fails[lv] || 0;
+  const fails = opt && opt.endless ? 0 : save.fails[lv] || 0;
   const assist = Math.max(.7, 1 - .1 * fails);
   for (const e of lvl.en) { e.hp *= assist; e.max *= assist; }
   G = {
@@ -404,10 +413,14 @@ function startLevel(lv) {
     fcd: .3, bullets: [], bolts: [], parts: [], texts: [],
     form: save.form, scrap: 0, kills: 0, item: { k: 'pulse', n: 2 }, c4: [], flares: [], fallout: [], beam: null, shake: 0, flash: 0, hurtFlash: 0,
     guard: null, gx: 0, pups: [], pupPlan: lvl.pups.map(p => ({ k: p.k, x: p.x, wz: p.wz, done: false })),
-    cls: Object.fromEntries(CLS.map(k => [k, 0])), sig: 7, scr: [], haz: lvl.haz, obs: lvl.obs, slow: 1, rockets: [], strikes: [], lt: [], warn: null, mz: 0, rcd: 2, peak: 6 + 2 * save.up.squad,
+    cls: Object.fromEntries(CLS.map(k => [k, 0])), sig: 7, scr: [], haz: lvl.haz, obs: lvl.obs, slow: 1, env: ENVS[SECT[(lv - 1) % SECT.length]] || null, dk: 0, rn: 0, storm: 0, rockets: [], strikes: [], lt: [], warn: null, mz: 0, rcd: 2, peak: 6 + 2 * save.up.squad,
     ts: 1, t: 0, later: [], deaths: [], waves: [], alert: null, over: false, won: false, endT: 0, paused: false,
   };
-  for (const k of save.loadout) { if (!CLASS[k] || !save.unlocked[k]) continue; const c0 = classStart(); G.cls[k] = c0; G.n += c0; G.peak += c0; }   // each picked class starts with a few soldiers, on top of the squad
+  for (const k of save.loadout) { if (!CLASS[k] || !save.unlocked[k]) continue; const c0 = classStart(); G.cls[k] = c0; G.n += c0; G.peak += c0; }
+  if (opt && opt.endless) { // survival: the squad, its specialists and its item carry from sector to sector
+    G.endless = { sectors: opt.sectors || 0, kills: opt.kills || 0, scrap: opt.scrap || 0, lost: opt.lost || 0 };
+    if (opt.carry) { const c = opt.carry; G.peak = Math.max(G.peak, c.peak); G.cls = Object.assign(G.cls, c.cls); G.n = Math.min(G.peak, c.n + 2 + Math.ceil(c.peak * .12)); G.item = c.item; G.form = c.form || G.form; trimClasses(); }
+  }   // each picked class starts with a few soldiers, on top of the squad
   decor = []; decorNext = 0; wallNext = 0;
   state = 'play'; ovHide(); musicStop(); ambStart();
   sfx.win();
@@ -428,7 +441,7 @@ function gateBefore(e) { let best = null; for (const g of G.gates) if (!g.used &
 function clAt(ci) { let c = ci; for (const k of CLS) { if (c < G.cls[k]) return k; c -= G.cls[k]; } return null; }   // which class the ci-th special soldier belongs to
 function slotOf(i, shown) { // where the i-th soldier stands: x offset in lane units, z offset in world px
   const f = (G && G.form) || 'free';
-  if (f === 'v') { const r = Math.ceil(i / 2), sd = i % 2 ? 1 : -1; return { ox: i === 0 ? 0 : sd * r * .03, oz: -r * 3.4 + 24 }; }
+  if (f === 'v') { const r = Math.ceil(i / 2), sd = i % 2 ? 1 : -1; return { ox: i === 0 ? 0 : sd * r * .02 + sd * .01, oz: -r * 2.4 + 20 }; }
   if (f === 'col') return { ox: (i % 4 - 1.5) * .03, oz: -Math.floor(i / 4) * 5 + 22 };
   if (f === 'wall') return { ox: (i % 10 - 4.5) * .06, oz: -Math.floor(i / 10) * 5 + 8 };
   const r = Math.sqrt(i + .5); return { ox: r * Math.cos(i * 2.39996) * .052, oz: r * Math.sin(i * 2.39996) * 4.6 };
@@ -438,6 +451,16 @@ function squadHalf() { return (.04 * Math.sqrt(Math.min(G.n, 40)) + .035) * form
 const demoK = () => (G && G.cls.demo > 0 ? 1.35 : 1);   // demolitions: splash damage and blast radius
 
 const BUFF = { rapid: { name: 'OVERDRIVE', col: '#ffb03a', desc: 'fire rate x1.8 for 7 s' }, shield: { name: 'ARMOUR PLATING', col: '#8fd0ff', desc: 'blocks the next 4 hits' } };
+// ---- radio chatter: short spoken barks from the squad (browser speech synthesis), rate-limited, switchable in Settings
+const BK = {};
+const BARKS = { tank: 'HK tank! Take cover!', gunship: 'Hunter killer overhead!', behemoth: 'T-1 on the road!', harvester: 'Harvester! Scatter!', heavy: 'Heavy walker, dead ahead!', aerostat: 'Aerostat, watch the sky!', ogre: 'It is huge! Everything we have!' };
+function bark(key, txt, gap) {
+  if (save.chat === false || save.mute || typeof speechSynthesis === 'undefined' || typeof SpeechSynthesisUtterance === 'undefined') return;
+  const n = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  if (n - (BK.last || -1e9) < 3200 || n - (BK[key] === undefined ? -1e9 : BK[key]) < (gap || 14000)) return;
+  BK.last = n; BK[key] = n;
+  try { const u = new SpeechSynthesisUtterance(txt); u.rate = 1.12; u.pitch = .7; u.volume = clamp((save.vol === undefined ? 1 : save.vol) * .9, 0, 1); sfx.squelch(); speechSynthesis.speak(u); } catch (e) {}
+}
 function activateBuff(k) {
   const q = squadPos(), B = BUFF[k];
   if (k === 'rapid') G.od = 7; else G.shield = 4;
@@ -508,7 +531,7 @@ function addLight(x, y, r, col, life, ground) { if (G.lt.length < 36) G.lt.push(
 function hurt(amt, bx, quiet) {
   if (G.over) return;
   if (G.shield > 0 && !quiet) { G.shield--; const q0 = squadPos(); addText(q0.x, q0.y - 80, 'BLOCKED', '#8fd0ff'); addSparks(q0.x + (bx || 0), q0.y - 40, 8, q0.y, false); sfx.ping(); buzz(25); return; }   // armour plating soaks a hit
-  G.n -= amt; trimClasses(); if (!quiet) buzz(amt >= 3 ? [110, 40, 110] : Math.min(220, 70 + amt * 30)); G.shake = Math.max(G.shake, quiet ? 2 : 6); G.hurtFlash = quiet ? .1 : .25; sfx.hurt();
+  G.n -= amt; trimClasses(); if (amt >= 3) bark('down', 'Man down!', 9000); else if (G.n > 0 && G.n <= G.peak * .25 && G.peak >= 8) bark('low', 'We are being overrun!', 25000); if (!quiet) buzz(amt >= 3 ? [110, 40, 110] : Math.min(220, 70 + amt * 30)); G.shake = Math.max(G.shake, quiet ? 2 : 6); G.hurtFlash = quiet ? .1 : .25; sfx.hurt();
   const q = squadPos();
   addParts(q.x + (bx || 0), q.y - 30, quiet ? 4 : 8, '#ff5a2a', 160, .5);
   addText(q.x, q.y - 80, '-' + amt, '#ff5a5a');
@@ -518,10 +541,41 @@ function hurt(amt, bx, quiet) {
 const bigFoe = e => { const d = ET[e.t]; return !!(d.block || d.fly || d.tracked); };
 const bossShielded = e => !!e.boss && G.en.some(o => !o.dead && !o.boss && o.wz < e.wz && bigFoe(o));   // the boss cannot be hurt while a large machine still stands in front of it
 const armorOf = e => (e.armor !== undefined ? e.armor : (ET[e.t].armor || 0));
+// ---- boss subsystems: shoot the left or right of the hull for the turret / launcher, use explosives for the tracks
+const BPARTS = {
+  tank: [{ k: 'L', name: 'LEFT TURRET' }, { k: 'R', name: 'SHOULDER LAUNCHER' }, { k: 'T', name: 'TRACK PODS' }],
+  ogre: [{ k: 'L', name: 'LEFT TURRET' }, { k: 'R', name: 'SHOULDER LAUNCHER' }, { k: 'T', name: 'TRACK PODS' }],
+  harvester: [{ k: 'L', name: 'GRAPPLE ARM' }, { k: 'R', name: 'SHOULDER CANNON' }, { k: 'T', name: 'LEG ACTUATORS' }],
+};
+function partFor(e, o) {
+  let k = null;
+  if (o.explosive) k = 'T'; else if (o.bx !== undefined) { const r = (o.bx - e.x) / (ET[e.t].hw * e.sc); k = r < -.4 ? 'L' : r > .4 ? 'R' : null; }
+  return k ? e.cp.find(p => p.k === k && !p.dead) || null : null;
+}
+function breakPart(e, cp) {
+  cp.dead = true; cp.fr = 0; e['no' + cp.k] = true; e.hp -= e.max * .03;
+  const sd = cp.k === 'L' ? -1 : cp.k === 'R' ? 1 : 0, q = P(e.x + sd * ET[e.t].hw * e.sc * .6, e.wz - G.dist), y = q.y - (cp.k === 'T' ? 14 : (HITH[e.t] || 60) * .8) * q.s * e.sc;
+  addParts(q.x, y, 30, '#ff9a2a', 300, .7); addParts(q.x, y, 18, '#2c3036', 220, 1, 90); addSparks(q.x, y, 22, q.y, true); addLight(q.x, y, 110 * q.s + 30, 'rgba(255,170,70,', .5);
+  addText(q.x, y - 24, cp.name + ' DESTROYED', '#ffb04a'); G.shake = Math.max(G.shake, 10); G.flash = Math.max(G.flash, .2); sfx.boom();
+}
+function dismember(e) { // endoskeletons lose an arm, then their legs, as they are shot up
+  if (e.hp <= 0 || e.crawl || e.revived || (e.t !== 'grunt' && e.t !== 'gunner')) return;
+  const f = e.hp / e.max, q = P(e.x, e.wz - G.dist), hy = q.y - 34 * q.s * e.sc;
+  if (!e.armOff && f < .66) {
+    e.armOff = true; addSparks(q.x, hy, 12, q.y, true);
+    if (G.parts.length < 380) G.parts.push({ x: q.x + 6 * q.s, y: hy, vx: rnd(-70, 70), vy: -90, life: .9, max: .9, col: '#9aa4ae', r: 3.4, g: 300, by: q.y });
+    if (e.t === 'gunner') addText(q.x, hy - 20, 'WEAPON ARM GONE', '#ffa05a');
+  }
+  if (!e.legOff && f < .33) {
+    e.legOff = true; e.revived = true; e.crawl = true; e.t = 'runner'; e.flash = .12;
+    addSparks(q.x, q.y - 22 * q.s, 10, q.y, true); addParts(q.x, q.y - 20 * q.s, 8, '#9aa4ae', 160, .5); addText(q.x, q.y - 70 * q.s, 'LEGS GONE', '#ff7a4a');
+  }
+}
 let SURE_BLAST = false;   // grenade splash: endoskeletons killed by it always come back as crawlers
 function hurtEnemy(e, dmg, o) { // front plating soaks fire first; flanking (squad well off to one side) bypasses it
   o = o || {};
   if (bossShielded(e)) return 'plate';   // shots glance off until the pre-boss is destroyed
+  if (e.cp) { const cp = partFor(e, o); if (cp) { cp.fr -= dmg / (e.max * .12); cp.hit = .15; if (cp.fr <= 0) breakPart(e, cp); dmg *= .5; } }   // a subsystem soaks the hit first; half of it still reaches the hull
   const raw = dmg * (o.ignoreArmor ? 1 : 1 - armorOf(e)); if (bigFoe(e) || e.boss) e.dmgAcc = (e.dmgAcc || 0) + raw; const flank = Math.abs(G.px - e.x) > .32;
   e.plateHit = 0; if (o.explosive) { e.blast = true; if (SURE_BLAST) e.sure = true; }
   if (e.plate > 0 && !flank) {
@@ -532,7 +586,7 @@ function hurtEnemy(e, dmg, o) { // front plating soaks fire first; flanking (squ
     }
     return 'plate';
   }
-  e.hp -= raw; return 'hp';
+  e.hp -= raw; dismember(e); return 'hp';
 }
 
 function spawnScrap(x, wz, sc) {
@@ -635,8 +689,9 @@ function c4Blow(c) {
   if (e.hp <= 0) kill(e);
 }
 const USE = {
-  pulse() { G.flash = .3; G.shake = 8; sfx.emp(); launchWave('pulse', PULSE_RANGE); addText(W / 2, 330, 'PULSE GRENADE', ITEMS.pulse.col); return true; },
+  pulse() { bark('u_pulse', 'Pulse out!', 8000); G.flash = .3; G.shake = 8; sfx.emp(); launchWave('pulse', PULSE_RANGE); addText(W / 2, 330, 'PULSE GRENADE', ITEMS.pulse.col); return true; },
   nuke() {
+    bark('u_nuke', 'Get down! Warhead!', 8000);
     G.flash = 1; G.shake = 22; sfx.emp(); sfx.boom(); launchWave('nuke', NUKE_RANGE * demoK()); for (const o of G.obs) { if (o.dead) continue; if (o.k === 'overpass') collapseStart(o); else if (o.wz - G.dist < NUKE_RANGE) obsBlast(o.x, o.wz, 1e4); } addText(W / 2, 330, 'M-38 DETONATION', ITEMS.nuke.col); buzz([200, 60, 200]);
     for (let i = 0; i < 8; i++) G.fallout.push({ x: clamp(G.px + rnd(-.25, .25), -.8, .8), wz: G.dist + 160 + i * 105, r: (.26 + rnd(0, .08)) * demoK(), t: 14 + rnd(0, 3), t0: 17, sd: Math.random() * 99 });
     return true;
@@ -650,6 +705,7 @@ const USE = {
     G.c4.push({ e: tg, ft: 0, stuck: false, fuse: 3.2, dead: false }); sfx.hit(); return true;
   },
   cannon() {
+    bark('u_cannon', 'Clear the lane!', 8000);
     G.beam = { t: .75, max: .75, x: G.px }; G.flash = Math.max(G.flash, .5); G.shake = 14; sfx.cannon(); buzz([120, 40, 120]);
     addText(W / 2, 330, 'M-25 PLASMA CANNON', ITEMS.cannon.col);
     const dm = (500 + 60 * G.lv) * ipow();
@@ -665,6 +721,7 @@ const USE = {
     return true;
   },
   spike() {
+    bark('u_spike', 'Reprogramming!', 8000);
     let tg = null, best = 1e9;
     for (const e of G.en) { if (e.dead || e.boss || (e.t !== 'grunt' && e.t !== 'gunner')) continue; const rel = e.wz - G.dist; if (rel < 40 || rel > 520 || rel >= best) continue; best = rel; tg = e; }
     if (!tg) return false;
@@ -676,6 +733,7 @@ const USE = {
     return true;
   },
   flare() {
+    bark('u_flare', 'Danger close! Artillery inbound!', 8000);
     let bx = 0, bz = G.dist + 450, bn = -1;
     for (const e of G.en) { if (e.dead) continue; const rel = e.wz - G.dist; if (rel < 160 || rel > 800) continue; let n = 0; for (const o of G.en) if (!o.dead && Math.abs(o.x - e.x) < .5 && Math.abs(o.wz - e.wz) < 105) n += bigFoe(o) ? 3 : 1; if (n > bn) { bn = n; bx = e.x; bz = e.wz; } }
     const f = { x: clamp(bx, -.7, .7), wz: bz, life: 5.2, t0: 5.2 }; G.flares.push(f);
@@ -686,7 +744,7 @@ const USE = {
   },
 };
 function collapseStart(o) {
-  if (o.st !== 0) return; o.st = 1; o.t = 1.5; o.open = Math.floor(Math.random() * 3);
+  if (o.st !== 0) return; bark('over', 'The overpass is coming down!', 20000); o.st = 1; o.t = 1.5; o.open = Math.floor(Math.random() * 3);
   addText(W / 2, 300, 'OVERPASS COLLAPSING', '#ff9a4a'); sfx.hurt(); G.shake = Math.max(G.shake, 6);
 }
 function obsBlast(x, wz, dmg) { // explosions chew through barriers and rubble, and bring a weakened overpass down
@@ -703,7 +761,8 @@ function obsStep(dt) {
   for (const o of G.obs) {
     if (o.dead) continue;
     const rel = o.wz - G.dist, k = o.k;
-    if (k === 'jersey' || k === 'slab') { // solid: the squad is slowed and shouldered to one side
+    if (o.hit > 0) o.hit -= dt;
+    if (k === 'jersey' || k === 'slab' || k === 'truck' || k === 'sandbag') { // solid: the squad is slowed and shouldered to one side
       if (rel < 26 && rel > -o.len - 12 && Math.abs(G.px - o.x) < o.hw + sh * .55 && !G.over) { G.slow = Math.min(G.slow, .3); G.px = clamp(G.px + (G.px >= o.x ? 1 : -1) * 1.1 * dt, -.9, .9); }
     } else if (k === 'rubble') {
       if (Math.abs(rel) < o.len * .5 + 10 && Math.abs(G.px - o.x) < o.hw + sh * .55 && !G.over) G.slow = Math.min(G.slow, .6);
@@ -919,7 +978,7 @@ function enemyShoot(e, sideSign) { // bolts leave the weapon's muzzle (not the m
   const d = ET[e.t], rel = e.wz - G.dist;
   if (rel < 20) return;
   const gOn = G.guard && !G.guard.dead && rel > GZ + 25, aimX = gOn ? G.gx : G.px, m = MUZ[e.t] || { ox: 0, h: 30 };
-  const cnt = d.burst ? 1 : (d.volley || 1) + (e.enr ? 2 : 0), tt = (rel - (gOn ? GZ : 0)) / 170;
+  const cnt = d.burst ? 1 : Math.max(1, (d.volley || 1) + (e.enr ? 2 : 0) - (e.noL ? 1 : 0)), tt = (rel - (gOn ? GZ : 0)) / 170;
   let dmg = d.dmg + (e.boss || d.block ? Math.floor(G.lv / 3) : 0);
   if (e.boss) dmg = Math.max(1, Math.round(G.n * .015 + dmg * .45));   // boss hits scale with the size of your squad, but never wipe it in a few volleys
   for (let i = 0; i < cnt; i++) {
@@ -997,7 +1056,7 @@ function update(dt) {
   if (!G.over) {
     G.fcd -= dt;
     const last = G.n > 0 && G.peak >= 12 && G.n <= G.peak * .25 ? 1.2 : 1;   // last stand: a battered squad fights harder
-    const iv = G.fiv = WEAPONS[G.tier].int / ((1 + .06 * save.up.rate) * G.rateG * (1 + Math.min(.3, .05 * G.cls.officer)) * (G.od > 0 ? 1.8 : 1) * last);
+    const iv = G.fiv = WEAPONS[G.tier].int / ((1 + .06 * save.up.rate) * G.rateG * (1 + Math.min(.3, .05 * G.cls.officer)) * (G.od > 0 ? 1.8 : 1) * (G.rn > .5 ? .9 : 1) * last);
     G.od = Math.max(0, (G.od || 0) - dt);
     let guard = 0;
     while (G.fcd <= 0 && guard++ < 5) { volley(); G.fcd += iv; }
@@ -1038,7 +1097,7 @@ function update(dt) {
       if (e.wz + 10 < b.pz || e.wz - 10 > b.wz) continue;
       if (Math.abs(e.x - b.x) > ET[e.t].hw * e.sc + .025) continue;
       b.hit.push(e);
-      const crit = b.crit && (e.boss || bigFoe(e)) ? b.crit : 1, res = hurtEnemy(e, b.dmg * crit, b.pen ? { ignoreArmor: true } : undefined), rel = e.wz - G.dist, q = P(b.x, rel), hy = q.y - (HITH[e.t] || 40) * q.s * e.sc;
+      const crit = b.crit && (e.boss || bigFoe(e)) ? b.crit : 1, res = hurtEnemy(e, b.dmg * crit, { ignoreArmor: !!b.pen, bx: b.x }), rel = e.wz - G.dist, q = P(b.x, rel), hy = q.y - (HITH[e.t] || 40) * q.s * e.sc;
       addSparks(q.x, hy, res === 'plate' ? 7 : 4, q.y - 2, res === 'plate'); sfx.impact(res, G.tier, b.w.name);
       if (crit > 1 && res !== 'plate') { addText(q.x, hy - 30, 'CRITICAL', '#ff9ad0'); addSparks(q.x, hy, 10, q.y - 2, true); }
       if (G.lt.length < 20) addLight(q.x, hy, 24, 'rgba(255,170,60,', .07);
@@ -1063,6 +1122,7 @@ function update(dt) {
     const rq = P(r.x, r.wz - G.dist);
     if (G.parts.length < 400) G.parts.push({ x: rq.x + rnd(-1, 1), y: rq.y - 30 * rq.s, vx: rnd(-10, 10), vy: rnd(-10, 10), life: .5, max: .5, col: Math.random() < .5 ? '#5a626e' : '#ffb02e', r: 2.4, g: -10 });
     if (r.wz - G.dist > 900) { r.dead = true; continue; }
+    { const gt = G.gates.find(g => !g.used && g.wz >= r.pz && g.wz <= r.wz + 4); if (gt) { r.dead = true; const gq = P(r.x, gt.wz - G.dist); addParts(gq.x, gq.y - 40 * gq.s, 6, '#ffb040', 160, .3); continue; } }   // gates stop rockets too
     for (const e of G.en) {
       if (e.dead || e.wz + 12 < r.pz || e.wz - 12 > r.wz || Math.abs(e.x - r.x) > ET[e.t].hw * e.sc + .08) continue;
       r.dead = true; SURE_BLAST = !!r.gren; explodeAt(r.x, e.wz, r.dmg, e); SURE_BLAST = false; break;
@@ -1091,7 +1151,7 @@ function update(dt) {
       } else { const k = clamp(Math.pow(squadDps() / 150, .7), .4, 6); e.hp *= k; e.max *= k; }
       if (e.boss) e.str = clamp(1 + G.n / 160, 1, 1.8);   // and hit harder / fire faster / call more reinforcements against a big squad
       if (d.plate) { const pf = e.plateMax ? e.plate / e.plateMax : 1; e.plateMax = e.max * d.plate; e.plate = e.plateMax * pf; }
-      if (e.boss) { G.warn = { t: 2.6, name: e.name || d.name || 'BOSS' }; G.shake = Math.max(G.shake, 14); G.flash = Math.max(G.flash, .35); sfx.siren(); }
+      if (e.boss) { bark('boss', 'Boss contact! Hit it with everything!', 60000); G.warn = { t: 2.6, name: e.name || d.name || 'BOSS' }; G.shake = Math.max(G.shake, 14); G.flash = Math.max(G.flash, .35); sfx.siren(); }
     }
     if (e.boss && e.scaled && !G.over) { // keep tracking your firepower: if the squad or weapon grows later (late multiplier gates, upgrades) the boss grows with it, never shrinks
       const tgt = Math.max((e.base0 || e.max) * .25, squadDps() * (16 + 2.5 * G.lv) * .75 / Math.max(.4, 1 - armorOf(e)) / (1 + (d.plate || 0))) * G.assist;
@@ -1101,9 +1161,12 @@ function update(dt) {
       }
       e.str = Math.max(e.str || 1, clamp(1 + G.n / 160, 1, 1.8));
     }
+    if (e.boss && BPARTS[e.t] && !e.cp && e.scaled) e.cp = BPARTS[e.t].map(p => ({ k: p.k, name: p.name, fr: 1, dead: false, hit: 0 }));
+    if (e.cp) for (const p of e.cp) if (p.hit > 0) p.hit -= dt;
+    if (e.boss) { const f = e.hp / e.max; e.gl = f < .25 ? 2 : f < .5 ? 1 : 0; if (e.gl && e.bx !== undefined && Math.random() < dw * (e.gl === 2 ? 2.4 : 1)) e.bx = clamp(e.bx + rnd(-.07, .07), -.8, .8); }   // a badly damaged boss glitches: twitching steering, slower, fewer shots
     const gate = gateBefore(e);   // the nearest unused gate between the squad and this enemy
     if (gate && G.dist < gate.wz - 380) continue;   // machines stay put until the squad is nearly at the gate in front of them
-    if (!e.active) { if (rel < 900) { e.active = true; toughen(e); if (!e.boss && bigFoe(e) && G.t - (G.lastAlert || -9) > 3.5) { G.lastAlert = G.t; G.alert = { t: 2.4, txt: (ET[e.t].name || '').toUpperCase() + ' INCOMING', fly: !!ET[e.t].fly }; } } else continue; }
+    if (!e.active) { if (rel < 900) { e.active = true; toughen(e); if (e.t === 'grunt' || e.t === 'gunner') bark('t800', 'T-800 incoming!', 40000); if (!e.boss && bigFoe(e) && G.t - (G.lastAlert || -9) > 3.5) { G.lastAlert = G.t; G.alert = { t: 2.4, txt: (ET[e.t].name || '').toUpperCase() + ' INCOMING', fly: !!ET[e.t].fly }; if (BARKS[e.t]) bark('b_' + e.t, BARKS[e.t], 20000); } } else continue; }
     if (e.t === 'gunner' && e.hp < e.max * .6 && Math.random() < dw * 5) { const q1 = P(e.x, rel); G.parts.push({ x: q1.x + rnd(-3, 3), y: q1.y - 48 * q1.s, vx: rnd(-8, 8), vy: -28, life: .8, max: .8, col: '#2a2f38', r: 3, g: -18 }); }
     if (e.crash !== undefined || e.rise !== undefined) { // an EMP'd flyer drops out of the sky and blows up on impact
       if (e.crash !== undefined) {
@@ -1128,13 +1191,13 @@ function update(dt) {
     let rolling = false;   // tracked vehicles may only change lane while they are actually driving forward
     if (d.hold && rel <= d.hold) {
       if (!d.block) e.wz = G.dist + d.hold;
-    } else { e.wz -= d.spd * dw; rolling = true; }
+    } else { e.wz -= d.spd * dw * (e.noT ? .5 : 1) * (e.gl === 2 ? .55 : e.gl === 1 ? .8 : 1) * (e.armOff && !d.shoot ? .8 : 1); rolling = true; }
     if (d.fly && rel <= d.hold + 50) { e.fph = (e.fph || 0) + dw; e.wz += (G.dist + d.hold + 45 * Math.sin(e.fph * .8 + e.id) - e.wz) * Math.min(1, dw * 4); }   // flyers ease into their hover bob instead of snapping to it   // own clock: it freezes with the machine and resumes exactly where it stopped
     if (gate && e.wz < gate.wz + 40) { e.wz = gate.wz + 40; rolling = false; }   // and never come through a gate before the squad has
     if (d.weave) {   // predictable slow weave
       if (e.bx === undefined) e.bx = e.x;
-      if (!d.tracked) { e.wph = (e.wph || 0) + dw; e.x = clamp(e.bx + d.weave * Math.sin(e.wph * .7 + e.id), -.88, .88); }
-      else if (rolling) { e.wph = (e.wph || 0) + dw; e.x = clamp(e.bx + d.weave * Math.sin(e.wph * .7 + e.id), -.88, .88); }   // tracks: no sidestepping when stopped, they can only turn on the spot (the sprite turns to face the squad)
+      if (!d.tracked) { e.wph = (e.wph || 0) + dw; e.x = clamp(e.bx + d.weave * (e.noT ? .5 : 1) * Math.sin(e.wph * .7 + e.id), -.88, .88); }
+      else if (rolling) { e.wph = (e.wph || 0) + dw; e.x = clamp(e.bx + d.weave * (e.noT ? .5 : 1) * Math.sin(e.wph * .7 + e.id), -.88, .88); }   // tracks: no sidestepping when stopped, they can only turn on the spot (the sprite turns to face the squad)
     }
     else e.x += clamp(G.px - e.x, -1, 1) * dw * d.chase;
     e.x = clamp(e.x, -.9, .9);
@@ -1147,7 +1210,7 @@ function update(dt) {
     }
     if (rel < -60) { e.dead = true; continue; }
     // harvester grab: aim (tracks you) -> lock (marker freezes) -> slam -> recover
-    if (d.grab && rel <= d.hold + 80 && !G.over) {
+    if (d.grab && !e.noL && rel <= d.hold + 80 && !G.over) {
       let want = 0;
       if (e.gs === 'idle') { e.gcd -= dw; if (e.gcd <= 0) { e.gs = 'aim'; e.gt = 1.2; e.tx = G.px; } }
       else if (e.gs === 'aim') { want = .55; e.tx += (G.px - e.tx) * Math.min(1, dw * 5); e.gt -= dw; if (e.gt <= 0) { e.gs = 'lock'; e.gt = .6; } }
@@ -1157,13 +1220,13 @@ function update(dt) {
       e.ext += (want - e.ext) * Math.min(1, dw * 8);
     }
     // shooting
-    if (d.shoot && rel <= (d.hold || 400) + 80 && rel > 20 && !G.over) {
+    if (d.shoot && !gate && rel <= (d.hold || 400) + 80 && rel > 20 && !G.over) {   // nothing fires across an uncollected gate
       if (d.burst && e.burst > 0) {
         e.bcd -= dw;
         if (e.bcd <= 0) { e.bcd = .11; e.burst--; e.side = -(e.side || 1); enemyShoot(e, e.side); }
       } else {
         e.fcd -= dw;
-        if (e.fcd <= 0) { e.fcd = d.shoot * rnd(.9, 1.2) * (e.enr ? .6 : 1) / (e.str ? 1 + (e.str - 1) * .5 : 1); if (d.burst) { e.burst = e.enr ? 10 : 7; e.bcd = 0; } else enemyShoot(e); }
+        if (e.fcd <= 0) { e.fcd = d.shoot * rnd(.9, 1.2) * (e.enr ? .6 : 1) / (e.str ? 1 + (e.str - 1) * .5 : 1) * (e.armOff ? 1.9 : 1) * (e.noR ? 1.25 : 1) * (e.gl === 2 ? 1.7 : e.gl === 1 ? 1.25 : 1); if (d.burst) { e.burst = e.enr ? 10 : 7; e.bcd = 0; } else enemyShoot(e); }
       }
     }
     // boss: enrage at half health, periodic reinforcements, sky hunter air strikes
@@ -1176,7 +1239,7 @@ function update(dt) {
           const cnt = (e.t === 'ogre' ? 3 : 2) + Math.floor(G.n / 80);
           for (let i = 0; i < cnt; i++) { const m = mk('grunt', e.wz - 20 - i * 10, clamp(e.x + rnd(-.5, .5), -.8, .8), (1 + .2 * (G.lv - 1)) * G.assist); m.active = true; toughen(m); G.en.push(m); }
         }
-        if ((e.t === 'ogre' || e.t === 'harvester') && e.enr) { // enraged ground bosses call down a barrage: weave through the gap while the markers burn
+        if ((e.t === 'ogre' || e.t === 'harvester') && e.enr && !e.noR) { // enraged ground bosses call down a barrage: weave through the gap while the markers burn
           if (e.sk2 === undefined) e.sk2 = 3; e.sk2 -= dw;
           if (e.sk2 <= 0) { strikeRound(e); e.sk2 = e.hp < e.max * .25 ? 5.5 : 8; addText(W / 2, 150, 'BARRAGE!', '#ff5a5a'); G.shake = Math.max(G.shake, 4); sfx.siren(); }
         }
@@ -1190,7 +1253,8 @@ function update(dt) {
   }
   G.en = G.en.filter(e => !e.dead);
   for (const Dh of G.deaths) deathStep(Dh, dt);
-  empStep(dt); obsStep(dt);
+  empStep(dt); obsStep(dt); envStep(dt);
+  if (G.item && G.item.k === 'c4' && !G.over && G.en.some(e => !e.dead && bigFoe(e) && !ET[e.t].fly && e.wz - G.dist > 100 && e.wz - G.dist < 600)) bark('c4', 'Drop the C4!', 25000);
   if (G.deaths.length) G.deaths = G.deaths.filter(Dh => Dh.t < (Dh.tb || 0) + 3.2 * (Dh.ts || 1) + .1);
 
   // hazards on the ground: unexploded ordnance
@@ -1241,7 +1305,7 @@ function update(dt) {
     if (rel < 140 && Math.abs(dx) < (G.sweep ? 1.4 : .5 + tw)) {   // during the victory march the whole lane's scrap is pulled in
       c.x += clamp(dx, -1, 1) * dt * 1.4; c.wz -= 60 * dt; }
     if (rel <= 25 && rel > -20 && Math.abs(c.x - G.px) < (G.sweep ? 1.4 : (.28 + squadHalf() * .3 + tw) * fp) && (!G.over || G.won)) {
-      c.got = true; G.scrap += Math.round(c.v); sfx.clink(); const q = squadPos();
+      c.got = true; G.scrap += Math.round(c.v * (G.rn > .5 ? 1.3 : 1)); sfx.clink(); const q = squadPos();
       addText(q.x + rnd(-14, 14), q.y - 60, '+' + Math.round(c.v), '#ffd24a'); addParts(q.x + dx * LANE * .2, q.y - 20, 4, '#ffd24a', 120, .3);
       if (G.cls.medic > 0 && G.guard && !G.guard.dead && G.guard.hp < G.guard.max && Math.random() < Math.min(.5, .12 * G.cls.medic)) { G.guard.hp = Math.min(G.guard.max, G.guard.hp + 2); const gq = P(G.gx, GZ); addText(gq.x, gq.y - 100 * gq.s, '+REPAIR', '#6ff3ff'); }
       if (G.cls.medic > 0 && G.n < G.peak && Math.random() < Math.min(.5, .1 * G.cls.medic)) { G.n++; addText(q.x, q.y - 100, '+1 REVIVED', '#6dffb5'); sfx.gate(); }
@@ -1266,6 +1330,18 @@ function update(dt) {
   // enemy bolts
   for (const b of G.bolts) {
     b.rz -= 170 * dw; b.x += b.vx * dw;
+    for (const g of G.gates) { const gr = g.wz - G.dist; if (!g.used && gr > 0 && b.rz <= gr && b.rz + 170 * dw > gr) { b.dead = true; const q = P(b.x, gr); addParts(q.x, q.y - 40 * q.s, 3, '#9cf', 120, .25); break; } }   // gates stop enemy fire
+    if (b.dead) continue;
+    for (const o of G.obs) { // trucks and sandbags soak enemy fire while they last
+      if (o.dead || (o.k !== 'truck' && o.k !== 'sandbag')) continue;
+      const orz = o.wz - G.dist;
+      if (orz > 2 && b.rz <= orz && b.rz + 170 * dw > orz && Math.abs(b.x - o.x) < o.hw + .05) {
+        b.dead = true; o.hp -= b.dmg * 30 * (b.big ? 2 : 1); o.hit = .15; const q = P(b.x, orz); addSparks(q.x, q.y - 14 * q.s, 6, q.y, true); sfx.ping();
+        if (o.hp <= 0) { o.dead = true; if (o.k === 'truck') explodeAt(o.x, o.wz, 50, null); else { addParts(q.x, q.y - 10 * q.s, 14, '#b8a070', 200, .7, 160); sfx.hit(); } }
+        break;
+      }
+    }
+    if (b.dead) continue;
     if (G.guard && !G.guard.dead && !b.passed && b.rz <= GZ) { b.passed = true; if (Math.abs(b.x - G.gx) < .14) { b.dead = true; hurtGuard(b.dmg); continue; } }   // the unit soaks the shot
     if (b.rz <= 0) {
       b.dead = true;
@@ -1300,6 +1376,7 @@ function update(dt) {
 function endRun() {
   state = 'end'; ambStop();
   const win = G.won;
+  if (G.endless) { if (win) { endlessAdvance(); return; } endlessOver(); return; }
   if (!G.banked) { // pay out once, however many times the Armory is opened from this screen
     G.banked = true;
     const lostN = G.lostN || 0, peak = Math.max(1, G.peak || G.n || 1);
@@ -1322,6 +1399,41 @@ function endRun() {
   $('mn').onclick = showMenu;
 }
 
+// ---- endless survival: sector after sector, no end but the loss of the squad; scored locally and on the shared leaderboard
+const startEndless = () => { beep(300, .05); startLevel(1, { endless: true }); };
+function endlessAdvance() {
+  const E = G.endless, bonus = Math.round(100 + 20 * G.lv);
+  startLevel(G.lv + 1, { endless: true, sectors: E.sectors + 1, kills: E.kills + G.kills, scrap: E.scrap + G.scrap + bonus, lost: E.lost + (G.lostN || 0), carry: { n: G.n, peak: G.peak, cls: Object.assign({}, G.cls), item: G.item, form: G.form } });
+  addText(W / 2, 330, 'SECTOR ' + (G.lv - 1) + ' HELD', '#6dffb5'); G.sfxDone = true; sfx.win();
+}
+const endlessScore = E => E.sectors * 1000 + E.kills * 10 + Math.floor(E.scrap / 5);
+async function netBoard(post) { // the shared leaderboard lives on the game server (tools/serve.py); offline or from a file it just reports null
+  try { if (typeof fetch !== 'function') return null; const r = await fetch('api/scores', post ? { method: 'POST', body: JSON.stringify(post) } : { cache: 'no-store' }); if (!r.ok) return null; const j = await r.json(); return Array.isArray(j) ? j : null; } catch (e) { return null; }
+}
+function boardHtml(rows, mine) { return rows.length ? rows.slice(0, 8).map((r, i) => `<div style="display:flex;justify-content:space-between;gap:.6em;font-size:.82em;${mine && r.score === mine.s && r.name === mine.n ? 'color:#ffd24a' : ''}"><span>${i + 1}. ${String(r.name || r.n).replace(/[<>&]/g, '')}</span><span>${r.score !== undefined ? r.score : r.s} · S${r.sectors !== undefined ? r.sectors : r.sec}</span></div>`).join('') : '<small>no runs yet</small>'; }
+function endlessOver() {
+  const E = G.endless, tot = { sectors: E.sectors, kills: E.kills + G.kills, scrap: E.scrap + G.scrap };
+  if (!G.banked) { G.banked = true; save.scrap += tot.scrap; G.eScore = endlessScore(tot); save.board.push({ n: save.name, s: G.eScore, sec: tot.sectors, k: tot.kills }); save.board.sort((a, b) => b.s - a.s); save.board = save.board.slice(0, 10); persist(); }
+  const sc = G.eScore, lg = G;
+  ov(`<div class="panel"><h2>SURVIVAL OVER</h2>
+    <div class="res">Sectors held: ${tot.sectors}<br>Machines destroyed: ${tot.kills}<br>Scrap: +${tot.scrap}<br><b style="color:#ffd24a;font-size:1.3em">SCORE ${sc}</b></div>
+    <p class="tag" style="margin:.2em 0">Your best</p><div id="lb1">${boardHtml(save.board, { s: sc, n: save.name })}</div>
+    <p class="tag" style="margin:.5em 0 .2em">Shared leaderboard</p><div id="lb2"><small>checking server...</small></div>
+    <input id="nm" maxlength="14" value="${save.name}" style="margin:.5em 0;text-align:center;font:inherit;padding:.4em;width:80%">
+    <button id="sub">Submit score</button>
+    <button class="big" id="rt">SURVIVE AGAIN</button><button id="arm">Armory</button><button id="mn">Menu</button></div>`);
+  const show = j => { const el = $('lb2'); if (el && state === 'end') el.innerHTML = j ? boardHtml(j, { s: sc, n: save.name }) : '<small>server not reachable: score kept on this device</small>'; };
+  netBoard().then(show);
+  $('sub').onclick = () => { const nm = ($('nm').value || '').replace(/[^A-Za-z0-9 _.\-]/g, '').slice(0, 14).trim() || 'RESISTANCE'; save.name = nm; persist(); $('sub').disabled = true; netBoard({ name: nm, score: sc, sectors: tot.sectors, kills: tot.kills }).then(j => { show(j); const b = $('sub'); if (b) b.textContent = j ? 'Submitted' : 'Could not reach the server'; }); };
+  $('rt').onclick = startEndless; $('arm').onclick = () => showArmory('end'); $('mn').onclick = showMenu;
+}
+function showBoard() {
+  ov(`<div class="panel"><h2>LEADERBOARD</h2><p class="tag" style="margin:0 0 .2em">Endless Survival: your best</p><div>${boardHtml(save.board)}</div>
+    <p class="tag" style="margin:.6em 0 .2em">Shared leaderboard</p><div id="lb2"><small>checking server...</small></div><button class="big" id="bk">Back</button></div>`);
+  netBoard().then(j => { const el = $('lb2'); if (el && state === 'menu') el.innerHTML = j ? boardHtml(j) : '<small>server not reachable</small>'; });
+  $('bk').onclick = showMenu;
+}
+
 // ---------------------------------------------------------------- UI overlays
 function ov(html) { const u = $('ui'); u.innerHTML = html; u.style.display = 'flex'; }
 function ovHide() { $('ui').style.display = 'none'; }
@@ -1336,6 +1448,7 @@ function showMenu() {
       <button id="nxl" ${lv >= save.best ? 'disabled' : ''}>▶</button></div>
     <button class="big" id="play">DEPLOY</button>
     <button id="sq">Squad · ${save.loadout.length ? save.loadout.map(k => CLASS[k].name).join(', ') : 'riflemen only'}</button>
+    <button id="endl">Endless Survival${save.board.length ? ' · best ' + save.board[0].s : ''}</button><button id="lbd">Leaderboard</button>
     <button id="arm">Armory · ${save.scrap} scrap</button>
     <button id="set">Settings</button>
     <p class="foot">No timers. No energy. No purchases.<br>Drag to move · auto-fire · shoot gates to boost them · Space or double tap = use item</p></div>`);
@@ -1344,6 +1457,7 @@ function showMenu() {
   $('nxl').onclick = () => { if (save.sel < save.best) { save.sel++; persist(); } showMenu(); };
   $('arm').onclick = () => showArmory('menu');
   $('sq').onclick = showSquad;
+  $('endl').onclick = startEndless; $('lbd').onclick = showBoard;
   $('set').onclick = () => showSettings('menu');
 }
 
@@ -1359,6 +1473,7 @@ function showSettings(from) {
     <button id="zm">Camera: ${ZNAMES[clamp(zoomLevel(), 0, 2)]}</button>
     <button id="fxq">Effects: ${save.fx === 'low' ? 'REDUCED (faster)' : 'FULL'}</button>
     <button id="vib">Vibration: ${save.vib === false ? 'OFF' : 'ON'}</button>
+    <button id="chat">Radio chatter: ${save.chat === false ? 'OFF' : 'ON'}</button>
     <button id="rst" style="margin-top:1em;border-color:#a33">Reset progress…</button>
     <button class="big" id="bk" style="margin-top:1em">Back</button></div>`);
   $('snd').onclick = () => { save.mute = !save.mute; persist(); if (save.mute) { musicStop(); ambStop(); } else if (state === 'menu') musicStart(); else if (state === 'play') ambStart(); showSettings(); };
@@ -1371,6 +1486,7 @@ function showSettings(from) {
   $('zm').onclick = () => { save.zoom = (clamp(zoomLevel(), 0, 2) + 1) % 3; persist(); showSettings(); };
   $('fxq').onclick = () => { save.fx = save.fx === 'low' ? 'full' : 'low'; persist(); showSettings(); };
   $('vib').onclick = () => { save.vib = save.vib === false; persist(); if (save.vib) buzz(60); showSettings(); };
+  $('chat').onclick = () => { save.chat = save.chat === false; persist(); if (save.chat) bark('test', 'Radio check. Resistance, copy.', 0); showSettings(); };
   $('rst').onclick = confirmReset;
   $('bk').onclick = () => { if (settingsFrom === 'pause' && G && state === 'play') setPause(true); else showMenu(); };
 }
@@ -1381,7 +1497,7 @@ function confirmReset() { // wipes scrap, upgrades, sectors and unlocked classes
     <button class="big" id="yes" style="background:#8a1d1d">YES, START FRESH</button><button id="no">Cancel</button></div>`);
   $('no').onclick = showSettings;
   $('yes').onclick = () => {
-    const keep = { mute: save.mute, crt: save.crt, vib: save.vib, music: save.music, vol: save.vol, mvol: save.mvol, fx: save.fx, zoom: save.zoom };
+    const keep = { mute: save.mute, crt: save.crt, vib: save.vib, music: save.music, vol: save.vol, mvol: save.mvol, fx: save.fx, zoom: save.zoom, chat: save.chat, form: save.form };
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(keep)); } catch (e) {}
     try { location.reload(); } catch (e) {}
   };
@@ -1425,8 +1541,11 @@ function showSquad() { // choose up to MAXPICK classes for the next sectors; unl
       <span style="color:${c.col}">${c.name}<br><small style="font-family:system-ui;font-weight:600;color:#9fb3c8">${c.desc}</small></span>
       <span>${on ? '✔ PICKED' : un ? 'PICK' : c.cost + ' ⚙'}</span></button>`;
   }
+  const pnm = i => { const p = save.presets[i]; return p ? (p.l.length ? p.l.map(k => CLASS[k].name.split(' ')[0]).join('+') : 'riflemen') + ' · ' + FORMS[p.f].name : 'empty'; };
+  const pre = [0, 1, 2].map(i => `<div style="display:flex;gap:.4em;margin:.25em 0"><button data-ld="${i}" style="flex:1;font-size:.78em" ${save.presets[i] ? '' : 'disabled'}>LOAD ${i + 1}: ${pnm(i)}</button><button data-sv="${i}" style="font-size:.78em">SAVE</button></div>`).join('');
   ov(`<div class="panel"><h2>SQUAD</h2>
     <div class="res">Pick up to ${MAXPICK} classes (${save.loadout.length}/${MAXPICK})<br>Scrap: ${save.scrap}</div>
+    <p class="tag" style="margin:0">Loadout presets (classes + formation)</p>${pre}
     <p class="tag" style="margin:0 0 .5em">Each picked class adds ${classStart()} soldiers to your squad of ${6 + 2 * save.up.squad}. Class gates add only your picks.</p>${rows}
     <button class="big" id="go">DEPLOY</button><button id="bk">Back</button></div>`);
   document.querySelectorAll('.row').forEach(b => b.onclick = () => {
@@ -1436,6 +1555,8 @@ function showSquad() { // choose up to MAXPICK classes for the next sectors; unl
     else if (save.scrap >= c.cost) { save.scrap -= c.cost; save.unlocked[k] = 1; if (save.loadout.length < MAXPICK) save.loadout.push(k); beep(600, .12, 'triangle', .06, 300); }
     persist(); showSquad();
   });
+  document.querySelectorAll('[data-ld]').forEach(b => b.onclick = () => { const p = save.presets[+b.dataset.ld]; if (!p) return; save.loadout = p.l.filter(k => save.unlocked[k]).slice(0, MAXPICK); save.form = p.f; persist(); beep(500, .06); showSquad(); });
+  document.querySelectorAll('[data-sv]').forEach(b => b.onclick = () => { save.presets[+b.dataset.sv] = { l: save.loadout.slice(), f: save.form }; persist(); beep(700, .06, 'triangle', .06, 400); showSquad(); });
   $('go').onclick = () => { beep(300, .05); startLevel(save.sel); };
   $('bk').onclick = showMenu;
 }
@@ -1840,11 +1961,22 @@ function drawStun(e, q, ss, sh) { // EMP'd machine: crackling blue-white arcs ju
 const EDRAW = {   // sprite, walk-cycle speed / sway, spotlight beams [spread, length, width, alpha], flyer flag
   grunt: { spr: 't800', walk: 1, amp: 1 }, gunner: { spr: 't800_minigun', walk: 1, amp: .7 }, runner: { spr: 't800_crawler', walk: .5, amp: .8 },
   harvester: { spr: 'harvester', walk: .5, amp: .35 }, behemoth: { spr: 't1', walk: 2, amp: .18, beam: [.14, 130, 16, .22] },
-  gunship: { spr: 'hk_aerial', fly: 1 }, aerostat: { spr: 'aerostat', fly: 1 }, heavy: { spr: 't47', walk: 1, amp: .55 },
-  tank: { spr: 'hk_tank', walk: 2.5, amp: .2, beam: [.12, 120, 24, .24] }, ogre: { spr: 'ogre', walk: .9, amp: .12, beam: [.16, 140, 22, .24] },
+  gunship: { spr: 'hk_aerial', fly: 1, laser: '90,235,255' }, aerostat: { spr: 'aerostat', fly: 1 }, heavy: { spr: 't47', walk: 1, amp: .55 },
+  tank: { spr: 'hk_tank', walk: 2.5, amp: .2, beam: [.12, 120, 24, .24], laser: '255,70,50' }, ogre: { spr: 'ogre', walk: .9, amp: .12, beam: [.16, 140, 22, .24] },
 };
+function drawLaser(e, q, ss, rgb, rel) { // a target designator: the line sharpens as the volley comes
+  const m = MUZ[e.t] || { ox: 0, h: 30 }; let mx, my;
+  if (e.vm) { mx = q.x + e.vm[0] * (e.vf || 1) * ss; my = q.y - (e.vm[1] + (e.lf || 0)) * ss; } else { mx = q.x + m.ox * (m.fwd ? (e.face || 1) : 1) * ss; my = q.y - m.h * ss; }
+  const gOn = G.guard && !G.guard.dead && rel > GZ + 25, T = P(gOn ? G.gx : G.px, gOn ? GZ : 0), tx = T.x, ty = T.y - 30 * T.s, p = clamp(1 - e.fcd / 1.5, 0, 1), fl = .75 + .25 * Math.sin(G.t * 40);
+  cx.save(); cx.globalCompositeOperation = 'lighter'; cx.lineCap = 'round';
+  cx.strokeStyle = `rgba(${rgb},${(.1 + .2 * p) * fl})`; cx.lineWidth = 3 + 4 * p; cx.beginPath(); cx.moveTo(mx, my); cx.lineTo(tx, ty); cx.stroke();
+  cx.strokeStyle = `rgba(${rgb},${(.35 + .6 * p) * fl})`; cx.lineWidth = 1 + 1.2 * p; cx.beginPath(); cx.moveTo(mx, my); cx.lineTo(tx, ty); cx.stroke();
+  cx.fillStyle = `rgba(${rgb},${(.4 + .5 * p) * fl})`; cx.beginPath(); cx.arc(tx, ty, 3 + 5 * p, 0, 7); cx.fill();
+  cx.restore();
+}
 function drawEnemy(e) {
   const rel = e.wz - G.dist, q = P(e.x, rel), s = q.s, a = (e.stun > 0 ? e.stunT : G.t) * 5 + e.id, fl = e.flash > 0, lk = e.crash !== undefined ? 1 - clamp(e.crash / .8, 0, 1) : e.rise !== undefined ? clamp(e.rise, 0, 1) : 1, tilt = (1 - lk) * (e.id % 2 ? .45 : -.45);
+  if (e.boss && e.gl && hash((G.t * 16 | 0) + (e.id * 10 | 0)) > (e.gl === 2 ? .7 : .9)) q.x += rnd(-5, 5) * s * e.sc;   // sprite glitch
   const ss = s * e.sc, face = e.face || 1, F = fl ? .9 : 0, hd = [clamp((G.px - e.x) * 1.5, -1.2, 1.2), -1];
   const D = (name, o) => { const pv = drawSpr(name, q.x, q.y, ss, Object.assign({ head: hd }, o)); if (pv) { e.sn = name; e.vk = pv.key; e.vf = pv.flip; e.vm = pv.muz; e.vl = pv.lights; e.vp = pv.vents; e.lf = (o && o.lift) || 0; } return pv; };
   let sh = 0;   // sprite height (world px at ss=1) for bars and plating overlays
@@ -1864,10 +1996,11 @@ function drawEnemy(e) {
     if (e.t === 'aerostat') { cx.fillStyle = 'rgba(0,0,0,.22)'; cx.beginPath(); cx.ellipse(q.x, q.y, 9 * ss, 2.8 * ss, 0, 0, 7); cx.fill(); }
     if (e.t === 'harvester') drawGrabArm(e, q, ss, face, fl);
     if (V.beam) lightBeams(e, q, rel, ss, V.beam[0], V.beam[1], V.beam[2], V.beam[3]);
+    if (V.laser && !(e.stun > 0) && e.fcd < 1.5 && e.fcd > 0 && rel > 20 && rel <= (ET[e.t].hold || 400) + 80 && !gateBefore(e) && !G.over) drawLaser(e, q, ss, V.laser, rel);
     if (e.t === 'gunship') { const ls = e.vl; if (ls) for (const l of ls) { const lx = l[0] * (e.vf || 1), d = lx < 0 ? -1 : 1, gp = P(e.x + d * .1, rel - 110); drawBeam(q.x + lx * ss, q.y - (l[1] + lift) * ss, gp.x, gp.y, 20 * gp.s + 6, .24); } }
   }
   if (G.snTg === e && !e.dead) { const ry = q.y - (HITH[e.t] || 40) * ss * 1.1, rr = 13 * ss + 5, pl = .6 + .4 * Math.sin(G.t * 9); cx.strokeStyle = `rgba(255,140,200,${.5 + .4 * pl})`; cx.lineWidth = Math.max(1.2, 1.6 * s); cx.beginPath(); cx.arc(q.x, ry, rr, 0, 7); cx.moveTo(q.x - rr * 1.4, ry); cx.lineTo(q.x - rr * .5, ry); cx.moveTo(q.x + rr * .5, ry); cx.lineTo(q.x + rr * 1.4, ry); cx.moveTo(q.x, ry - rr * 1.4); cx.lineTo(q.x, ry - rr * .5); cx.moveTo(q.x, ry + rr * .5); cx.lineTo(q.x, ry + rr * 1.4); cx.stroke(); }
-  if (e.stun > 0) drawStun(e, q, ss, sh);
+  if (e.stun > 0 || (e.boss && e.gl && Math.sin(G.t * 3.1 + e.id * 7) + Math.sin(G.t * 7.7 + e.id) > (e.gl === 2 ? -.6 : 1.1))) drawStun(e, q, ss, sh);   // a failing boss throws blue electrical arcs
   e.sh0 = sh || { heavy: 150, tank: 100, gunship: 160, harvester: 200, ogre: 165 }[e.t] || 120;
   if (e.boss || ET[e.t].block || ET[e.t].fly || ET[e.t].tracked) drawDamageFX(e, q, ss, sh);   // every big machine, flyers included, smoulders then burns as it is shot up
   if (e.plateMax && e.plate > 0) { // front plating: a curved shield on the face the squad is shooting at
@@ -2152,6 +2285,22 @@ function drawObs(o) {
       }
       if (hash(tick + sd) > .6) { const f = hash(tick * 3 + sd), x = xa.x + (xb.x - xa.x) * f; glow(x, xa.y - hgt + Math.sin(f * Math.PI) * sag * 2, 2 * s, '#bfe6ff'); }
     }
+  } else if (k === 'truck') { // an abandoned pickup seen from behind
+    const bw = w * 1.1, bh = 26 * s, dm = 1 - o.hp / o.max, fl = o.hit > 0;
+    cx.fillStyle = 'rgba(0,0,0,.35)'; cx.beginPath(); cx.ellipse(q.x, q.y, bw * 1.1, 4 * s, 0, 0, 7); cx.fill();
+    cx.fillStyle = '#15171a'; cx.fillRect(q.x - bw * .92, q.y - 10 * s, bw * .32, 10 * s); cx.fillRect(q.x + bw * .6, q.y - 10 * s, bw * .32, 10 * s);
+    cx.fillStyle = fl ? '#e8d8c0' : '#6b4a32'; cx.fillRect(q.x - bw, q.y - bh, bw * 2, bh * .78);
+    cx.fillStyle = fl ? '#fff' : '#7f5a3d'; cx.fillRect(q.x - bw, q.y - bh, bw * 2, 4 * s);
+    cx.fillStyle = fl ? '#d8c8b0' : '#58402c'; cx.fillRect(q.x - bw * .78, q.y - bh * 1.52, bw * 1.56, bh * .54);
+    cx.fillStyle = '#1b2a34'; cx.fillRect(q.x - bw * .62, q.y - bh * 1.44, bw * 1.24, bh * .34);
+    cx.fillStyle = '#c0291a'; cx.fillRect(q.x - bw * .95, q.y - bh * .75, bw * .16, bh * .22); cx.fillRect(q.x + bw * .79, q.y - bh * .75, bw * .16, bh * .22);
+    cx.strokeStyle = '#2b1f16'; cx.lineWidth = Math.max(1, s * .8); cx.strokeRect(q.x - bw, q.y - bh * .78, bw * 2, bh * .5);
+    if (dm > .35) { cx.strokeStyle = 'rgba(15,10,6,.8)'; cx.lineWidth = Math.max(1, s); cx.beginPath(); cx.moveTo(q.x - bw * .5, q.y - bh * .9); cx.lineTo(q.x - bw * .2, q.y - bh * .5); cx.moveTo(q.x + bw * .4, q.y - bh * 1.2); cx.lineTo(q.x + bw * .1, q.y - bh * .6); cx.stroke(); }
+    if (dm > .6 && Math.random() < .2 && G.parts.length < 380) G.parts.push({ x: q.x + rnd(-bw, bw) * .5, y: q.y - bh, vx: rnd(-6, 6), vy: -30, life: .8, max: .8, col: '#2a2d33', r: 3, g: -20 });
+  } else if (k === 'sandbag') { // a low wall of sandbags
+    const rows = 3, fl = o.hit > 0, dm = 1 - o.hp / o.max, vis = Math.max(1, Math.ceil(rows * (1 - dm * .6)));
+    cx.fillStyle = 'rgba(0,0,0,.3)'; cx.beginPath(); cx.ellipse(q.x, q.y, w * 1.15, 4 * s, 0, 0, 7); cx.fill();
+    for (let r = 0; r < vis; r++) { const n = 5 - r, bw = (w * 2.1) / 5, y = q.y - (r + 1) * 8.5 * s; for (let i = 0; i < n; i++) { const x = q.x - (n * bw) / 2 + i * bw + bw / 2, c = 150 + (hash(sd + r * 9 + i) - .5) * 40 | 0; cx.fillStyle = fl ? '#fff' : `rgb(${c},${c - 28},${c - 66})`; cx.beginPath(); cx.ellipse(x, y + 4 * s, bw * .56, 5.6 * s, 0, 0, 7); cx.fill(); cx.strokeStyle = 'rgba(40,28,14,.55)'; cx.lineWidth = Math.max(1, s * .6); cx.stroke(); } }
   } else if (k === 'overpass') {
     const xa = P(-1.12, rel), xb = P(1.12, rel), top = 250 * q.s * 1.4, dk = 42 * q.s * 1.4, col = o.st === 1 ? 1 : 0;
     cx.fillStyle = '#4a4e54'; for (const p of [xa, xb]) { cx.fillRect(p.x - 26 * q.s, p.y - top, 52 * q.s, top); cx.fillStyle = '#62666d'; cx.fillRect(p.x - 26 * q.s, p.y - top, 8 * q.s, top); cx.fillStyle = '#4a4e54'; }
@@ -2194,11 +2343,54 @@ function drawRocket(r) {
   cx.restore();
 }
 
+// ---- sector weather: plasma storms in the Foundry, night-vision dark zones in the Metro, radioactive rain on the Salt Flats
+const ENVS = { 'Foundry': 'storm', 'Salt Flats': 'rain', 'Drowned Metro': 'dark' };
+const ENV_NAMES = { storm: 'PLASMA STORM', rain: 'RADIOACTIVE RAIN', dark: 'DARK ZONE' };
+function envStep(dt) {
+  if (!G.env || G.over) return;
+  if (G.env === 'storm') {   // squalls of burning plasma: markers burn on the road, then it comes down. A gap is always open.
+    G.stCd = (G.stCd === undefined ? 7 : G.stCd) - dt;
+    if (G.stCd <= 0) { G.stCd = rnd(11, 16); G.squall = 4.5; addText(W / 2, 300, 'PLASMA STORM', '#ff8a3a'); sfx.siren(); }
+    if (G.squall > 0) {
+      G.squall -= dt; G.sqT = (G.sqT || 0) - dt;
+      if (G.sqT <= 0) { G.sqT = .9; const gx = clamp(G.px + rnd(-.5, .5), -.6, .6); for (let i = 0; i < 2; i++) { let x = rnd(-.85, .85); if (Math.abs(x - gx) < .4) x = gx + (x < gx ? -.45 : .45); G.strikes.push({ x: clamp(x, -.88, .88), rz: rnd(4, 40), t: 1.2, max: 1.2, dmg: 1 + Math.floor(G.lv / 6), r: .13, fire: 0, storm: 1 }); } }
+    }
+    G.storm = clamp((G.storm || 0) + ((G.squall > 0 ? 1 : 0) - (G.storm || 0)) * dt * 1.5, 0, 1);
+  } else if (G.env === 'dark') {
+    const ph = Math.sin(G.dist / 520 + 1.2), tg = ph > .15 ? clamp((ph - .15) * 3, 0, 1) : 0, was = (G.dk || 0) > .3;
+    G.dk = (G.dk || 0) + (tg - (G.dk || 0)) * dt * 1.2;
+    if (!was && G.dk > .3) addText(W / 2, 300, 'DARK ZONE: NIGHT VISION', '#6dff9a');
+  } else if (G.env === 'rain') {
+    const ph = Math.sin(G.dist / 700 + 2.4), tg = ph > 0 ? clamp(ph * 3, 0, 1) : 0, was = (G.rn || 0) > .3;
+    G.rn = (G.rn || 0) + (tg - (G.rn || 0)) * dt * 1.2;
+    if (!was && G.rn > .3) addText(W / 2, 300, 'RADIOACTIVE RAIN: SCRAP +30%, FIRE -10%', '#9aff7a');
+    if (G.rn > .5 && Math.random() < dt * 8) sfx.geiger();
+  }
+}
+function drawEnv() {
+  const t = G.t;
+  if (G.env === 'storm' && (G.storm || 0) > .01) {
+    const k = G.storm; cx.fillStyle = `rgba(255,70,15,${.07 * k})`; cx.fillRect(0, 0, W, H);
+    cx.save(); cx.globalCompositeOperation = 'lighter'; cx.lineWidth = 1.6;
+    for (let i = 0; i < 46; i++) { const x = (hash(i) * W + t * 120 * (.5 + hash(i + 9))) % W, y = (hash(i + 3) * H + t * 300 * (.6 + hash(i + 5))) % H; cx.strokeStyle = `rgba(255,${120 + hash(i) * 100 | 0},40,${.55 * k})`; cx.beginPath(); cx.moveTo(x, y); cx.lineTo(x - 7, y - 16); cx.stroke(); }
+    cx.restore();
+  } else if (G.env === 'rain' && (G.rn || 0) > .01) {
+    const k = G.rn; cx.fillStyle = `rgba(40,255,70,${.05 * k})`; cx.fillRect(0, 0, W, H);
+    cx.save(); cx.strokeStyle = `rgba(160,255,150,${.4 * k})`; cx.lineWidth = 1;
+    for (let i = 0; i < 110; i++) { const x = (hash(i) * (W + 80) + t * 60) % (W + 80) - 40, y = (hash(i + 3) * H + t * 640 * (.7 + hash(i + 7) * .5)) % H; cx.beginPath(); cx.moveTo(x, y); cx.lineTo(x - 4, y + 15); cx.stroke(); }
+    cx.restore();
+  } else if (G.env === 'dark' && (G.dk || 0) > .01) {
+    const k = G.dk, g = cx.createRadialGradient(W / 2, H - 250, 90, W / 2, H - 250, 560);
+    g.addColorStop(0, 'rgba(0,16,6,0)'); g.addColorStop(.4, `rgba(0,14,5,${.62 * k})`); g.addColorStop(1, `rgba(0,6,2,${.93 * k})`);
+    cx.fillStyle = g; cx.fillRect(0, 0, W, H);
+    cx.save(); cx.globalCompositeOperation = 'lighter'; cx.fillStyle = `rgba(20,255,90,${.045 * k})`; cx.fillRect(0, 0, W, H); cx.restore();
+  }
+}
 function drawStrike(st) {
   const q = P(st.x, st.rz), rx = st.r * LANE * q.s + 10, ry = rx * .3;
   if (!st.fire) {
     const p = 1 - st.t / st.max, on = Math.sin(G.t * (10 + p * 22)) > -.3;
-    cx.strokeStyle = `rgba(255,60,40,${.45 + .5 * p})`; cx.lineWidth = 2 + 2 * p; cx.beginPath(); cx.ellipse(q.x, q.y, rx, ry, 0, 0, 7); cx.stroke();
+    cx.strokeStyle = st.storm ? `rgba(255,150,40,${.45 + .5 * p})` : `rgba(255,60,40,${.45 + .5 * p})`; cx.lineWidth = 2 + 2 * p; cx.beginPath(); cx.ellipse(q.x, q.y, rx, ry, 0, 0, 7); cx.stroke();
     if (on) { cx.fillStyle = `rgba(255,60,40,${.1 + .16 * p})`; cx.fill(); }
     cx.strokeStyle = `rgba(255,150,120,${.5})`; cx.lineWidth = 1.5; cx.beginPath(); cx.ellipse(q.x, q.y, rx * (1 - p * .65), ry * (1 - p * .65), 0, 0, 7); cx.stroke();
   } else {
@@ -2469,6 +2661,7 @@ function render() {
   }
   if (G.flash > 0) { cx.fillStyle = `rgba(255,255,255,${G.flash * .6})`; cx.fillRect(0, 0, W, H); }
   if (G.hurtFlash > 0) { cx.fillStyle = `rgba(255,0,0,${G.hurtFlash * .5})`; cx.fillRect(0, 0, W, H); }
+  drawEnv();
   cx.restore();
   drawGrade();
   drawHUD();
@@ -2477,7 +2670,7 @@ function render() {
 function drawHUD() {
   cx.fillStyle = 'rgba(0,0,0,.5)'; cx.fillRect(0, 0, W, 52);
   cx.textBaseline = 'middle'; cx.textAlign = 'left'; cx.font = `15px ${FONT}`; cx.fillStyle = '#ff9a4a';
-  cx.fillText('SECTOR ' + G.lv, 14, 18);
+  cx.fillText('SECTOR ' + G.lv + (G.endless ? ' · SURVIVAL' : ''), 14, 18);
   cx.textAlign = 'right'; cx.fillStyle = '#ffd24a'; cx.fillText('⚙ ' + G.scrap, W - 60, 18);
   const pw = W - 100, pr = clamp(G.dist / G.L, 0, 1);
   cx.fillStyle = '#222'; cx.fillRect(14, 34, pw, 8); cx.fillStyle = '#ff5a2a'; cx.fillRect(14, 34, pw * pr, 8);
@@ -2490,6 +2683,7 @@ function drawHUD() {
     cx.textAlign = 'center'; cx.font = `13px ${FONT}`; cx.fillStyle = '#fff'; cx.fillText((boss.name || ET[boss.t].name).toUpperCase(), W / 2, 68);
     cx.fillStyle = '#300'; cx.fillRect(30, 78, W - 60, 10); cx.fillStyle = '#ff2a2a'; cx.fillRect(30, 78, (W - 60) * Math.max(0, boss.hp / boss.max), 10);
     if (boss.plateMax) { cx.fillStyle = '#012'; cx.fillRect(30, 90, W - 60, 5); cx.fillStyle = '#6ff3ff'; cx.fillRect(30, 90, (W - 60) * Math.max(0, boss.plate / boss.plateMax), 5); }
+    if (boss.cp) { const cw = (W - 60) / boss.cp.length; cx.font = `8px ${FONT}`; boss.cp.forEach((p, i) => { const x0 = 30 + i * cw; cx.fillStyle = '#1a1010'; cx.fillRect(x0 + 1, 98, cw - 2, 4); cx.fillStyle = p.dead ? '#444' : p.hit > 0 ? '#fff' : '#ffb04a'; cx.fillRect(x0 + 1, 98, (cw - 2) * Math.max(0, p.fr), 4); cx.fillStyle = p.dead ? '#666' : '#c9a070'; cx.textAlign = 'center'; cx.fillText((p.dead ? '✕ ' : '') + p.name, x0 + cw / 2, 111); }); }
   }
   // weapon
   cx.textAlign = 'left'; cx.font = `14px ${FONT}`; cx.fillStyle = WEAPONS[G.tier].col; cx.fillText(WEAPONS[G.tier].name, 14, H - 20);
@@ -2502,7 +2696,7 @@ function drawHUD() {
     if (G.n > 0 && G.peak >= 12 && G.n <= G.peak * .25) { cx.fillStyle = '#ff6a4a'; cx.globalAlpha = .6 + .4 * Math.sin(T * 8); cx.fillText('LAST STAND +20%', 14, by); cx.globalAlpha = 1; } }
   // specialist squad members
   cx.textAlign = 'left'; cx.font = `11px ${FONT}`; let cxp = 14;
-  for (const k of CLS) { if (!G.cls[k]) continue; const t = CLASS[k].name + ' x' + G.cls[k]; cx.fillStyle = CLASS[k].col; cx.fillText(t, cxp, H - 40); cxp += cx.measureText(t).width + 10; }
+  { let row = 0; for (const k of CLS) { if (!G.cls[k]) continue; const t = CLASS[k].name.split(' ')[0] + ' x' + G.cls[k], tw = cx.measureText(t).width; if (cxp + tw > W - 140 && cxp > 14) { cxp = 14; row++; } cx.fillStyle = CLASS[k].col; cx.fillText(t, cxp, H - 40 - row * 14); cxp += tw + 10; } }
   // formation button
   { const fx = W - 118, fy = H - 52; cx.fillStyle = 'rgba(0,0,0,.55)'; cx.beginPath(); cx.arc(fx, fy, 24, 0, 7); cx.fill(); cx.strokeStyle = '#8fb4d8'; cx.lineWidth = 2; cx.beginPath(); cx.arc(fx, fy, 21, 0, 7); cx.stroke();
     cx.fillStyle = '#cfe8ff'; const f = G.form || 'free', dot = (x, y) => cx.fillRect(fx + x - 2, fy + y - 2, 4, 4);
