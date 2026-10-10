@@ -28,7 +28,7 @@ if (args.includes('--help') || args.includes('-h')) {
   --start N        begin at sector N (default 1)
   --up L           begin with every upgrade at level L (to test a late sector)
   --attempts N     tries per sector before buying upgrades (default 3)
-  --time S         wall-clock budget in seconds (default 900)
+  --time S         optional wall-clock budget in seconds (default: none, runs until the cap; Ctrl+C to stop)
   --seed N         random seed (default 11)
   --form F         free | v | col | wall (default v)
   --assist         keep the game's "machines get weaker after a loss" help (off by default)
@@ -36,7 +36,7 @@ if (args.includes('--help') || args.includes('-h')) {
 }
 for (const a of args) if (a.startsWith('--')) { const k = ALIAS[a.slice(2)] || a.slice(2); if (!KNOWN.includes(k)) { console.error('unknown option ' + a + ' (try --help)'); process.exit(2); } }
 const opt = (k, d) => { let i = args.indexOf('--' + k); if (i < 0) for (const a in ALIAS) if (ALIAS[a] === k && args.indexOf('--' + a) >= 0) i = args.indexOf('--' + a); return i < 0 ? d : (typeof d === 'boolean' ? true : +args[i + 1]); };
-const WHY = opt('why', false), MAXLV = opt('max-sector', 100), ATT = opt('attempts', 3), BUDGET = opt('time', 900) * 1000, ASSIST = opt('assist', false);
+const WHY = opt('why', false), MAXLV = opt('max-sector', 100), ATT = opt('attempts', 3), BUDGET = opt('time', 0) > 0 ? opt('time', 0) * 1000 : Infinity, ASSIST = opt('assist', false);
 const FORM = (args.indexOf('--form') >= 0 ? args[args.indexOf('--form') + 1] : 'v');
 let seed = opt('seed', 11); Math.random = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;
 
