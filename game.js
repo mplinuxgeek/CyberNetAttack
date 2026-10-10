@@ -237,6 +237,7 @@ const sfx = {   // gritty, low and heavy: filtered noise and saturated low tones
   hurt() { tn(0, 110, 36, .2, 'sawtooth', .5); nz(0, .13, { type: 'lowpass', f0: 1200, f1: 160, g: .4 }); },
   emp() { tn(0, 70, 1400, .35, 'sawtooth', .16); nz(.28, .7, { f0: 2200, f1: 120, q: .6, g: .6 }); tn(.28, 70, 22, .7, 'sawtooth', .5); tn(.28, 48, 20, .8, 'sine', .8); },   // charge up then a deep concussive burst
   cannon() { tn(0, 1400, 70, .5, 'sawtooth', .3); nz(0, .6, { f0: 3500, f1: 250, q: .7, g: .55 }); tn(.05, 60, 30, .8, 'sine', .8); tn(0, 200, 900, .25, 'square', .1); },   // a heavy plasma discharge
+  arc() { nz(0, .2, { f0: 3200, f1: 700, q: 2, g: .4 }); tn(0, 1900, 160, .14, 'square', .14); },   // live cable discharge
   ping() { if (ok('png', 60)) { tn(0, rnd(300, 480), 220, .16, 'square', .12); nz(0, .03, { f0: 1600, q: 1.5, g: .2 }); } },   // a clang on the reprogrammed unit
   mg() { for (let i = 0; i < 3; i++) { nz(i * .055, .045, { f0: 1500, q: .9, g: .45 }); tn(i * .055, 100, 55, .06, 'sawtooth', .25); } },   // enemy minigun burst
   zap(big) { // enemy plasma bolt leaving the barrel
@@ -300,6 +301,29 @@ function addHazards(haz, z, lv) {
   const xs = [-.72, -.2, .32, .78].sort(() => Math.random() - .5).slice(0, rint(2, 3));
   for (const x of xs) haz.push({ k: 'uxo', x: x + rnd(-.06, .06), hw: .09, wz: z + rnd(-20, 20), len: 30, tick: 0, dead: false });
 }
+// ---- terrain obstacles: concrete barriers, rubble, tank traps, live cables and collapsing overpasses. Every one leaves a way through.
+function addObstacles(obs, gates, en, L, lv) {
+  const gap = () => rnd(-.55, .55), side = () => (Math.random() < .5 ? -1 : 1);
+  const pool = ['jersey', 'rubble']; if (lv >= 2) pool.push('trap', 'cable'); if (lv >= 3) pool.push('overpass');
+  let over = 0;
+  for (const g of gates) {   // one candidate slot in the stretch behind each gate, clear of every gate approach
+    const z = g.wz + rnd(280, 400);
+    const clear = z < L - 560 && !gates.some(h => z > h.wz - 170 && z < h.wz + 270);
+    if (clear && Math.random() < Math.min(.9, .55 + .08 * lv)) {
+      const k = pool[Math.floor(Math.random() * pool.length)];
+      if (k === 'jersey' || k === 'trap') { // a broken line of blocks with one gap
+        const g = gap(), hw = k === 'jersey' ? .1 : .085;
+        for (let x = -.85; x <= .85; x += hw * 2.2) if (Math.abs(x - g) > .3) obs.push({ k, x, hw, wz: z + rnd(-5, 5), len: k === 'jersey' ? 28 : 24, hp: k === 'jersey' ? 120 : 260, dead: false });
+      } else if (k === 'rubble') {
+        obs.push({ k, x: rnd(-.6, .6), hw: rnd(.28, .45), wz: z, len: 90, hp: 80, dead: false, sd: Math.random() * 99 });
+      } else if (k === 'cable') {
+        const hw = rnd(.4, .6); obs.push({ k, x: side() * (.9 - hw), hw, wz: z, len: 6, hp: 1e9, dead: false, sd: Math.random() * 99 });
+      } else if (k === 'overpass' && over < 2) {
+        over++; obs.push({ k, x: 0, hw: 1.1, wz: z, len: 60, hp: 1e9, dead: false, st: 0, t: 0, open: 0 });
+      }
+    }
+  }
+}
 function genLevel(lv) {
   const L = 2800 + lv * 260, hpm = 1 + .2 * (lv - 1);
   const gates = [], en = [];
@@ -325,7 +349,8 @@ function genLevel(lv) {
   if (lv >= 3) pups.push({ k: 'guard', x: rnd(-.55, .55), wz: pg(.7).wz + 95 });
   pups.push({ k: 'supply', x: rnd(-.55, .55), wz: pg(.5).wz + 95 });   // tactical-item supply crates: one mid-sector, another late on from sector 3
   if (lv >= 3) pups.push({ k: 'supply', x: rnd(-.55, .55), wz: pg(.85).wz + 95 });
-  return { L, gates, en, haz, pups };
+  const obs = []; addObstacles(obs, gates, en, L, lv);
+  return { L, gates, en, haz, pups, obs };
 }
 
 // ---------------------------------------------------------------- state
@@ -366,7 +391,7 @@ function startLevel(lv) {
     fcd: .3, bullets: [], bolts: [], parts: [], texts: [],
     scrap: 0, kills: 0, item: { k: 'pulse', n: 2 }, c4: [], flares: [], fallout: [], beam: null, shake: 0, flash: 0, hurtFlash: 0,
     guard: null, gx: 0, pups: [], pupPlan: lvl.pups.map(p => ({ k: p.k, x: p.x, wz: p.wz, done: false })),
-    cls: Object.fromEntries(CLS.map(k => [k, 0])), sig: 7, scr: [], haz: lvl.haz, rockets: [], strikes: [], lt: [], warn: null, mz: 0, rcd: 2, peak: 6 + 2 * save.up.squad,
+    cls: Object.fromEntries(CLS.map(k => [k, 0])), sig: 7, scr: [], haz: lvl.haz, obs: lvl.obs, slow: 1, rockets: [], strikes: [], lt: [], warn: null, mz: 0, rcd: 2, peak: 6 + 2 * save.up.squad,
     ts: 1, t: 0, later: [], deaths: [], waves: [], alert: null, over: false, won: false, endT: 0, paused: false,
   };
   for (const k of save.loadout) { if (!CLASS[k] || !save.unlocked[k]) continue; const c0 = classStart(); G.cls[k] = c0; G.n += c0; G.peak += c0; }   // each picked class starts with a few soldiers, on top of the squad
@@ -579,7 +604,7 @@ function empStep(dt) {
 }
 function c4Blow(c) {
   if (c.dead) return; c.dead = true; const e = c.e;
-  explodeAt(e.x, e.wz, 40, null);
+  explodeAt(e.x, e.wz, 40, null); obsBlast(e.x, e.wz, 300);
   const dmg = (260 + 40 * G.lv) * ipow() + e.max * (e.boss ? .07 : .25);
   hurtEnemy(e, dmg, { ignoreArmor: true, plateMul: 2, explosive: true }); e.flash = .3;
   const q = P(e.x, e.wz - G.dist); addText(q.x, q.y - (HITH[e.t] || 60) * q.s * e.sc - 30, 'C4', '#ffb03a'); G.flash = Math.max(G.flash, .25); G.shake = Math.max(G.shake, 10);
@@ -588,7 +613,7 @@ function c4Blow(c) {
 const USE = {
   pulse() { G.flash = .3; G.shake = 8; sfx.emp(); launchWave('pulse', PULSE_RANGE); addText(W / 2, 330, 'PULSE GRENADE', ITEMS.pulse.col); return true; },
   nuke() {
-    G.flash = 1; G.shake = 22; sfx.emp(); sfx.boom(); launchWave('nuke', NUKE_RANGE); addText(W / 2, 330, 'M-38 DETONATION', ITEMS.nuke.col); buzz([200, 60, 200]);
+    G.flash = 1; G.shake = 22; sfx.emp(); sfx.boom(); launchWave('nuke', NUKE_RANGE); for (const o of G.obs) { if (o.dead) continue; if (o.k === 'overpass') collapseStart(o); else if (o.wz - G.dist < NUKE_RANGE) obsBlast(o.x, o.wz, 1e4); } addText(W / 2, 330, 'M-38 DETONATION', ITEMS.nuke.col); buzz([200, 60, 200]);
     for (let i = 0; i < 8; i++) G.fallout.push({ x: clamp(G.px + rnd(-.25, .25), -.8, .8), wz: G.dist + 160 + i * 105, r: .26 + rnd(0, .08), t: 14 + rnd(0, 3), t0: 17, sd: Math.random() * 99 });
     return true;
   },
@@ -612,6 +637,7 @@ const USE = {
       if (e.hp <= 0) kill(e);
     }
     G.bolts = G.bolts.filter(b => Math.abs(b.x - G.px) > .2);
+    for (const o of G.obs) if (!o.dead && Math.abs(o.x - G.px) < .2 + o.hw) obsBlast(o.x, o.wz, 900); for (const o of G.obs) if (o.k === 'overpass' && o.wz - G.dist < 900) collapseStart(o);
     return true;
   },
   spike() {
@@ -635,6 +661,62 @@ const USE = {
     return true;
   },
 };
+function collapseStart(o) {
+  if (o.st !== 0) return; o.st = 1; o.t = 1.5; o.open = Math.floor(Math.random() * 3);
+  addText(W / 2, 300, 'OVERPASS COLLAPSING', '#ff9a4a'); sfx.hurt(); G.shake = Math.max(G.shake, 6);
+}
+function obsBlast(x, wz, dmg) { // explosions chew through barriers and rubble, and bring a weakened overpass down
+  for (const o of G.obs) {
+    if (o.dead) continue;
+    if (o.k === 'overpass') { if (Math.abs(o.wz - wz) < 240) collapseStart(o); continue; }
+    if (o.k === 'cable' || Math.abs(o.x - x) > .32 + o.hw || Math.abs(o.wz - wz) > 60 + o.len * .5) continue;
+    o.hp -= dmg;
+    if (o.hp <= 0) { o.dead = true; const q = P(o.x, o.wz - G.dist); addParts(q.x, q.y - 12 * q.s, 18, '#8a8f96', 220, .7, 120); addParts(q.x, q.y - 12 * q.s, 8, '#6b5a48', 160, .6, 120); sfx.hit(); }
+  }
+}
+function obsStep(dt) {
+  G.slow = 1; const sh = squadHalf();
+  for (const o of G.obs) {
+    if (o.dead) continue;
+    const rel = o.wz - G.dist, k = o.k;
+    if (k === 'jersey' || k === 'slab') { // solid: the squad is slowed and shouldered to one side
+      if (rel < 26 && rel > -o.len - 12 && Math.abs(G.px - o.x) < o.hw + sh * .55 && !G.over) { G.slow = Math.min(G.slow, .3); G.px = clamp(G.px + (G.px >= o.x ? 1 : -1) * 1.1 * dt, -.9, .9); }
+    } else if (k === 'rubble') {
+      if (Math.abs(rel) < o.len * .5 + 10 && Math.abs(G.px - o.x) < o.hw + sh * .55 && !G.over) G.slow = Math.min(G.slow, .6);
+    } else if (k === 'trap') { // heavy tracked machines cannot cross a hedgehog line; infantry and endoskeletons squeeze through
+      for (const e of G.en) {
+        if (e.dead || !ET[e.t].tracked) continue;
+        if (Math.abs(e.x - o.x) < o.hw + ET[e.t].hw * e.sc * .5 + .03 && e.wz < o.wz + o.len * .5 + 14 && e.wz > o.wz - 24) e.wz = o.wz + o.len * .5 + 14;
+      }
+    } else if (k === 'cable') { // a live cable: one jolt for whoever crosses it, a short stun for machines
+      if (!o.sq && rel <= 0 && rel > -40) {
+        o.sq = true;
+        if (!G.over && Math.abs(G.px - o.x) < o.hw + sh * .5) { hurt(1, 0, true); G.hurtFlash = .2; sfx.arc(); const q = squadPos(); addSparks(q.x, q.y - 20, 14, q.y, true); addText(q.x, q.y - 100, 'LIVE CABLE', '#9fd8ff'); }
+      }
+      for (const e of G.en) {
+        if (e.dead || ET[e.t].fly || (e.zap && e.zap.has(o))) continue;
+        if (e.wz <= o.wz + 8 && e.wz > o.wz - 60 && Math.abs(e.x - o.x) < o.hw + ET[e.t].hw * e.sc * .5) {
+          (e.zap = e.zap || new Set()).add(o); if (!bossShielded(e)) { e.stun = Math.max(e.stun || 0, 2.5); e.stunT = G.t; e.stunRel = undefined; }
+          const q = P(e.x, e.wz - G.dist); addSparks(q.x, q.y - 40 * q.s, 12, q.y, true); sfx.arc();
+        }
+      }
+    } else if (k === 'overpass' && o.st === 1) {
+      o.t -= dt; const q = P(o.x, rel); if (Math.random() < dt * 30) addParts(q.x + rnd(-200, 200) * q.s, q.y - 200 * q.s, 1, '#9a8f84', 60, .8, 200);
+      if (o.t <= 0) {
+        o.st = 2; G.shake = Math.max(G.shake, 16); sfx.boom(); G.flash = Math.max(G.flash, .2);
+        for (let i = 0; i < 3; i++) {
+          if (i === o.open) continue;
+          const lx = (i - 1) * .6; G.obs.push({ k: 'slab', x: lx, hw: .3, wz: o.wz, len: 40, hp: 220, dead: false, fall: 0, sd: Math.random() * 99 });
+          if (!G.over && Math.abs(o.wz - G.dist) < 50 && Math.abs(G.px - lx) < .3 + sh * .4) { hurt(2, 0); addText(squadPos().x, squadPos().y - 100, 'CRUSHED', '#ff5a5a'); }
+          for (const e of G.en.slice()) if (!e.dead && Math.abs(e.x - lx) < .3 && Math.abs(e.wz - o.wz) < 50 && !e.boss) { hurtEnemy(e, 400 * (1 + .1 * G.lv), { ignoreArmor: true, explosive: true }); if (e.hp <= 0) kill(e); }
+          const q2 = P(lx, rel); addParts(q2.x, q2.y - 10 * q2.s, 20, '#9a8f84', 260, .9, 160);
+        }
+      }
+    }
+    if (k === 'slab' && o.fall < 1) o.fall = Math.min(1, o.fall + dt * 4);
+  }
+  G.obs = G.obs.filter(o => !o.dead && o.wz - G.dist > -200);
+}
 function drawEmpWave(w) { // the ring on the ground, in perspective, with a faint trailing echo
   const r = waveSpeed(w) * w.t, fade = clamp(1 - r / (w.range + 80), 0, 1), nk = w.kind === 'nuke';
   cx.save(); cx.globalCompositeOperation = 'lighter'; cx.lineCap = 'round'; cx.lineJoin = 'round';
@@ -748,6 +830,7 @@ function explodeAt(x, wz, dmg, main) {
     if (o.hp <= 0) kill(o);
   }
   for (const h of G.haz) if (!h.dead && h.k === 'uxo' && Math.abs(h.x - x) < .3 && Math.abs(h.wz - wz) < 60) detonateHaz(h, false);
+  obsBlast(x, wz, dmg);
 }
 function detonateHaz(h, hitsSquad) {
   if (h.dead) return;
@@ -846,7 +929,7 @@ function update(dt) {
     }
   }
   if (G.over) blocked = true;
-  const target = blocked ? 0 : 90 * G.ts;
+  const target = blocked ? 0 : 90 * G.ts * (G.slow || 1);
   G.spd += (target - G.spd) * Math.min(1, dt * 6);
   G.dist += G.spd * dt;
 
@@ -1060,7 +1143,7 @@ function update(dt) {
   }
   G.en = G.en.filter(e => !e.dead);
   for (const Dh of G.deaths) deathStep(Dh, dt);
-  empStep(dt);
+  empStep(dt); obsStep(dt);
   if (G.deaths.length) G.deaths = G.deaths.filter(Dh => Dh.t < (Dh.tb || 0) + 3.2 * (Dh.ts || 1) + .1);
 
   // hazards on the ground: unexploded ordnance
@@ -1120,7 +1203,7 @@ function update(dt) {
     if (!st.fire) {
       st.t -= dt;
       if (st.t <= 0) {
-        st.fire = .3; G.shake = Math.max(G.shake, 7); sfx.boom();
+        st.fire = .3; G.shake = Math.max(G.shake, 7); sfx.boom(); obsBlast(st.x, G.dist + st.rz, 60);
         if (G.guard && !G.guard.dead && Math.abs(G.gx - st.x) < st.r + .08) hurtGuard(st.dmg);
         if (!G.over && Math.abs(G.px - st.x) < st.r + squadHalf() * .5) hurt(st.dmg, (st.x - G.px) * LANE);
       }
@@ -1972,6 +2055,67 @@ function drawFlare(f) { // a red signal flare burning on the road, smoke rising,
   for (let i = 0; i < 6; i++) { const t = (G.t * .5 + i / 6) % 1; cx.fillStyle = `rgba(255,${90 + 60 * t | 0},${70 + 80 * t | 0},${(1 - t) * .3})`; cx.beginPath(); cx.arc(q.x + Math.sin(t * 5 + i) * 6 * s, q.y - t * 150 * s, (4 + t * 16) * s, 0, 7); cx.fill(); }
   cx.restore();
 }
+function drawObs(o) {
+  const rel = o.wz - G.dist, q = P(o.x, rel), s = q.s * 1.4, w = o.hw * LANE * q.s, k = o.k, sd = o.sd || o.x * 50 + o.wz;
+  cx.save();
+  if (k === 'jersey') { // concrete barrier: a stepped block with a warning stripe
+    const h = 24 * s, tw = w * .55;
+    cx.fillStyle = 'rgba(0,0,0,.35)'; cx.beginPath(); cx.ellipse(q.x, q.y, w * 1.1, 4 * s, 0, 0, 7); cx.fill();
+    cx.fillStyle = '#8c9096'; cx.beginPath(); cx.moveTo(q.x - w, q.y); cx.lineTo(q.x - w * .8, q.y - h * .4); cx.lineTo(q.x - tw, q.y - h); cx.lineTo(q.x + tw, q.y - h); cx.lineTo(q.x + w * .8, q.y - h * .4); cx.lineTo(q.x + w, q.y); cx.fill();
+    cx.fillStyle = '#b3b7bc'; cx.fillRect(q.x - tw, q.y - h, tw * 2, h * .16);
+    cx.fillStyle = '#5e6268'; cx.beginPath(); cx.moveTo(q.x + w * .8, q.y - h * .4); cx.lineTo(q.x + w, q.y); cx.lineTo(q.x + w * .3, q.y); cx.lineTo(q.x + tw, q.y - h); cx.fill();
+    cx.fillStyle = '#c0451f'; for (let i = -1; i <= 1; i += 2) cx.fillRect(q.x + i * w * .32 - w * .1, q.y - h * .75, w * .2, h * .22);
+    cx.strokeStyle = 'rgba(30,30,34,.7)'; cx.lineWidth = Math.max(1, s * .6); cx.beginPath(); cx.moveTo(q.x - w * .55, q.y - h * .3); cx.lineTo(q.x - w * .2, q.y - h * .5); cx.stroke();
+  } else if (k === 'rubble') { // a berm of broken slabs with rebar webbing
+    const rx = w * 1.05, ry = Math.max(5, rx * .28);
+    cx.fillStyle = 'rgba(0,0,0,.3)'; cx.beginPath(); cx.ellipse(q.x, q.y, rx, ry, 0, 0, 7); cx.fill();
+    for (let i = 0; i < 14; i++) {
+      const px = q.x + (hash(sd * 3 + i) - .5) * rx * 1.7, py = q.y - hash(sd * 5 + i) * ry * 1.1, sz = (6 + hash(sd * 7 + i) * 14) * s, g = 70 + hash(sd + i) * 60 | 0;
+      cx.fillStyle = `rgb(${g},${g - 6},${g - 14})`; cx.beginPath(); cx.moveTo(px - sz, py); cx.lineTo(px - sz * .4, py - sz * .9); cx.lineTo(px + sz * .5, py - sz * .7); cx.lineTo(px + sz, py); cx.fill();
+    }
+    cx.strokeStyle = '#6a3a22'; cx.lineWidth = Math.max(1, s * .9);
+    for (let i = 0; i < 9; i++) { const px = q.x + (hash(sd * 11 + i) - .5) * rx * 1.6, py = q.y - hash(sd * 13 + i) * ry; cx.beginPath(); cx.moveTo(px, py); cx.lineTo(px + (hash(sd * 17 + i) - .5) * 30 * s, py - (10 + hash(sd * 19 + i) * 26) * s); cx.stroke(); }
+  } else if (k === 'trap') { // czech hedgehog: three crossed steel beams
+    const r = w * 1.15 + 6 * s;
+    cx.fillStyle = 'rgba(0,0,0,.35)'; cx.beginPath(); cx.ellipse(q.x, q.y, r, 3 * s, 0, 0, 7); cx.fill();
+    cx.lineCap = 'butt';
+    for (const [a, b] of [[-1, 1], [1, 1], [0, 1.25]]) {
+      cx.strokeStyle = '#2b3036'; cx.lineWidth = Math.max(2, 7 * s); cx.beginPath(); cx.moveTo(q.x - a * r, q.y - 2 * s); cx.lineTo(q.x + a * r, q.y - 2 * s - b * r * 1.35); cx.stroke();
+      cx.strokeStyle = '#5a636c'; cx.lineWidth = Math.max(1, 3 * s); cx.beginPath(); cx.moveTo(q.x - a * r, q.y - 3 * s); cx.lineTo(q.x + a * r, q.y - 3 * s - b * r * 1.35); cx.stroke();
+    }
+  } else if (k === 'cable') { // a fallen power line: pylon stubs at each end, a sagging cable, arcs of electricity
+    const xa = P(o.x - o.hw, rel), xb = P(o.x + o.hw, rel), hgt = 34 * s, sag = 10 * s, live = !o.sq || rel > -60;
+    for (const p of [xa, xb]) { cx.fillStyle = '#2a2420'; cx.fillRect(p.x - 3 * s, p.y - hgt * 1.3, 6 * s, hgt * 1.3); cx.fillStyle = '#4a3c30'; cx.fillRect(p.x - 7 * s, p.y - hgt * 1.3, 14 * s, 3 * s); }
+    cx.strokeStyle = '#15110e'; cx.lineWidth = Math.max(1.5, 2.4 * s); cx.beginPath(); cx.moveTo(xa.x, xa.y - hgt); cx.quadraticCurveTo(q.x, q.y - hgt + sag * 2, xb.x, xb.y - hgt); cx.stroke();
+    if (live) {
+      cx.globalCompositeOperation = 'lighter'; const n = 7, tick = Math.floor(G.t * 18);
+      for (const [lw, col] of [[Math.max(2, 5 * s), 'rgba(80,160,255,.35)'], [Math.max(1, 1.6 * s), 'rgba(225,245,255,.95)']]) {
+        cx.strokeStyle = col; cx.lineWidth = lw; cx.beginPath();
+        for (let i = 0; i <= n; i++) { const f = i / n, x = xa.x + (xb.x - xa.x) * f, y = xa.y + (xb.y - xa.y) * f - hgt + Math.sin(f * Math.PI) * sag * 2 + (i % (n) === 0 ? 0 : (hash(tick * 9 + i + sd) - .5) * 14 * s); i ? cx.lineTo(x, y) : cx.moveTo(x, y); }
+        cx.stroke();
+      }
+      if (hash(tick + sd) > .6) { const f = hash(tick * 3 + sd), x = xa.x + (xb.x - xa.x) * f; glow(x, xa.y - hgt + Math.sin(f * Math.PI) * sag * 2, 2 * s, '#bfe6ff'); }
+    }
+  } else if (k === 'overpass') {
+    const xa = P(-1.12, rel), xb = P(1.12, rel), top = 250 * q.s * 1.4, dk = 42 * q.s * 1.4, col = o.st === 1 ? 1 : 0;
+    cx.fillStyle = '#4a4e54'; for (const p of [xa, xb]) { cx.fillRect(p.x - 26 * q.s, p.y - top, 52 * q.s, top); cx.fillStyle = '#62666d'; cx.fillRect(p.x - 26 * q.s, p.y - top, 8 * q.s, top); cx.fillStyle = '#4a4e54'; }
+    if (o.st < 2) {
+      const sh = o.st === 1 ? Math.sin(G.t * 60) * 2 * s : 0, y0 = xa.y - top - dk * .2 + sh;
+      cx.fillStyle = '#3a3d42'; cx.fillRect(xa.x - 34 * q.s, y0, xb.x - xa.x + 68 * q.s, dk);
+      cx.fillStyle = '#585c63'; cx.fillRect(xa.x - 34 * q.s, y0, xb.x - xa.x + 68 * q.s, dk * .22);
+      cx.fillStyle = '#c8b030'; for (let i = 0; i < 18; i++) cx.fillRect(xa.x - 34 * q.s + i * (xb.x - xa.x + 68 * q.s) / 18, y0 + dk * .78, (xb.x - xa.x + 68 * q.s) / 36, dk * .12);
+      cx.strokeStyle = '#161719'; cx.lineWidth = Math.max(1, 1.4 * s); cx.beginPath(); for (let i = 0; i < 6; i++) { const x = xa.x + (xb.x - xa.x) * (.1 + i * .16); cx.moveTo(x, y0 + dk * .25); cx.lineTo(x + (hash(i + sd) - .5) * 30 * s, y0 + dk * .95); } cx.stroke();
+      if (col) for (let i = 0; i < 3; i++) { if (i === o.open) continue; const lp = P((i - 1) * .6, rel); cx.fillStyle = `rgba(255,70,40,${.18 + .2 * Math.sin(G.t * 14)})`; cx.beginPath(); cx.ellipse(lp.x, lp.y, .3 * LANE * lp.s, Math.max(4, .3 * LANE * lp.s * .28), 0, 0, 7); cx.fill(); }
+    }
+  } else if (k === 'slab') { // a fallen deck section: tilted concrete with rebar sticking out
+    const drop = (1 - o.fall) * 320 * s, h = 30 * s;
+    cx.translate(0, -drop); cx.fillStyle = 'rgba(0,0,0,.35)'; cx.beginPath(); cx.ellipse(q.x, q.y + drop, w * 1.05, 5 * s, 0, 0, 7); cx.fill();
+    cx.fillStyle = '#6c7076'; cx.beginPath(); cx.moveTo(q.x - w, q.y); cx.lineTo(q.x - w * .9, q.y - h); cx.lineTo(q.x + w * .8, q.y - h * 1.35); cx.lineTo(q.x + w, q.y); cx.fill();
+    cx.fillStyle = '#8a8e94'; cx.beginPath(); cx.moveTo(q.x - w * .9, q.y - h); cx.lineTo(q.x + w * .8, q.y - h * 1.35); cx.lineTo(q.x + w * .8, q.y - h * 1.2); cx.lineTo(q.x - w * .9, q.y - h * .85); cx.fill();
+    cx.strokeStyle = '#6a3a22'; cx.lineWidth = Math.max(1, s); for (let i = 0; i < 6; i++) { const px = q.x - w * .8 + i * w * .3; cx.beginPath(); cx.moveTo(px, q.y - h * 1.1); cx.lineTo(px + (hash(sd + i) - .5) * 14 * s, q.y - h * 1.1 - (8 + hash(sd * 2 + i) * 14) * s); cx.stroke(); }
+  }
+  cx.restore();
+}
 function drawScrapChunk(c) {
   const rel = c.wz - G.dist; if (rel < -20) return;
   const q = P(c.x, rel), s = q.s * 1.5, sp = c.sp + G.t * 2;
@@ -2193,6 +2337,7 @@ function render() {
   for (const g of G.gates) { const z = g.wz - G.dist; if (!g.used && z < 1500 && z > -30) items.push({ z, f: () => drawGate(g) }); }
   for (const e of G.en) { const z = e.wz - G.dist; if (z < 1500 && z > -120 && !e.dead) items.push({ z, f: () => drawEnemy(e) }); }
   for (const Dh of G.deaths) items.push({ z: Dh.e.wz - G.dist, f: () => drawBossDeath(Dh) });
+  for (const o of G.obs) { const z = o.wz - G.dist; if (z < 1500 && z > -260) items.push({ z: o.k === 'overpass' ? z + 40 : z, f: () => drawObs(o) }); }
   for (const w of G.waves) items.push({ z: 1e6, f: () => drawEmpWave(w) });
   if (G.beam) items.push({ z: 1e6, f: () => drawBeam(G.beam) });
   for (const f of G.fallout) { const z = f.wz - G.dist; if (z < 1500 && z > -100) items.push({ z: z + 1, f: () => drawFallout(f) }); }

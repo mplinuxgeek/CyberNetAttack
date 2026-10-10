@@ -255,4 +255,26 @@ const arena=(lv,...en)=>{ const G=fresh(lv,[]); G.n=40; G.gates=[]; G.en=[]; G.p
   const G2=arena(3,t.mk('tank',1,0,1)); G2.en[0].wz=G2.dist+250; G2.item={k:'spike',n:1}; check('machines cannot be reprogrammed', t.useItem()===false); }
 { const a=[]; for(let i=0;i<5;i++){ const g=t.mk('grunt',i,.1*i-.2,1); g.hp=g.max=60; a.push(g); } const far=t.mk('grunt',9,.0,1); far.hp=far.max=60; const G=arena(3,...a,far); a.forEach((g,i)=>{ g.wz=G.dist+500+i*10; }); far.wz=G.dist+1200;
   G.item={k:'flare',n:1}; t.useItem(); run(G,1.0); check('the barrage waits for the flare to be spotted', a.every(g=>!g.dead)); run(G,5); check('105mm shells destroy the marked group', a.filter(g=>g.dead).length>=3, a.map(g=>g.hp)); check('...and spare what is far away', !far.dead && far.hp===far.max); check('no flares linger', G.flares.length===0); }
+// ---- phase 2: terrain obstacles
+{ let bad=0, kinds=new Set(), blocked=0, n=0;
+  for(let lv=1;lv<=12;lv++) for(let r=0;r<6;r++){ const L=t.genLevel(lv); n+=L.obs.length;
+    for(const o of L.obs){ kinds.add(o.k); if(L.gates.some(g=>o.wz>g.wz-170&&o.wz<g.wz+270)) bad++; }
+    for(const z of new Set(L.obs.map(o=>Math.round(o.wz/60)))){ const row=L.obs.filter(o=>Math.abs(o.wz-z*60)<40&&(o.k==='jersey'||o.k==='trap')); if(row.length){ let free=false; for(let x=-.88;x<=.88;x+=.02) if(row.every(o=>Math.abs(o.x-x)>o.hw+.05)) free=true; if(!free) blocked++; } } }
+  check('obstacles appear on every sector', n>40, n); check('...never in a gate approach', bad===0, bad); check('...and every barrier line has a gap', blocked===0, blocked);
+  check('sector 1 has only barriers and rubble', ![...new Set(t.genLevel(1).obs.map(o=>o.k))].some(k=>k==='cable'||k==='trap'||k==='overpass')); check('later sectors use every kind', ['jersey','rubble','trap','cable','overpass'].every(k=>kinds.has(k)), [...kinds]); }
+{ const G=arena(2); G.obs=[{k:'jersey',x:0,hw:.1,wz:G.dist+60,len:28,hp:120,dead:false}]; G.n=30; let sp=0,minS=99; for(let i=0;i<60*2;i++){ G.n=30; t.update(1/60); const r=G.obs[0]?G.obs[0].wz-G.dist:-99; if(r<20&&r>-30){ minS=Math.min(minS,G.spd); } }
+  check('a jersey barrier slows the squad', minS<45, minS); check('...and shoulders it aside', Math.abs(G.px)>.02, G.px); }
+{ const G=arena(2); G.obs=[{k:'rubble',x:0,hw:.4,wz:G.dist+1,len:90,hp:80,dead:false,sd:1}]; let mn=1e9; for(let i=0;i<90;i++){ G.n=30; t.update(1/60); if(i>30) mn=Math.min(mn,G.spd); } check('rubble slows the squad (to about 60% speed)', mn>40 && mn<62, mn);
+  const G2=arena(2); G2.obs=[{k:'jersey',x:0,hw:.1,wz:G2.dist+300,len:28,hp:120,dead:false},{k:'rubble',x:0,hw:.4,wz:G2.dist+300,len:90,hp:80,dead:false,sd:1}]; G2.item={k:'flare',n:1}; t.useItem(); G2.en=[]; for(let i=0;i<60*6;i++){ G2.n=30; t.update(1/60); } check('explosives destroy barriers and rubble', G2.obs.length<2 || G2.obs.some(o=>o.hp<(o.k==='jersey'?120:80)), G2.obs.length); }
+{ const tk=t.mk('tank',1,0,1), gr=t.mk('grunt',2,0,1); const G=arena(3,tk,gr); tk.wz=G.dist+500; gr.wz=G.dist+500; tk.hp=tk.max=gr.hp=gr.max=1e6; G.obs=[]; for(let x=-.88;x<=.9;x+=.22) G.obs.push({k:'trap',x,hw:.09,wz:G.dist+420,len:24,hp:260,dead:false});
+  let tkMin=1e9, grMin=1e9; for(let i=0;i<60*6;i++){ G.n=40; G.px=0; G.tx=0; G.fcd=1e9; tk.wz-=2; gr.wz-=2; t.update(1/60); tkMin=Math.min(tkMin,tk.wz-G.obs[0].wz); grMin=Math.min(grMin,gr.wz-G.obs[0].wz); }
+  check('a tank cannot cross a tank-trap line', tkMin>0, tkMin); check('...but an endoskeleton squeezes through', grMin<0, grMin); }
+{ const gr=t.mk('grunt',1,.3,1), tk=t.mk('tank',2,.3,1), ae=t.mk('aerostat',3,.3,1); const G=arena(3,gr,tk,ae); gr.wz=tk.wz=ae.wz=G.dist+400; G.n=40; gr.hp=gr.max=tk.hp=tk.max=ae.hp=ae.max=1e6; G.px=-.7; G.tx=-.7; G.obs=[{k:'cable',x:.3,hw:.5,wz:G.dist+200,len:6,hp:1e9,dead:false,sd:1},{k:'cable',x:-.7,hw:.05,wz:G.dist+100,len:6,hp:1e9,dead:false,sd:2}];
+  for(let i=0;i<60*4;i++){ G.fcd=1e9; gr.wz-=2; tk.wz-=2; ae.wz-=2; t.update(1/60); }
+  check('a live cable stuns machines that cross it', gr.zap&&gr.zap.size===1 && tk.zap&&tk.zap.size===1, ''); check('...but not flyers', !ae.zap);
+  const G4=arena(3); G4.n=40; G4.px=-.7; G4.tx=-.7; G4.obs=[{k:'cable',x:-.5,hw:.4,wz:G4.dist+100,len:6,hp:1e9,dead:false,sd:2},{k:'cable',x:.6,hw:.2,wz:G4.dist+300,len:6,hp:1e9,dead:false,sd:3}]; for(let i=0;i<60*5;i++){ G4.fcd=1e9; t.update(1/60); }
+  check('the squad is shocked once by a cable it crosses, not by one it avoids', G4.n===39, G4.n); }
+{ const ov=()=>({k:'overpass',x:0,hw:1.1,wz:0,len:60,hp:1e9,dead:false,st:0,t:0,open:0}); const tk=t.mk('tank',1,-.6,1); const G=arena(4,tk); const o=ov(); o.wz=G.dist+400; G.obs=[o]; tk.wz=G.dist+400; tk.x=-.6; tk.hp=tk.max=1000; G.en.push(tk); tk.active=true; G.px=.6; G.tx=.6; G.n=40;
+  run(G,.5); check('an overpass stands until something sets it off', o.st===0 && G.obs.length===1); const open=1; o.open=2;
+  const arty=t.G; G.item={k:'flare',n:1}; for(const e of G.en) e.wz=G.dist+400; t.useItem(); let st1=false, slabs=0; for(let i=0;i<60*8;i++){ G.n=40; G.fcd=1e9; t.update(1/60); if(o.st===1) st1=true; slabs=Math.max(slabs,G.obs.filter(q=>q.k==='slab').length); } check('shelling an overpass starts a warned collapse', st1 && o.st===2); check('it drops slabs across exactly two of three lanes', slabs===2, slabs); }
 console.log(pass+' passed, '+fail+' failed');

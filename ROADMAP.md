@@ -10,11 +10,11 @@
 - [x] **Resistance Signal Flare (Heavy Artillery Strike)**: Consumable radio flare item that paints a 30-meter radius on the road for a 105mm artillery barrage from hidden Tech-Com bunkers.
 
 ## Phase 2: Tactical Terrain & Environmental Obstacles
-- [ ] **Concrete Jersey Barriers**: Rigid concrete road dividers spawned in lanes. Squad movement is blocked or slowed when bumping into them, requiring players to weave around them or destroy them with heavy weapons.
-- [ ] **Rubble Berms & Rebar Webbing**: Choked ruins across lanes that slow squad speed by 40% and disable sprint until cleared or blown up with explosive ordnance.
-- [ ] **Collapsing Overpass Bridges**: Overhead structural ruins that drop heavy debris slabs across 2 of 3 lanes when shot or triggered by HK missile strikes.
-- [ ] **Electrified High-Voltage Power Lines**: Fallen grid cables dangling over the road that electrocute squad members and stun machines passing beneath them.
-- [ ] **Tank Traps / Czech Hedgehogs**: Heavy steel X-barriers that block heavy tracked units (HK-Tank, T-1, Ogre) but allow light infantry and bipedal endos to squeeze through.
+- [x] **Concrete Jersey Barriers**: Rigid concrete road dividers spawned in lanes. Squad movement is blocked or slowed when bumping into them, requiring players to weave around them or destroy them with heavy weapons.
+- [x] **Rubble Berms & Rebar Webbing**: Choked ruins across lanes that slow squad speed by 40% and disable sprint until cleared or blown up with explosive ordnance.
+- [x] **Collapsing Overpass Bridges**: Overhead structural ruins that drop heavy debris slabs across 2 of 3 lanes when shot or triggered by HK missile strikes.
+- [x] **Electrified High-Voltage Power Lines**: Fallen grid cables dangling over the road that electrocute squad members and stun machines passing beneath them.
+- [x] **Tank Traps / Czech Hedgehogs**: Heavy steel X-barriers that block heavy tracked units (HK-Tank, T-1, Ogre) but allow light infantry and bipedal endos to squeeze through.
 
 ## Phase 3: New Terminator Franchise Enemy Units
 - [ ] **T-1000 Liquid Metal Prototype (Boss/Special Hunter)**: A deadly shape-shifting infiltrator that morphs between a runner blade stance and bullet-absorbing chrome form, immune to ballistics but vulnerable to plasma and mini-nukes.
