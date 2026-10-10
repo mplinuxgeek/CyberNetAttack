@@ -9,7 +9,7 @@ global.performance={now:()=>Date.now()};
 let rafcb;global.requestAnimationFrame=f=>{rafcb=f};
 global.setTimeout=(f)=>{f()};
 let src=fs.readFileSync((process.argv[2]||require('path').join(__dirname,'..','game.js')),'utf8')+`
-;globalThis.__t={setPause,showSettings,sanitizeSave,endRun,activateBuff,dropCrate,bossShielded,hurtEnemy,useItem,fireEMP,render,airStrike,hurt0:0,armoryBuy,armoryDown,UPS,showArmory,activateGuard,buzz,mk,update,ET,keys,kill,startLevel,applyGate,volley,showSquad,genLevel,CLS,CLASS,airStrike,clsTotal,hurt,ITEMS,cycleForm,FORMS,slotOf,squadHalf,explodeAt,enemyShoot,showSquad,bark,setRS,depthKey,squadDps,applyGate,addParts,unlockAudio,checkLost,volley,BOSS_KINDS,WEAPONS,get state(){return state},get save(){return save},get G(){return G}};`;
+;globalThis.__t={setPause,showSettings,sanitizeSave,endRun,activateBuff,dropCrate,bossShielded,hurtEnemy,useItem,fireEMP,render,airStrike,hurt0:0,armoryBuy,armoryDown,UPS,showArmory,activateGuard,buzz,mk,update,ET,keys,kill,startLevel,applyGate,volley,showSquad,genLevel,CLS,CLASS,airStrike,clsTotal,hurt,ITEMS,cycleForm,FORMS,slotOf,squadHalf,explodeAt,enemyShoot,showSquad,bark,setRS,depthKey,squadDps,applyGate,addParts,unlockAudio,checkLost,volley,BOSS_KINDS,WEAPONS,tierMul,tierOf,get state(){return state},get save(){return save},get G(){return G}};`;
 eval(src); const t=globalThis.__t; let pass=0,fail=0;
 const check=(n,c,i)=>{ if(c){pass++;console.log('PASS',n)} else {fail++;console.log('FAIL',n,i||'')} };
 function fresh(lv,loadout){ t.save.loadout=loadout; t.save.unlocked={heavy:1,tech:1,medic:1,shot:1,mark:1,officer:1,signal:1}; t.startLevel(lv); return t.G; }
@@ -339,7 +339,7 @@ const arena=(lv,...en)=>{ const G=fresh(lv,[]); G.n=40; G.gates=[]; G.en=[]; G.o
 { const G=fresh(3,[]); G.n=100; G.peak=100; const g={px:-.001,L:{k:'add',v:10},R:{k:'add',v:20}}; t.applyGate(g); t.applyGate(g); check('a gate fires exactly once however wide the squad is', G.n===110, G.n);
   G.n=300; G.peak=300; const g2={px:.0,L:{k:'add',v:5},R:{k:'add',v:7}}; t.applyGate(g2); check('...and only one option applies', G.n===307 || G.n===305, G.n); }
 { const G=fresh(40,[]); G.n=10; G.peak=10; G.gates=[]; G.en=[]; const b=t.mk('tank',1,0,1,{boss:true}); b.hp=b.max=5e7; b.armor=.25; G.en.push(b); b.wz=G.dist+400; G.px=0; G.tx=0; for(let i=0;i<5;i++){ G.n=10; G.fcd=1e9; t.update(1/60); }
-  const dps=t.squadDps(), ttk=b.max/(dps*(1-.25)); check('late-sector boss health is capped to a bounded time-to-kill', ttk<=150*1.05, ttk.toFixed(0)+' s'); }
+  const dps=t.squadDps(), ttk=b.max/(dps*(1-.25)); check('late-sector boss health is capped to a bounded time-to-kill (before the threat-tier multiplier)', ttk<=150*t.tierMul(40)*1.05, ttk.toFixed(0)+' s'); }
 { const G=fresh(3,[]); for(let i=0;i<300;i++) t.addParts(100,100,40,'#fff',200,1); check('the particle buffer never exceeds its cap', G.parts.length<=420, G.parts.length); }
 { const r=[]; for(const d of [1,1.25,1.5,2,2.625,3,4]){ window.devicePixelRatio=d; const o=t.setRS(); r.push(o.w*5===o.h*3 && Number.isInteger(o.w) && Number.isInteger(o.h)); } delete window.devicePixelRatio; t.save.crt=true; const o2=t.setRS(); check('the canvas keeps an exact 3:5 ratio at every pixel density, CRT or not', r.every(Boolean) && o2.w*5===o2.h*3, r.join()); t.save.crt=false; t.setRS(); }
 { const G=arena(3); const hv=t.mk('harvester',1,0,1), gs=t.mk('gunship',2,0,1); hv.wz=G.dist+300; gs.wz=G.dist+320; check('a hovering gunship is drawn over a harvester at about its depth', t.depthKey(gs)<t.depthKey(hv)); const far=t.mk('gunship',3,0,1); far.wz=G.dist+400; check('...but not over one that is clearly nearer', t.depthKey(far)>t.depthKey(hv)); }
@@ -381,4 +381,11 @@ const arena=(lv,...en)=>{ const G=fresh(lv,[]); G.n=40; G.gates=[]; G.en=[]; G.o
   check('a boss eases down when the squad shrinks', boss.max<big*.8, big+' -> '+boss.max); }
 { for(const k of ['plate','rein','gate','crit','cache']) check('upgrade '+k+' exists', t.UPS[k] && t.UPS[k].max>0); check('late sectors cap per-hit damage', true); }
 { let bad=0; for(let lv=6;lv<=40;lv++) for(let r=0;r<3;r++){ const z=t.genLevel(lv).en.filter(e=>e.t==='t1000').map(e=>e.wz).sort((a,b)=>a-b); for(let i=1;i<z.length;i++) if(z[i]-z[i-1]<600) bad++; } check('T-1000s never come two at a time', bad===0, bad); }
+// ---- threat tiers: +10% enemy health every ten sectors, forever
+{ check('no tier before sector 10', t.tierMul(1)===1 && t.tierMul(9)===1 && t.tierOf(9)===0); check('tier 1 starts at sector 10 (+10%)', Math.abs(t.tierMul(10)-1.1)<1e-9 && t.tierOf(10)===1 && Math.abs(t.tierMul(19)-1.1)<1e-9);
+  check('...and it keeps climbing without a limit', Math.abs(t.tierMul(100)-2)<1e-9 && Math.abs(t.tierMul(1000)-11)<1e-9 && t.tierMul(5000)>50);
+  const hp=lv=>{ t.save.up={squad:0,dmg:0,rate:0,weapon:0,guard:0,emp:0,plate:0,rein:0,gate:0,crit:0,cache:0}; const boss=t.mk('tank',1,0,1,{boss:true}); boss.hp=boss.max=1e6; const G=fresh(lv,[]); G.n=60; G.peak=60; G.gates=[]; G.en=[boss]; boss.wz=G.dist+400; G.assist=1; for(let i=0;i<4;i++){ G.n=60; G.fcd=1e9; t.update(1/60); } return boss.max; };
+  const a=hp(29), b=hp(30); check('a boss gets 10% (of base) tougher at a tier boundary, at the same squad power', b/a>1.05 && b/a<1.12, (b/a).toFixed(3));
+  const g=lv=>{ t.save.up={squad:0,dmg:0,rate:0,weapon:0,guard:0,emp:0,plate:0,rein:0,gate:0,crit:0,cache:0}; const G=fresh(lv,[]); G.n=60; G.peak=60; G.assist=1; const e=t.mk('grunt',1,0,1); e.hp=e.max=1; G.en=[e]; e.wz=G.dist+300; G.gates=[]; for(let i=0;i<4;i++){ G.n=60; G.fcd=1e9; t.update(1/60); } return e.max; };
+  const ga=g(39), gb=g(40); check('endoskeletons too (sized to squad firepower, then x tier)', gb/ga>1.05 && gb/ga<1.12, (gb/ga).toFixed(3)); }
 console.log(pass+' passed, '+fail+' failed');

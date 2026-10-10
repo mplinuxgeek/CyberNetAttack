@@ -22,7 +22,7 @@ const REAL = { setTimeout, setInterval, clearInterval };   // (the headless bot 
 global.setTimeout = () => {}; global.setInterval = () => 0; global.clearInterval = noop;
 
 const args = process.argv.slice(2);
-const KNOWN = ['max-sector', 'attempts', 'time', 'assist', 'seed', 'why', 'form', 'start', 'up', 'help', 'watch', 'speed', 'mute', 'chrome', 'port', 'size', 'shot', 'shot-after', 'headless', 'verbose'], ALIAS = { max: 'max-sector', levels: 'max-sector', sectors: 'max-sector' };
+const KNOWN = ['max-sector', 'attempts', 'time', 'assist', 'seed', 'why', 'form', 'start', 'up', 'help', 'watch', 'speed', 'mute', 'chrome', 'port', 'size', 'shot', 'shot-after', 'headless', 'verbose', 'level-time'], ALIAS = { max: 'max-sector', levels: 'max-sector', sectors: 'max-sector' };
 if (args.includes('--help') || args.includes('-h')) {
   console.log(`usage: node tests/bot.js [options]
   --max-sector N   stop after clearing sector N (default 100; aliases --max, --levels)
@@ -30,6 +30,7 @@ if (args.includes('--help') || args.includes('-h')) {
   --up L           begin with every upgrade at level L (to test a late sector)
   --attempts N     tries per sector before buying upgrades (default 3)
   --time S         optional wall-clock budget in seconds (default: none, runs until the cap; Ctrl+C to stop)
+  --level-time S   give up on one attempt after S simulated seconds (default 480; raise it for very high sectors)
   --seed N         random seed (default 11)
   --form F         free | v | col | wall (default v)
   --assist         keep the game's "machines get weaker after a loss" help (off by default)
@@ -41,6 +42,7 @@ for (const a of args) if (a.startsWith('--')) { const k = ALIAS[a.slice(2)] || a
 if (args.includes('--watch')) { Object.assign(global, REAL); require('../tools/watch.js')(args); return; }   // the same bot, drawn in a Chrome window
 const opt = (k, d) => { let i = args.indexOf('--' + k); if (i < 0) for (const a in ALIAS) if (ALIAS[a] === k && args.indexOf('--' + a) >= 0) i = args.indexOf('--' + a); return i < 0 ? d : (typeof d === 'boolean' ? true : +args[i + 1]); };
 const WHY = opt('why', false), MAXLV = opt('max-sector', 100), ATT = opt('attempts', 3), BUDGET = opt('time', 0) > 0 ? opt('time', 0) * 1000 : Infinity, ASSIST = opt('assist', false);
+const LEVELT = opt('level-time', 480);
 const FORM = (args.indexOf('--form') >= 0 ? args[args.indexOf('--form') + 1] : 'v');
 let seed = opt('seed', 11); Math.random = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;
 
@@ -61,7 +63,7 @@ function attempt(lv) {
   if (!ASSIST) save.fails[lv] = 0;
   t.startLevel(lv); let G = t.G; G.form = FORM;
   let stuckN = 0, stall = null; const t0 = Date.now(); let f = 0, pn = G.n; const drops = [];
-  for (; f < 60 * 480 && t.state === 'play'; f++) {
+  for (; f < 60 * LEVELT && t.state === 'play'; f++) {
     G = t.G;
     if (WHY && G.n < pn - 2) { const g = G.gates.find(g => !g.used); drops.push(`f${f} -${pn - G.n} dist ${G.dist.toFixed(0)} gate ${g ? Math.round(g.wz - G.dist) : '-'} near ${G.en.filter(e => !e.dead).sort((a, b) => a.wz - b.wz).slice(0, 2).map(e => e.t + '@' + Math.round(e.wz - G.dist)).join(',')}`); } pn = G.n;
     if (f % 4 === 0 && !G.sweep && !G.over) { pilot(G); useItems(G); }

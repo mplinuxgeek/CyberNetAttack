@@ -389,10 +389,12 @@ function addObstacles(obs, gates, en, L, lv) {
   }
 }
 const BOSS_KINDS = ['heavy', 'harvester', 'tank', 'gunship', 'ogre', 'centurion'];
+const tierOf = lv => Math.floor(lv / 10);   // threat tier: +1 every ten sectors, starting at sector 10, with no upper limit
+const tierMul = lv => 1 + .1 * tierOf(lv);   // enemy health multiplier: +10% per tier, applied on top of everything that sizes a machine (including the firepower-based sizing of endos, big machines and bosses)
 const hpScale = lv => lv <= 30 ? 1 + .2 * (lv - 1) : 6.8 + .06 * (lv - 30);   // enemy health grows steadily to sector 30, then gently: the squad keeps up
 const LS = (div, cap) => Math.min(cap, Math.floor(G.lv / div));   // per-hit damage growth with the sector, capped so a late hit never wipes a squad
 function genLevel(lv) {
-  const L = 2800 + 260 * Math.min(lv, 30), hpm = hpScale(lv);
+  const L = 2800 + 260 * Math.min(lv, 30), hpm = hpScale(lv) * tierMul(lv);
   const gates = [], en = [];
   let z = 480, k = 0, wv = 0;
   while (z < L - 420) {
@@ -1247,7 +1249,7 @@ function update(dt) {
       if (e.boss) { // boss health is sized from your actual damage output: the fight lasts ~25s + 3s per sector whatever your power level
         const base = e.hp; e.base0 = base;   // total (health + plating) takes roughly T seconds of accurate fire
         const fr = e.max > 0 ? clamp(e.hp / e.max, 0, 1) : 1; e.hp = e.max = bossSize(e, d, base); e.hp *= fr;   // keep whatever damage it already has
-      } else { const k = clamp(Math.pow(squadDps() / 150, .7), .4, 6) * (d.soft || 1); e.hp *= k; e.max *= k; }
+      } else { const k = clamp(Math.pow(squadDps() / 150, .7), .4, 6) * (d.soft || 1) * tierMul(G.lv); e.hp *= k; e.max *= k; }
       if (e.boss) e.str = clamp(1 + G.n / 160, 1, 1.8);   // and hit harder / fire faster / call more reinforcements against a big squad
       if (d.plate) { const pf = e.plateMax ? e.plate / e.plateMax : 1; e.plateMax = e.max * d.plate; e.plate = e.plateMax * pf; }
       if (e.boss) { bark('boss', 'Boss contact! Hit it with everything!', 60000); G.warn = { t: 2.6, name: e.name || d.name || 'BOSS' }; G.shake = Math.max(G.shake, 14); G.flash = Math.max(G.flash, .35); sfx.siren(); }
@@ -1350,7 +1352,7 @@ function update(dt) {
         if (e.sum <= 0) {
           e.sum = (e.enr ? 6 : 9) / (e.str ? 1 + (e.str - 1) * .4 : 1);
           const cnt = Math.min(8, (e.t === 'ogre' ? 3 : 2) + Math.floor(G.n / 80));
-          for (let i = 0; i < cnt; i++) { const m = mk('grunt', e.wz - 20 - i * 10, clamp(e.x + rnd(-.5, .5), -.8, .8), hpScale(G.lv) * G.assist); m.active = true; m.tough = true; m.hp = m.max = Math.max(m.max, squadDps() * .05 * G.assist); G.en.push(m); }   // a boss's reinforcements are fodder, not a wall that soaks the squad's whole output
+          for (let i = 0; i < cnt; i++) { const m = mk('grunt', e.wz - 20 - i * 10, clamp(e.x + rnd(-.5, .5), -.8, .8), hpScale(G.lv) * G.assist); m.active = true; m.tough = true; m.hp = m.max = Math.max(m.max, squadDps() * .05 * G.assist * tierMul(G.lv)); G.en.push(m); }   // a boss's reinforcements are fodder, not a wall that soaks the squad's whole output
         }
         if (d.mortar && !e.noR) { e.mrt = (e.mrt === undefined ? 4 : e.mrt) - dw; if (e.mrt <= 0) { e.mrt = e.enr ? 4.5 : 7; mortarRound(e); addText(W / 2, 150, 'MORTARS!', '#ff9a3a'); sfx.siren(); } }
         if ((e.t === 'ogre' || e.t === 'harvester') && e.enr && !e.noR) { // enraged ground bosses call down a barrage: weave through the gap while the markers burn
@@ -1567,7 +1569,7 @@ function showMenu() {
   ov(`<div class="panel"><h1>CYBER<br>NET ATTACK</h1>
     <p class="tag">Hold the line. Slay the machines.</p>
     <div class="sel"><button id="pv" ${lv <= 1 ? 'disabled' : ''}>◀</button>
-      <div>SECTOR ${lv}<br><small>${SECT[(lv - 1) % SECT.length]}</small><br><small style="color:#ffd24a">${'\u2605'.repeat(save.stars[lv] || 0)}${'\u2606'.repeat(3 - (save.stars[lv] || 0))}</small><br><small style="color:#ff9a7a">Boss: ${ET[BOSS_KINDS[(lv - 1) % BOSS_KINDS.length]].name}</small></div>
+      <div>SECTOR ${lv}<br><small>${SECT[(lv - 1) % SECT.length]}</small>${tierOf(lv) > 0 ? `<br><small style="color:#ff6a5a">Threat tier ${tierOf(lv)}: enemy health +${Math.round((tierMul(lv) - 1) * 100)}%</small>` : ''}<br><small style="color:#ffd24a">${'\u2605'.repeat(save.stars[lv] || 0)}${'\u2606'.repeat(3 - (save.stars[lv] || 0))}</small><br><small style="color:#ff9a7a">Boss: ${ET[BOSS_KINDS[(lv - 1) % BOSS_KINDS.length]].name}</small></div>
       <button id="nxl" ${lv >= save.best ? 'disabled' : ''}>▶</button></div>
     <button class="big" id="play">DEPLOY</button>
     <button id="sq">Squad · ${save.loadout.length ? save.loadout.map(k => CLASS[k].name).join(', ') : 'riflemen only'}</button>
@@ -1924,12 +1926,12 @@ const hsh = k => { const v = Math.sin(k * 127.1 + 311.7) * 43758.5453; return v 
 const bossT = lv => 14 + 2 * Math.min(lv, 25);   // boss fight length (nominal seconds of the squad's full output): grows to sector 25, then stays
 function bossSize(e, d, base) { // boss health: sized to the squad's firepower, with a floor from the sector's base value, but never more than a bounded time-to-kill whatever the sector number
   const dps = squadDps(), ak = Math.max(.4, 1 - armorOf(e)), pk = 1 + (d.plate || 0), byDps = dps * bossT(G.lv) * .75 / ak / pk, cap = dps * Math.min(150, 45 + 3 * G.lv) * ak / pk;   // (cap: the real time-to-kill, armour and plating included)
-  return Math.min(Math.max(base * .25, byDps), Math.max(cap, byDps)) * G.assist;
+  return Math.min(Math.max(base * .25, byDps), Math.max(cap, byDps)) * G.assist * tierMul(G.lv);
 }
 function toughen(e) { // Endos are built to take a beating: when one comes within reach its armour is sized to the squad's firepower, so a pack always takes a few seconds to cut down
   const TF = { grunt: .3, gunner: .6, t700: .9, t400: .12, t1000: 1.4 };
   if (e.tough || !TF[e.t]) return; e.tough = true;
-  const f = TF[e.t], hp = Math.max(e.max, squadDps() * f) * G.assist;
+  const tm = tierMul(G.lv), f = TF[e.t], hp = Math.max(e.max, squadDps() * f) * G.assist * tm;
   e.hp = e.max = hp;
 }
 function bodyPoint(e, q, ss, k) { // a spot on the boss's solid body (screen coords)
@@ -2944,7 +2946,9 @@ function drawHUD() {
   if (G.t < 2.2) {
     cx.globalAlpha = clamp(2.2 - G.t, 0, 1); cx.font = `30px ${FONT}`; cx.lineWidth = 6; cx.strokeStyle = '#000'; cx.textAlign = 'center';
     const nm = SECT[(G.lv - 1) % SECT.length].toUpperCase();
-    cx.strokeText(nm, W / 2, 200); cx.fillStyle = '#ff9a4a'; cx.fillText(nm, W / 2, 200); cx.globalAlpha = 1;
+    cx.strokeText(nm, W / 2, 200); cx.fillStyle = '#ff9a4a'; cx.fillText(nm, W / 2, 200);
+    if (tierOf(G.lv) > 0) { cx.font = `14px ${FONT}`; cx.lineWidth = 4; const tt = 'THREAT TIER ' + tierOf(G.lv) + ' · ENEMY HEALTH +' + Math.round((tierMul(G.lv) - 1) * 100) + '%'; cx.strokeText(tt, W / 2, 228); cx.fillStyle = '#ff6a5a'; cx.fillText(tt, W / 2, 228); }
+    cx.globalAlpha = 1;
   }
   { const pu = G.pups.find(q => q.wz - G.dist > 40 && q.wz - G.dist < 720);
     if (pu && G.lv <= 2 && !G.guard) { cx.globalAlpha = .6 + .4 * Math.sin(T * 6); cx.font = `12px ${FONT}`; cx.textAlign = 'center'; cx.lineWidth = 4; cx.strokeStyle = '#000'; cx.strokeText('STEER ONTO THE CYAN CRATE: REPROGRAMMED UNIT', W / 2, 232); cx.fillStyle = '#6ff3ff'; cx.fillText('STEER ONTO THE CYAN CRATE: REPROGRAMMED UNIT', W / 2, 232); cx.globalAlpha = 1; } }
