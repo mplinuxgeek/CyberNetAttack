@@ -22,7 +22,7 @@ const REAL = { setTimeout, setInterval, clearInterval };   // (the headless bot 
 global.setTimeout = () => {}; global.setInterval = () => 0; global.clearInterval = noop;
 
 const args = process.argv.slice(2);
-const KNOWN = ['max-sector', 'attempts', 'time', 'assist', 'seed', 'why', 'form', 'start', 'up', 'help', 'watch', 'speed', 'mute', 'chrome', 'port', 'size', 'shot', 'shot-after', 'headless', 'verbose', 'level-time'], ALIAS = { max: 'max-sector', levels: 'max-sector', sectors: 'max-sector' };
+const KNOWN = ['max-sector', 'attempts', 'time', 'assist', 'seed', 'why', 'form', 'start', 'up', 'help', 'watch', 'speed', 'mute', 'chrome', 'port', 'size', 'shot', 'shot-after', 'headless', 'verbose', 'level-time', 'slow-time', 'slow-levels'], ALIAS = { max: 'max-sector', levels: 'max-sector', sectors: 'max-sector' };
 if (args.includes('--help') || args.includes('-h')) {
   console.log(`usage: node tests/bot.js [options]
   --max-sector N   stop after clearing sector N (default 100; aliases --max, --levels)
@@ -31,6 +31,8 @@ if (args.includes('--help') || args.includes('-h')) {
   --attempts N     tries per sector before buying upgrades (default 3)
   --time S         optional wall-clock budget in seconds (default: none, runs until the cap; Ctrl+C to stop)
   --level-time S   give up on one attempt after S simulated seconds (default 900; raise it for very high sectors)
+  --slow-time S    also buy an upgrade round when the last --slow-levels cleared sectors each took longer than S game seconds (default 300 = 5 minutes; 0 turns the rule off)
+  --slow-levels N  how many slow sectors in a row trigger it (default 3)
   --seed N         random seed (default 11)
   --form F         free | v | col | wall (default v)
   --assist         keep the game's "machines get weaker after a loss" help (off by default)
@@ -42,7 +44,7 @@ for (const a of args) if (a.startsWith('--')) { const k = ALIAS[a.slice(2)] || a
 if (args.includes('--watch')) { Object.assign(global, REAL); require('../tools/watch.js')(args); return; }   // the same bot, drawn in a Chrome window
 const opt = (k, d) => { let i = args.indexOf('--' + k); if (i < 0) for (const a in ALIAS) if (ALIAS[a] === k && args.indexOf('--' + a) >= 0) i = args.indexOf('--' + a); return i < 0 ? d : (typeof d === 'boolean' ? true : +args[i + 1]); };
 const WHY = opt('why', false), MAXLV = opt('max-sector', 100), ATT = opt('attempts', 3), BUDGET = opt('time', 0) > 0 ? opt('time', 0) * 1000 : Infinity, ASSIST = opt('assist', false);
-const LEVELT = opt('level-time', 900);
+const LEVELT = opt('level-time', 900), SLOWT = opt('slow-time', 300), SLOWN = opt('slow-levels', 3);
 const FORM = (args.indexOf('--form') >= 0 ? args[args.indexOf('--form') + 1] : 'v');
 let seed = opt('seed', 11); Math.random = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;
 
@@ -88,10 +90,10 @@ const upLine = () => ORDER.map(k => (ABBR[k] || k) + save.up[k]).join(' ');
 const T0 = Date.now(); let runs = 0, farmed = 0, rounds = 0; const hist = [];
 function log(s) { console.log(s); }
 let spent = 0; const timeline = [];
-function upgradeRound(atLv) {
+function upgradeRound(atLv, why) {
   rounds++; let bought = []; const before = save.scrap;
   for (const k of ORDER) { const u = t.UPS[k]; if (save.up[k] < u.max && save.scrap >= u.cost(save.up[k])) { if (t.armoryBuy(k)) bought.push(k); } }
-  spent += before - save.scrap; timeline.push({ round: rounds, before: atLv, bought: bought.slice(), line: upLine(), cost: before - save.scrap });
+  spent += before - save.scrap; timeline.push({ round: rounds, why, before: atLv, bought: bought.slice(), line: upLine(), cost: before - save.scrap });
   return bought;
 }
 function cheapestNeed() { let m = 1e9; for (const k of ORDER) { const u = t.UPS[k]; if (save.up[k] < u.max) m = Math.min(m, u.cost(save.up[k])); } return m; }
@@ -100,7 +102,7 @@ const allMaxed = () => ORDER.every(k => save.up[k] >= t.UPS[k].max);
 (async () => {
 log(`bot: sectors up to ${MAXLV}, ${ATT} attempts per sector before upgrading, ${ASSIST ? 'with' : 'without'} the retry assist, seed ${opt('seed', 11)}`);
 if (opt('up', 0)) for (const k of ORDER) save.up[k] = save.paid[k] = Math.min(t.UPS[k].max, opt('up', 0));   // --up N: start with every upgrade at level N (for diagnosing a late sector)
-let lv = opt('start', 1), best = 0, fails = 0, exhausted = false;
+let slowRun = []; let lv = opt('start', 1), best = 0, fails = 0, exhausted = false;
 while (lv <= MAXLV && Date.now() - T0 < BUDGET && !exhausted && !STOP) {
   let won = false;
   for (let a = 1; a <= ATT && !won; a++) {
@@ -108,7 +110,15 @@ while (lv <= MAXLV && Date.now() - T0 < BUDGET && !exhausted && !STOP) {
     log(`  S${String(lv).padStart(2)} try ${a}  ${won ? 'WON ' : r.timeout ? 'TIME' : 'LOST'}  squad ${String(r.left).padStart(3)}/${String(r.peak).padStart(3)}  kills ${String(r.kills).padStart(3)}  ${(r.frames / 60).toFixed(0)}s  scrap ${save.scrap}  [${upLine()}]  (${r.ms} ms)`);
     if (Date.now() - T0 > BUDGET) break;
   }
-  if (won) { best = lv; lv++; fails = 0; continue; }
+  if (won) {
+    best = lv; lv++; fails = 0;
+    const lastWin = [...hist].reverse().find(h => !h.farm && h.won); slowRun.push(lastWin ? lastWin.frames / 60 : 0);
+    if (SLOWT > 0 && slowRun.length >= SLOWN && slowRun.slice(-SLOWN).every(x => x > SLOWT)) {   // sectors are taking too long: buy a round now rather than wait for a loss
+      const b = upgradeRound(lv, 'slow'); slowRun = [];
+      if (b.length) log(`  >> upgrade round ${rounds} before sector ${lv} (the last ${SLOWN} sectors each took over ${Math.round(SLOWT / 60 * 10) / 10} min): bought ${b.join(', ')}  [${upLine()}]  scrap ${save.scrap}`);
+    }
+    continue;
+  }
   if (Date.now() - T0 > BUDGET) break;
   // could not pass: upgrade one step of everything it can afford, farming earlier sectors for scrap if it cannot afford anything
   let bought = upgradeRound(lv), farmRuns = 0;
@@ -148,7 +158,7 @@ function summary() {
   if (won.length) { const c = won.map(h => h.frames / 60); L.push(`Clear time (game seconds): average ${Math.round(avg(won, h => h.frames / 60))}, fastest ${Math.round(Math.min(...c))} (sector ${won[c.indexOf(Math.min(...c))].lv}), slowest ${Math.round(Math.max(...c))} (sector ${won[c.indexOf(Math.max(...c))].lv})`); }
   L.push(`Scrap: earned ${save.scrap + spent}, spent on upgrades ${spent}, left ${save.scrap}`);
   L.push(`Upgrades: ${ORDER.map(k => `${t.UPS[k].name} ${save.up[k]}/${t.UPS[k].max}`).join(', ')}`);
-  if (timeline.length) { L.push('', 'Upgrade rounds (one level of each affordable path, bought only after a sector beat it):'); for (const r of timeline) L.push(`  round ${String(r.round).padStart(2)} before sector ${String(r.before).padStart(3)}: ${r.bought.length ? r.bought.join(', ') : '(nothing affordable)'}`); }
+  if (timeline.length) { L.push('', 'Upgrade rounds (one level of each affordable path; after a sector beat the bot ' + ATT + ' times' + (SLOWT > 0 ? ', or after ' + SLOWN + ' sectors in a row took over ' + Math.round(SLOWT / 60 * 10) / 10 + ' min' : '') + '):'); for (const r of timeline) L.push(`  round ${String(r.round).padStart(2)} before sector ${String(r.before).padStart(3)}${r.why === 'slow' ? ' (slow clears)' : ''}: ${r.bought.length ? r.bought.join(', ') : '(nothing affordable)'}`); }
   else L.push('', 'No upgrades were needed (no sector beat the bot ' + ATT + ' times in a row).');
   if (sectors.length) {
     L.push('', 'By sector band:   attempts  wins  win%   first-try%  avg clear  avg squad left');

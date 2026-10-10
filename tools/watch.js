@@ -7,7 +7,7 @@ module.exports = function watch(args) {
   const val = (k, d) => { const i = args.indexOf('--' + k); return i < 0 ? d : args[i + 1]; }, has = k => args.includes('--' + k);
   const alias = k => { for (const a of [k, ...(k === 'max-sector' ? ['max', 'levels', 'sectors'] : [])]) if (has(a)) return val(a); return undefined; };
   const qs = new URLSearchParams();
-  for (const [k, p] of [['max', 'max-sector'], ['start', 'start'], ['up', 'up'], ['attempts', 'attempts'], ['speed', 'speed'], ['form', 'form'], ['leveltime', 'level-time']]) { const v = alias(p); if (v !== undefined) qs.set(k, v); }
+  for (const [k, p] of [['max', 'max-sector'], ['start', 'start'], ['up', 'up'], ['attempts', 'attempts'], ['speed', 'speed'], ['form', 'form'], ['leveltime', 'level-time'], ['slowtime', 'slow-time'], ['slowlevels', 'slow-levels']]) { const v = alias(p); if (v !== undefined) qs.set(k, v); }
   if (has('assist')) qs.set('assist', '1'); if (has('mute')) qs.set('mute', '1');
   const shot = val('shot'), headless = has('headless') || !!shot;
 
