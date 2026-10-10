@@ -9,7 +9,7 @@ global.performance={now:()=>Date.now()};
 let rafcb;global.requestAnimationFrame=f=>{rafcb=f};
 global.setTimeout=noop;
 let src=fs.readFileSync((process.argv[2]||require('path').join(__dirname,'..','game.js')),'utf8')+`
-;globalThis.__t={enemyShoot,activateGuard,hurtGuard,get save(){return save},UPS,GZ,mk,kill,hurtEnemy,fireEMP,update,render,detonateHaz,strikeRound,applyGate,ET,CLASS,startLevel,get G(){return G},get state(){return state},frame,keys};`;
+;globalThis.__t={enemyShoot,activateGuard,hurtGuard,get save(){return save},UPS,GZ,mk,kill,hurtEnemy,useItem,fireEMP,update,render,detonateHaz,strikeRound,applyGate,ET,CLASS,startLevel,get G(){return G},get state(){return state},frame,keys};`;
 eval(src);
 
 
@@ -19,7 +19,7 @@ function fresh(lv){ t.startLevel(lv); const G=t.G; G.en=[];G.gates=[];G.haz=[];G
 function step(G,sec){ for(let i=0;i<Math.round(sec*60);i++){ G.fcd=99; t.update(1/60);} }
 
 { const G=fresh(2); check('the unit is NOT with the squad at the start', !G.guard, String(G.guard)); }
-{ const G=fresh(1); check('every sector plans a power-up crate', G.pupPlan.length>=1, `planned ${G.pupPlan.length}`); const G3=fresh(3); check('later sectors plan two', G3.pupPlan.length===2, `planned ${G3.pupPlan.length}`); }
+{ const G=fresh(1); check('every sector plans a power-up crate', G.pupPlan.some(p=>p.k==='guard'), `planned ${G.pupPlan.length}`); const G3=fresh(3); check('later sectors plan two', G3.pupPlan.filter(p=>p.k==='guard').length===2, `planned ${G3.pupPlan.length}`); }
 { const G=fresh(2); G.n=30; G.px=0; G.tx=0; G.pups=[{k:'guard',x:0,wz:G.dist+60}]; step(G,2.5);
   check('driving over the crate brings the unit online', G.guard && !G.guard.dead && G.guard.hp>=G.guard.max-1.5 && G.pups.length===0, G.guard?`hp ${G.guard.hp}`:'none'); }
 { const G=fresh(2); G.n=30; G.px=.85; G.tx=.85; G.pups=[{k:'guard',x:-.6,wz:G.dist+60}]; step(G,2.5); check('steering clear of the crate misses it', !G.guard); }

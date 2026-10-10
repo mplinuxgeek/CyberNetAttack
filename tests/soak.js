@@ -9,7 +9,7 @@ global.performance={now:()=>Date.now()};
 let rafcb;global.requestAnimationFrame=f=>{rafcb=f};
 global.setTimeout=()=>{};
 let src=fs.readFileSync((process.argv[2]||require('path').join(__dirname,'..','game.js')),'utf8')+`
-;globalThis.__t={render,showMenu,update,startLevel,fireEMP,CLS,get save(){return save},get G(){return G},get state(){return state},ET,activateGuard,applyGate};`;
+;globalThis.__t={render,showMenu,update,startLevel,useItem,fireEMP,CLS,get save(){return save},get G(){return G},get state(){return state},ET,activateGuard,applyGate};`;
 eval(src); const t=globalThis.__t;
 let seed=+process.argv[3]||777; const R=()=>{ seed=(seed*1664525+1013904223)>>>0; return seed/4294967296; };
 Math.random=R;
@@ -26,7 +26,7 @@ for(let run=0;run<+(process.argv[4]||40);run++){
       if(i%90===0) steer=style===0?0:(R()*1.7-.85);
       if(style===2&&R()<.01) steer=G.px;
       G.tx=Math.max(-.88,Math.min(.88,steer));
-      if(R()<.006) t.fireEMP(); if(R()<.003&&G.en.length){ const e=G.en[Math.floor(R()*G.en.length)]; e.hp=Math.min(e.hp,1); } if(R()<.002&&G.n<400) G.n+=5;
+      if(R()<.006){ G.item={k:['pulse','c4','flare','spike','cannon','nuke'][Math.floor(R()*6)],n:3}; t.useItem(); } if(R()<.003&&G.en.length){ const e=G.en[Math.floor(R()*G.en.length)]; e.hp=Math.min(e.hp,1); } if(R()<.002&&G.n<400) G.n+=5;
       if(R()<.0015&&!G.over&&G.pups.length) t.activateGuard();
       t.update(1/60); if(i%4===0) t.render();
       // invariants

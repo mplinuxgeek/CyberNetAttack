@@ -1,13 +1,13 @@
 # CyberNetAttack - Feature & Enhancement Roadmap
 
 ## Phase 1: Special Weapon & Pickup System (Level Pickups)
-- [ ] **Pickup-Activated Special Weapons**: Replace the default EMP meter with an Active Tactical Item Slot. Special weapons drop from downed heavy machines or appear in supply crates; once depleted/used, players must scavenge a new item drop.
-- [ ] **Tactical Mini-Nuke (M-38 Davy Crockett / Tech-Com Warhead)**: A rare consumable pickup. When triggered, launches a low-yield nuclear charge down the center lane, emitting a blinding flash, destroying all ground forces, stripping boss plating by 80%, and leaving radioactive fallout trails.
-- [ ] **Throwable C4 Explosive Pack**: Consumable special item (3 charges). The lead squad member hurls C4 packs that stick to incoming heavy machinery/tanks and detonate manually or upon impact for massive concentrated structural damage.
-- [ ] **M-25 Phased-Plasma Heavy Cannon**: Single-use heavy shoulder weapon pickup for the squad leader that fires a piercing ultra-high-output 100kW purple plasma beam down an entire lane, destroying everything in its path.
-- [ ] **Magnetic Pulse Grenade Bundle**: Short-range 3-charge throwable item. Disables machine optics, turns off laser targeting arcs, and stuns all bipedal endoskeletons in a wide radius for 8 seconds.
-- [ ] **Infiltrator Reprogramming Spike**: A single-use melee hack dart pickup. Converts an incoming bipedal T-800 or T-600 into an auxiliary squad guard that walks point until destroyed.
-- [ ] **Resistance Signal Flare (Heavy Artillery Strike)**: Consumable radio flare item that paints a 30-meter radius on the road for a 105mm artillery barrage from hidden Tech-Com bunkers.
+- [x] **Pickup-Activated Special Weapons**: Replace the default EMP meter with an Active Tactical Item Slot. Special weapons drop from downed heavy machines or appear in supply crates; once depleted/used, players must scavenge a new item drop.
+- [x] **Tactical Mini-Nuke (M-38 Davy Crockett / Tech-Com Warhead)**: A rare consumable pickup. When triggered, launches a low-yield nuclear charge down the center lane, emitting a blinding flash, destroying all ground forces, stripping boss plating by 80%, and leaving radioactive fallout trails.
+- [x] **Throwable C4 Explosive Pack**: Consumable special item (3 charges). The lead squad member hurls C4 packs that stick to incoming heavy machinery/tanks and detonate manually or upon impact for massive concentrated structural damage.
+- [x] **M-25 Phased-Plasma Heavy Cannon**: Single-use heavy shoulder weapon pickup for the squad leader that fires a piercing ultra-high-output 100kW purple plasma beam down an entire lane, destroying everything in its path.
+- [x] **Magnetic Pulse Grenade Bundle**: Short-range 3-charge throwable item. Disables machine optics, turns off laser targeting arcs, and stuns all bipedal endoskeletons in a wide radius for 8 seconds.
+- [x] **Infiltrator Reprogramming Spike**: A single-use melee hack dart pickup. Converts an incoming bipedal T-800 or T-600 into an auxiliary squad guard that walks point until destroyed.
+- [x] **Resistance Signal Flare (Heavy Artillery Strike)**: Consumable radio flare item that paints a 30-meter radius on the road for a 105mm artillery barrage from hidden Tech-Com bunkers.
 
 ## Phase 2: Tactical Terrain & Environmental Obstacles
 - [ ] **Concrete Jersey Barriers**: Rigid concrete road dividers spawned in lanes. Squad movement is blocked or slowed when bumping into them, requiring players to weave around them or destroy them with heavy weapons.

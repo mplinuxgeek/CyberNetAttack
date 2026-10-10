@@ -9,7 +9,7 @@ global.performance={now:()=>Date.now()};
 let rafcb;global.requestAnimationFrame=f=>{rafcb=f};
 global.setTimeout=noop;
 let src=fs.readFileSync((process.argv[2]||require('path').join(__dirname,'..','game.js')),'utf8')+`
-;globalThis.__t={mk,kill,hurtEnemy,fireEMP,update,render,detonateHaz,strikeRound,applyGate,ET,CLASS,startLevel,get G(){return G},get state(){return state},frame,keys};`;
+;globalThis.__t={mk,kill,hurtEnemy,useItem,fireEMP,update,render,detonateHaz,strikeRound,applyGate,ET,CLASS,startLevel,get G(){return G},get state(){return state},frame,keys};`;
 eval(src);
 
 const t=globalThis.__t; let ok=0,bad=0;
@@ -26,7 +26,7 @@ function step(G,sec){ for(let i=0;i<Math.round(sec*60);i++){ G.fcd=99; t.update(
   G.px=-.6; e.x=0; const hp0=e.hp; t.hurtEnemy(e,100); check('flank bypasses plate', e.hp<hp0, `hp ${e.hp.toFixed(0)}`);
   G.px=0; e.plate=10; t.hurtEnemy(e,100); check('plate breaks cleanly', e.plate===0 && e.hp<=hp0-70); }
 // 3 aerostat EMP
-{ const G=fresh(3); const e=t.mk('aerostat',G.dist+200,0,1); e.active=true; G.en.push(e); G.emp=100; const m=e.max; t.fireEMP(); for(let i=0;i<100;i++) t.update(1/60); check('EMP drops the aerostat out of the sky', e.dead, `hp ${e.hp.toFixed(0)}/${m.toFixed(0)} crash ${e.crash}`); }
+{ const G=fresh(3); const e=t.mk('aerostat',G.dist+200,0,1); e.active=true; G.en.push(e); G.item={k:'pulse',n:3}; const m=e.max; t.useItem(); for(let i=0;i<100;i++) t.update(1/60); check('EMP drops the aerostat out of the sky', e.dead, `hp ${e.hp.toFixed(0)}/${m.toFixed(0)} crash ${e.crash}`); }
 // 4 scrap drops physically and is vacuumed
 { const G=fresh(1); G.px=0; G.tx=0; const e=t.mk('heavy',G.dist+60,0,1); e.active=true; G.en.push(e); const before=G.scrap; e.hp=0; t.kill(e);
   check('kill spawns scrap chunks, no instant scrap', G.scr.length>0 && G.scrap===before, `chunks ${G.scr.length}`);

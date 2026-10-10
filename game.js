@@ -30,7 +30,7 @@ const UPS = {
   rate:   { name: 'Fire Rate',       desc: '+6% fire rate',                 max: 20, cost: l => Math.round(70 * Math.pow(1.4, l)) },
   weapon: { name: 'Starting Weapon', desc: 'Begin each run with a better gun. Max tier: Pulse-Plasma Rifle (40kW Output)', max: 4, cost: l => [200, 500, 1100, 2200][l] },
   guard:  { name: 'Reprogrammed Unit', desc: '+25% alloy plating on the infiltrator unit leading your squad', max: 10, cost: l => Math.round(80 * Math.pow(1.4, l)) },
-  emp:    { name: 'EMP Pulse',       desc: 'Charges faster, hits harder',   max: 10, cost: l => Math.round(90 * Math.pow(1.4, l)) },
+  emp:    { name: 'Tactical Ordnance', desc: '+20% special-item power, supply crates drop more often', max: 10, cost: l => Math.round(90 * Math.pow(1.4, l)) },
 };
 const WEAPONS = [
   { name: 'Sidearm',       dmg: 3,   int: .30,  pierce: false, splash: 0,   col: '#bfe3ff', spread: .01 },
@@ -54,7 +54,7 @@ const ET = {
 };
 const CLASS = {   // special squad classes: pick up to 3 before a sector (unlock with scrap); gates then grow only your picks
   heavy:  { name: 'ORDNANCE',  col: '#ff9a4a', gate: 'rgba(255,140,40,.6)', spr: 'resistance_heavy', cost: 0,   desc: 'Homing rockets (splash) at armoured machines and bosses' },
-  tech:   { name: 'TECH OP',   col: '#6ff3ff', gate: 'rgba(40,215,230,.6)', spr: 'resistance_tech',     cost: 0,   desc: 'EMP charges faster, wider scrap and gate pickup' },
+  tech:   { name: 'TECH OP',   col: '#6ff3ff', gate: 'rgba(40,215,230,.6)', spr: 'resistance_tech',     cost: 0,   desc: 'Supply crates drop more often, wider scrap and gate pickup' },
   medic:  { name: 'SCAVENGER', col: '#6dffb5', gate: 'rgba(50,215,120,.6)', spr: 'resistance_medic',     cost: 120, desc: 'Revives fallen soldiers and repairs the reprogrammed unit' },
   shot:   { name: 'SHOTGUNNER', col: '#ffd27a', gate: 'rgba(255,200,90,.6)', spr: 'resistance_shotgunner',  cost: 150, desc: 'Close-range pellet bursts: huge damage up close' },
   mark:   { name: 'MARKSMAN',  col: '#b9a8ff', gate: 'rgba(160,140,255,.6)', spr: 'resistance_goggles', cost: 220, desc: 'Armour-piercing shots that punch through the whole line' },
@@ -236,6 +236,7 @@ const sfx = {   // gritty, low and heavy: filtered noise and saturated low tones
   bad() { nz(0, .45, { type: 'lowpass', f0: 800, f1: 90, g: .35 }); tn(0, 150, 50, .5, 'sawtooth', .2); },
   hurt() { tn(0, 110, 36, .2, 'sawtooth', .5); nz(0, .13, { type: 'lowpass', f0: 1200, f1: 160, g: .4 }); },
   emp() { tn(0, 70, 1400, .35, 'sawtooth', .16); nz(.28, .7, { f0: 2200, f1: 120, q: .6, g: .6 }); tn(.28, 70, 22, .7, 'sawtooth', .5); tn(.28, 48, 20, .8, 'sine', .8); },   // charge up then a deep concussive burst
+  cannon() { tn(0, 1400, 70, .5, 'sawtooth', .3); nz(0, .6, { f0: 3500, f1: 250, q: .7, g: .55 }); tn(.05, 60, 30, .8, 'sine', .8); tn(0, 200, 900, .25, 'square', .1); },   // a heavy plasma discharge
   ping() { if (ok('png', 60)) { tn(0, rnd(300, 480), 220, .16, 'square', .12); nz(0, .03, { f0: 1600, q: 1.5, g: .2 }); } },   // a clang on the reprogrammed unit
   mg() { for (let i = 0; i < 3; i++) { nz(i * .055, .045, { f0: 1500, q: .9, g: .45 }); tn(i * .055, 100, 55, .06, 'sawtooth', .25); } },   // enemy minigun burst
   zap(big) { // enemy plasma bolt leaving the barrel
@@ -322,6 +323,8 @@ function genLevel(lv) {
   const pg = (frac) => gates.reduce((b, g) => Math.abs(g.wz + 95 - L * frac) < Math.abs(b.wz + 95 - L * frac) ? g : b, gates[0]);
   pups.push({ k: 'guard', x: rnd(-.55, .55), wz: pg(.3).wz + 95 });
   if (lv >= 3) pups.push({ k: 'guard', x: rnd(-.55, .55), wz: pg(.7).wz + 95 });
+  pups.push({ k: 'supply', x: rnd(-.55, .55), wz: pg(.5).wz + 95 });   // tactical-item supply crates: one mid-sector, another late on from sector 3
+  if (lv >= 3) pups.push({ k: 'supply', x: rnd(-.55, .55), wz: pg(.85).wz + 95 });
   return { L, gates, en, haz, pups };
 }
 
@@ -361,8 +364,8 @@ function startLevel(lv) {
     dist: 0, spd: 0, px: 0, tx: 0,
     n: 6 + 2 * save.up.squad, tier: save.up.weapon, rateG: 1, dmgG: 1,
     fcd: .3, bullets: [], bolts: [], parts: [], texts: [],
-    scrap: 0, kills: 0, emp: 0, shake: 0, flash: 0, hurtFlash: 0,
-    guard: null, gx: 0, pups: [], pupPlan: lvl.pups.map(p => ({ x: p.x, wz: p.wz, done: false })),
+    scrap: 0, kills: 0, item: { k: 'pulse', n: 2 }, c4: [], flares: [], fallout: [], beam: null, shake: 0, flash: 0, hurtFlash: 0,
+    guard: null, gx: 0, pups: [], pupPlan: lvl.pups.map(p => ({ k: p.k, x: p.x, wz: p.wz, done: false })),
     cls: Object.fromEntries(CLS.map(k => [k, 0])), sig: 7, scr: [], haz: lvl.haz, rockets: [], strikes: [], lt: [], warn: null, mz: 0, rcd: 2, peak: 6 + 2 * save.up.squad,
     ts: 1, t: 0, later: [], deaths: [], waves: [], alert: null, over: false, won: false, endT: 0, paused: false,
   };
@@ -394,8 +397,30 @@ function activateBuff(k) {
   addText(q.x, q.y - 100, B.name, B.col); G.flash = Math.max(G.flash, .2); sfx.gate(); buzz(60);
   addParts(q.x, q.y - 30, 24, B.col, 240, .6); addLight(q.x, q.y - 40, 120, k === 'rapid' ? 'rgba(255,170,60,' : 'rgba(120,200,255,', .4);
 }
+// ---- tactical items: one slot, picked up from crates (dropped by big machines or left on the road), used with a tap on the slot, a double tap or Space
+const ITEMS = {
+  pulse:  { name: 'PULSE GRENADES',     g: 'PG', col: '#6ff3ff', n: 3, w: 4, desc: 'stuns machines nearby' },
+  c4:     { name: 'C4 PACKS',           g: 'C4', col: '#ffb03a', n: 3, w: 3, desc: 'sticks to a machine; use again to detonate' },
+  flare:  { name: 'SIGNAL FLARE',       g: 'SF', col: '#ff5a4a', n: 1, w: 3, desc: 'calls a 105mm barrage' },
+  spike:  { name: 'REPROGRAMMING SPIKE', g: 'RS', col: '#8fe8a0', n: 1, w: 3, desc: 'turns an endoskeleton to your side' },
+  cannon: { name: 'M-25 PLASMA CANNON', g: 'M25', col: '#c86bff', n: 1, w: 2, desc: 'piercing beam down the lane' },
+  nuke:   { name: 'M-38 MINI-NUKE',     g: 'M38', col: '#ffe24a', n: 1, w: 1, desc: 'destroys every machine ahead; bosses lose plating' },
+};
+const ipow = () => 1 + .2 * save.up.emp;
+function rollItem(lv) {
+  const ks = Object.keys(ITEMS).filter(k => k !== 'nuke' || lv >= 4); let r = Math.random() * ks.reduce((a, k) => a + ITEMS[k].w, 0);
+  for (const k of ks) { r -= ITEMS[k].w; if (r <= 0) return k; }
+  return ks[0];
+}
+function takeItem(k) {
+  const d = ITEMS[k], q = squadPos();
+  if (G.item && G.item.k === k) G.item.n = Math.min(Math.max(d.n, 2) * 2, G.item.n + d.n); else G.item = { k, n: d.n };
+  addText(q.x, q.y - 100, d.name, d.col); addText(q.x, q.y - 118, d.desc, '#cfd8e0'); G.flash = Math.max(G.flash, .15); sfx.gate(); buzz(40);
+  addParts(q.x, q.y - 30, 18, d.col, 220, .6); addLight(q.x, q.y - 40, 110, 'rgba(255,255,255,', .3);
+}
 function dropCrate(e) { // big machines sometimes drop a supply crate where they fall
-  if (G.pups.length < 3 && e.wz - G.dist > 30 && Math.random() < .3) G.pups.push({ k: Math.random() < .55 ? 'rapid' : 'shield', x: clamp(e.x, -.8, .8), wz: e.wz });
+  const p = .3 * (1 + .08 * save.up.emp) * (1 + Math.min(.5, .15 * G.cls.tech));
+  if (G.pups.length < 3 && e.wz - G.dist > 30 && Math.random() < p) G.pups.push({ k: Math.random() < .5 ? (Math.random() < .55 ? 'rapid' : 'shield') : rollItem(G.lv), x: clamp(e.x, -.8, .8), wz: e.wz });
 }
 function activateGuard() {
   const mx = Math.round((5 + 1.2 * G.lv) * (1 + .25 * save.up.guard)), q = squadPos();
@@ -481,7 +506,6 @@ function kill(e) {
   const big = d.block ? 1 : 0;
   const sc = Math.round(d.scrap * (1 + .1 * (G.lv - 1)) * 1.2);
   if (e.boss) G.scrap += sc; else spawnScrap(e.x, e.wz, sc);
-  G.emp = Math.min(100, G.emp + d.emp * (1 + .15 * save.up.emp) * (1 + Math.min(1, .15 * G.cls.tech)));
   addParts(q.x, q.y - 30 * q.s, big ? 40 : 10, '#9aa4ae', big ? 260 : 150, .7);
   addParts(q.x, q.y - 30 * q.s, big ? 30 : 6, '#ff9a2a', big ? 300 : 160, .5, 0);
   addSparks(q.x, q.y - (HITH[e.t] || 40) * q.s * e.sc, big ? 24 : 8, q.y, true);
@@ -494,39 +518,129 @@ function kill(e) {
   }
 }
 
-const EMP_SPEED = 780, EMP_RANGE = 960;   // the pulse travels outward at this many world px per second
-function fireEMP() { // a circular pulse leaves the squad; each machine is hit only when the wavefront reaches it
-  if (!G || G.emp < 100 || G.over || G.paused) return;
-  G.emp = 0; G.flash = .35; G.shake = 8; sfx.emp();
-  G.waves.push({ t: 0, x: G.px, z: G.dist, hit: new Set() });
-  addText(W / 2, 330, 'EMP PULSE', '#6ff3ff');
+const EMP_SPEED = 780, PULSE_RANGE = 560, NUKE_SPEED = 1500, NUKE_RANGE = 1500;   // shockwaves travel outward at these world px per second
+const BIPED = new Set(['grunt', 'gunner', 'runner']);   // the endoskeletons: pulse grenades hold these for longer
+const waveSpeed = w => (w.kind === 'nuke' ? NUKE_SPEED : EMP_SPEED);
+function launchWave(kind, range) { G.waves.push({ t: 0, x: G.px, z: G.dist, hit: new Set(), kind, range }); }
+function useItem() { // fire whatever the tactical slot holds; returns whether it did anything
+  if (!G || G.over || G.paused || state !== 'play') return false;
+  const it = G.item; if (!it) return false;
+  const r = USE[it.k](); if (!r) { const q = squadPos(); addText(q.x, q.y - 100, 'NO TARGET', '#ff9a5a'); return false; }
+  if (r !== 'free') it.n--;
+  if (it.n <= 0) G.item = null;
+  return true;
 }
-function empHit(e) { // what the pulse does to one machine
+function fireEMP() { return useItem(); }
+function empHit(e) { // what a pulse grenade does to one machine
   if (bossShielded(e)) { e.flash = .15; return; }   // the pulse does nothing to a shielded boss
-  const d = (30 + G.lv * 6) * (1 + .2 * save.up.emp);
+  const d = (30 + G.lv * 6) * ipow();
   if (!ET[e.t].fly) e.hp -= (e.boss ? e.max * .04 + d : d) * (1 - armorOf(e));
   e.flash = .2;
   const q = P(e.x, e.wz - G.dist); addSparks(q.x, q.y - (HITH[e.t] || 40) * q.s * e.sc, 10, q.y, true); addLight(q.x, q.y - 30 * q.s, 70 * q.s * e.sc + 20, 'rgba(110,210,255,', .3);
-  if (e.hp > 0 || ET[e.t].fly) { e.stun = 5; e.stunT = G.t; { const dd = ET[e.t], rl = e.wz - G.dist; e.stunRel = (dd.hold && !dd.block && rl <= dd.hold + 60) ? rl : undefined; } if (ET[e.t].fly && e.crash === undefined && !e.crashed) e.crash = 0; }   // every machine is knocked offline for 5 s; anything airborne loses lift and falls
+  if (e.hp > 0 || ET[e.t].fly) { e.stun = BIPED.has(e.t) ? 8 : 5; e.stunT = G.t; { const dd = ET[e.t], rl = e.wz - G.dist; e.stunRel = (dd.hold && !dd.block && rl <= dd.hold + 60) ? rl : undefined; } if (ET[e.t].fly && e.crash === undefined && !e.crashed) e.crash = 0; }
+  if (e.hp <= 0) kill(e);
+}
+function nukeHit(e) { // the warhead's shockwave: every machine is vaporised, bosses lose their plating
+  if (bossShielded(e)) { e.flash = .15; return; }
+  const d = ET[e.t], q = P(e.x, e.wz - G.dist);
+  addSparks(q.x, q.y - (HITH[e.t] || 40) * q.s * e.sc, 14, q.y, true); addParts(q.x, q.y - 30 * q.s, 14, '#ffe9a0', 280, .6); addLight(q.x, q.y - 30 * q.s, 110 * q.s * e.sc + 30, 'rgba(255,240,180,', .4);
+  e.flash = .3;
+  if (e.boss) { if (e.plate > 0) e.plate *= .2; e.hp -= e.max * (e.plateMax ? .12 : .25); }
+  else e.hp = 0;   // airborne machines are brought down with the rest
   if (e.hp <= 0) kill(e);
 }
 function empStep(dt) {
   for (const w of G.waves) {
-    w.t += dt; const r = EMP_SPEED * w.t;
+    w.t += dt; const r = waveSpeed(w) * w.t, hitFn = w.kind === 'nuke' ? nukeHit : empHit;
     for (const e of G.en.slice()) {
       if (e.dead || w.hit.has(e)) continue;
-      if (Math.hypot((e.x - w.x) * LANE, e.wz - w.z) <= r) { w.hit.add(e); empHit(e); }
+      if (Math.hypot((e.x - w.x) * LANE, e.wz - w.z) <= r) { w.hit.add(e); hitFn(e); }
     }
     G.bolts = G.bolts.filter(b => Math.hypot((b.x - w.x) * LANE, G.dist + b.rz - w.z) > r);   // enemy fire is swept away as the ring passes
   }
-  if (G.waves.length) G.waves = G.waves.filter(w => EMP_SPEED * w.t < EMP_RANGE + 80);
+  if (G.waves.length) G.waves = G.waves.filter(w => waveSpeed(w) * w.t < w.range + 80);
+  // fallout from a warhead: it burns machines that stand in it (never the squad)
+  for (const f of G.fallout) {
+    f.t -= dt; if (f.t <= 0) continue;
+    for (const e of G.en) if (!e.dead && !e.boss && Math.abs(e.x - f.x) < f.r && Math.abs(e.wz - f.wz) < 70) { hurtEnemy(e, (14 + 2 * G.lv) * dt, { ignoreArmor: true }); if (e.hp <= 0) kill(e); }
+  }
+  if (G.fallout.length) G.fallout = G.fallout.filter(f => f.t > 0);
+  // C4: a pack flies to its machine, sticks, and goes off on a fuse unless the player sets it off first
+  for (const c of G.c4) {
+    if (c.dead) continue;
+    if (c.e.dead) { c.dead = true; explodeAt(c.e.x, c.e.wz, 60, null); continue; }
+    if (!c.stuck) { c.ft += dt / .4; if (c.ft >= 1) { c.stuck = true; sfx.ping(); } }
+    else { c.fuse -= dt; if (c.fuse <= 0) c4Blow(c); }
+  }
+  if (G.c4.length) G.c4 = G.c4.filter(c => !c.dead);
+  if (G.beam) { G.beam.t -= dt; if (G.beam.t <= 0) G.beam = null; }
+  for (const f of G.flares) f.life -= dt;
+  if (G.flares.length) G.flares = G.flares.filter(f => f.life > 0);
 }
+function c4Blow(c) {
+  if (c.dead) return; c.dead = true; const e = c.e;
+  explodeAt(e.x, e.wz, 40, null);
+  const dmg = (260 + 40 * G.lv) * ipow() + e.max * (e.boss ? .07 : .25);
+  hurtEnemy(e, dmg, { ignoreArmor: true, plateMul: 2, explosive: true }); e.flash = .3;
+  const q = P(e.x, e.wz - G.dist); addText(q.x, q.y - (HITH[e.t] || 60) * q.s * e.sc - 30, 'C4', '#ffb03a'); G.flash = Math.max(G.flash, .25); G.shake = Math.max(G.shake, 10);
+  if (e.hp <= 0) kill(e);
+}
+const USE = {
+  pulse() { G.flash = .3; G.shake = 8; sfx.emp(); launchWave('pulse', PULSE_RANGE); addText(W / 2, 330, 'PULSE GRENADE', ITEMS.pulse.col); return true; },
+  nuke() {
+    G.flash = 1; G.shake = 22; sfx.emp(); sfx.boom(); launchWave('nuke', NUKE_RANGE); addText(W / 2, 330, 'M-38 DETONATION', ITEMS.nuke.col); buzz([200, 60, 200]);
+    for (let i = 0; i < 8; i++) G.fallout.push({ x: clamp(G.px + rnd(-.25, .25), -.8, .8), wz: G.dist + 160 + i * 105, r: .26 + rnd(0, .08), t: 14 + rnd(0, 3), t0: 17, sd: Math.random() * 99 });
+    return true;
+  },
+  c4() {
+    const armed = G.c4.filter(c => c.stuck && !c.dead);
+    if (armed.length) { armed.forEach(c4Blow); return 'free'; }   // a second press sets off the packs already in place
+    let tg = null, best = 1e9;
+    for (const e of G.en) { if (e.dead) continue; const rel = e.wz - G.dist, big = bigFoe(e) && !ET[e.t].fly; if (rel < 30 || rel > 700) continue; const sc = rel + (big ? 0 : 400) + (ET[e.t].fly ? 800 : 0); if (sc < best) { best = sc; tg = e; } }
+    if (!tg) return false;
+    G.c4.push({ e: tg, ft: 0, stuck: false, fuse: 3.2, dead: false }); sfx.hit(); return true;
+  },
+  cannon() {
+    G.beam = { t: .75, max: .75, x: G.px }; G.flash = Math.max(G.flash, .5); G.shake = 14; sfx.cannon(); buzz([120, 40, 120]);
+    addText(W / 2, 330, 'M-25 PLASMA CANNON', ITEMS.cannon.col);
+    const dm = (500 + 60 * G.lv) * ipow();
+    for (const e of G.en.slice().sort((a, b) => a.wz - b.wz)) {   // nearest first, so a machine in front is gone before the boss behind it is hit
+      if (e.dead || e.wz - G.dist < 0 || Math.abs(e.x - G.px) > ET[e.t].hw * e.sc * .6 + .16) continue;
+      if (e.boss) hurtEnemy(e, dm + e.max * .12, { ignoreArmor: true, plateMul: 1.5 }); else e.hp = 0;   // nothing but a boss survives the beam
+      e.flash = .3;
+      const q = P(e.x, e.wz - G.dist); addSparks(q.x, q.y - (HITH[e.t] || 40) * q.s * e.sc, 16, q.y, true); addParts(q.x, q.y - 30 * q.s, 10, '#d9a0ff', 260, .5);
+      if (e.hp <= 0) kill(e);
+    }
+    G.bolts = G.bolts.filter(b => Math.abs(b.x - G.px) > .2);
+    return true;
+  },
+  spike() {
+    let tg = null, best = 1e9;
+    for (const e of G.en) { if (e.dead || e.boss || (e.t !== 'grunt' && e.t !== 'gunner')) continue; const rel = e.wz - G.dist; if (rel < 40 || rel > 520 || rel >= best) continue; best = rel; tg = e; }
+    if (!tg) return false;
+    const q = P(tg.x, tg.wz - G.dist), s0 = squadPos();
+    tg.dead = true; G.kills++;   // the endoskeleton is taken over, not destroyed: no scrap, no wreck
+    addSparks(q.x, q.y - 50 * q.s, 20, q.y, true); addParts(q.x, q.y - 50 * q.s, 14, '#8fe8a0', 200, .6); addLight(q.x, q.y - 50 * q.s, 90, 'rgba(140,255,170,', .4);
+    for (let i = 1; i < 6; i++) addParts(s0.x + (q.x - s0.x) * i / 6, s0.y - 30 + (q.y - 50 * q.s - s0.y + 30) * i / 6, 2, '#8fe8a0', 40, .35, 0);   // the dart's trail
+    activateGuard(); sfx.gate();
+    return true;
+  },
+  flare() {
+    let bx = 0, bz = G.dist + 450, bn = -1;
+    for (const e of G.en) { if (e.dead) continue; const rel = e.wz - G.dist; if (rel < 160 || rel > 800) continue; let n = 0; for (const o of G.en) if (!o.dead && Math.abs(o.x - e.x) < .5 && Math.abs(o.wz - e.wz) < 105) n += bigFoe(o) ? 3 : 1; if (n > bn) { bn = n; bx = e.x; bz = e.wz; } }
+    const f = { x: clamp(bx, -.7, .7), wz: bz, life: 5.2, t0: 5.2 }; G.flares.push(f);
+    const dmg = (75 + 9 * G.lv) * ipow();
+    for (let i = 0; i < 20; i++) G.later.push({ t: 1.7 + i * .12, f: () => explodeAt(clamp(f.x + rnd(-.5, .5), -.9, .9), f.wz + rnd(-105, 105), dmg, null) });
+    addText(W / 2, 330, 'ARTILLERY INBOUND', ITEMS.flare.col); sfx.siren();
+    return true;
+  },
+};
 function drawEmpWave(w) { // the ring on the ground, in perspective, with a faint trailing echo
-  const r = EMP_SPEED * w.t, fade = clamp(1 - r / (EMP_RANGE + 80), 0, 1);
+  const r = waveSpeed(w) * w.t, fade = clamp(1 - r / (w.range + 80), 0, 1), nk = w.kind === 'nuke';
   cx.save(); cx.globalCompositeOperation = 'lighter'; cx.lineCap = 'round'; cx.lineJoin = 'round';
   for (const [k, al, wd] of [[1, 1, 1], [.93, .4, .6], [.85, .18, .4]]) {
     const rr = r * k; if (rr < 4) continue;
-    for (const [lw, col] of [[11 * wd, `rgba(60,170,255,${.34 * al * fade})`], [3.2 * wd, `rgba(220,248,255,${.95 * al * fade})`]]) {
+    for (const [lw, col] of [[(nk ? 26 : 11) * wd, nk ? `rgba(255,170,50,${.4 * al * fade})` : `rgba(60,170,255,${.34 * al * fade})`], [(nk ? 7 : 3.2) * wd, nk ? `rgba(255,250,220,${.95 * al * fade})` : `rgba(220,248,255,${.95 * al * fade})`]]) {
       cx.strokeStyle = col; cx.beginPath(); let pen = false;
       for (let i = 0; i <= 120; i++) {
         const an = i / 120 * Math.PI * 2, rel = w.z + Math.sin(an) * rr - G.dist;
@@ -963,12 +1077,13 @@ function update(dt) {
     if (pl.done) continue;
     const rel = pl.wz - G.dist;
     if (rel < 250) { pl.done = true; continue; }
+    if (pl.k === 'supply') { if (rel < 1300) { G.pups.push({ k: rollItem(G.lv), x: pl.x, wz: pl.wz }); pl.done = true; } continue; }
     if (rel < 1300 && !G.pups.some(p => p.k === 'guard') && (!G.guard || G.guard.dead)) { G.pups.push({ k: 'guard', x: pl.x, wz: pl.wz }); pl.done = true; }
   }
   // steer the squad onto a crate to bring the reprogrammed unit online
   for (const pu of G.pups) {
     const rel = pu.wz - G.dist;
-    if (rel <= 22 && rel > -26 && Math.abs(pu.x - G.px) < .3 + squadHalf() * .45 + .04 * G.cls.tech && !G.over) { pu.got = true; if (pu.k === 'guard') activateGuard(); else activateBuff(pu.k); }
+    if (rel <= 22 && rel > -26 && Math.abs(pu.x - G.px) < .3 + squadHalf() * .45 + .04 * G.cls.tech && !G.over) { pu.got = true; if (pu.k === 'guard') activateGuard(); else if (ITEMS[pu.k]) takeItem(pu.k); else activateBuff(pu.k); }
     if (rel < -30) pu.got = true;
   }
   G.pups = G.pups.filter(pu => !pu.got);
@@ -1088,7 +1203,7 @@ function showMenu() {
     <button id="sq">Squad · ${save.loadout.length ? save.loadout.map(k => CLASS[k].name).join(', ') : 'riflemen only'}</button>
     <button id="arm">Armory · ${save.scrap} scrap</button>
     <button id="set">Settings</button>
-    <p class="foot">No timers. No energy. No purchases.<br>Drag to move · auto-fire · shoot gates to boost them · Space = EMP</p></div>`);
+    <p class="foot">No timers. No energy. No purchases.<br>Drag to move · auto-fire · shoot gates to boost them · Space or double tap = use item</p></div>`);
   $('play').onclick = () => { beep(300, .05); startLevel(save.sel); };
   $('pv').onclick = () => { if (save.sel > 1) { save.sel--; persist(); } showMenu(); };
   $('nxl').onclick = () => { if (save.sel < save.best) { save.sel++; persist(); } showMenu(); };
@@ -1214,13 +1329,14 @@ cv.addEventListener('pointerdown', e => {
   const r = cv.getBoundingClientRect();
   const mx = (e.clientX - r.left) / r.width * W, my = (e.clientY - r.top) / r.height * H;
   if (Math.hypot(mx - (W - 26), my - 26) < 24) { setPause(!G.paused); return; }
-  { const n = performance.now(), L = G.lastTap; if (L && n - L.t < 330 && Math.hypot(mx - L.x, my - L.y) < 60) { G.lastTap = null; fireEMP(); return; } G.lastTap = { t: n, x: mx, y: my }; }   // a quick second tap or click anywhere = EMP
+  if (!G.paused && Math.hypot(mx - (W - 56), my - (H - 70)) < 38) { useItem(); return; }   // the item slot is a button
+  { const n = performance.now(), L = G.lastTap; if (L && n - L.t < 330 && Math.hypot(mx - L.x, my - L.y) < 60) { G.lastTap = null; useItem(); return; } G.lastTap = { t: n, x: mx, y: my }; }   // a quick second tap or click anywhere = EMP
   try { cv.setPointerCapture(e.pointerId); } catch (x) {}
   setTarget(e);
 });
 window.addEventListener('keydown', e => {
   keys[e.key] = true;
-  if (e.key === ' ' || e.key === 'e' || e.key === 'E') { fireEMP(); e.preventDefault(); }
+  if (e.key === ' ' || e.key === 'e' || e.key === 'E') { useItem(); e.preventDefault(); }
   if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') { if (G) setPause(!G.paused); }
 });
 window.addEventListener('keyup', e => { keys[e.key] = false; });
@@ -1814,17 +1930,46 @@ function drawHaz(h) {
 
 function drawPowerup(pu) {
   const rel = pu.wz - G.dist, q = P(pu.x, rel), s = q.s * 1.5, bob = Math.sin(G.t * 3 + pu.x * 4) * 2 * s;
-  cx.save(); cx.globalCompositeOperation = 'lighter'; cx.fillStyle = pu.k === 'rapid' ? 'rgba(255,170,60,.16)' : pu.k === 'shield' ? 'rgba(120,200,255,.16)' : 'rgba(110,230,255,.16)'; cx.fillRect(q.x - 6 * s, 0, 12 * s, q.y); cx.fillStyle = pu.k === 'rapid' ? 'rgba(255,220,160,.22)' : 'rgba(190,245,255,.22)'; cx.fillRect(q.x - 2.4 * s, 0, 4.8 * s, q.y); cx.restore();   // beacon
+  cx.save(); cx.globalCompositeOperation = 'lighter'; cx.fillStyle = pu.k === 'rapid' ? 'rgba(255,170,60,.16)' : pu.k === 'shield' ? 'rgba(120,200,255,.16)' : ITEMS[pu.k] ? 'rgba(255,255,255,.14)' : 'rgba(110,230,255,.16)'; cx.fillRect(q.x - 6 * s, 0, 12 * s, q.y); cx.fillStyle = pu.k === 'rapid' ? 'rgba(255,220,160,.22)' : 'rgba(190,245,255,.22)'; cx.fillRect(q.x - 2.4 * s, 0, 4.8 * s, q.y); cx.restore();   // beacon
   cx.fillStyle = 'rgba(0,0,0,.35)'; cx.beginPath(); cx.ellipse(q.x, q.y, 16 * s, 4 * s, 0, 0, 7); cx.fill();
   cx.save(); cx.translate(q.x, q.y - 14 * s + bob); cx.scale(s, s);
-  const bc = pu.k === 'rapid' ? '#ffb03a' : pu.k === 'shield' ? '#8fd0ff' : '#6ff3ff';
+  const bc = pu.k === 'rapid' ? '#ffb03a' : pu.k === 'shield' ? '#8fd0ff' : ITEMS[pu.k] ? ITEMS[pu.k].col : '#6ff3ff';
   cx.fillStyle = '#0b1218'; cx.fillRect(-13, -14, 26, 24); cx.fillStyle = '#2a3a4a'; cx.fillRect(-12, -13, 24, 22); cx.fillStyle = '#4a6a86'; cx.fillRect(-12, -13, 24, 3);
   cx.strokeStyle = bc; cx.lineWidth = 1.4; cx.strokeRect(-12, -13, 24, 22);
   cx.fillStyle = bc; cx.fillRect(-12, -4, 24, 1.4); cx.fillRect(-12, 3, 24, 1.4);
   if (pu.k === 'rapid') { cx.fillStyle = '#0b1218'; cx.fillRect(-7, -12, 14, 18); cx.fillStyle = bc; cx.beginPath(); cx.moveTo(2, -11); cx.lineTo(-5, 0); cx.lineTo(0, 0); cx.lineTo(-2, 8); cx.lineTo(6, -3); cx.lineTo(1, -3); cx.closePath(); cx.fill(); }   // lightning bolt
   else if (pu.k === 'shield') { cx.fillStyle = '#0b1218'; cx.fillRect(-7, -12, 14, 18); cx.fillStyle = bc; cx.beginPath(); cx.moveTo(0, -11); cx.lineTo(6, -8); cx.lineTo(5, 0); cx.lineTo(0, 6); cx.lineTo(-5, 0); cx.lineTo(-6, -8); cx.closePath(); cx.fill(); cx.fillStyle = '#0b1218'; cx.fillRect(-1, -7, 2, 9); }   // shield
+  else if (ITEMS[pu.k]) { cx.fillStyle = '#0b1218'; cx.fillRect(-9, -12, 18, 18); cx.fillStyle = bc; cx.font = '9px ' + FONT; cx.textAlign = 'center'; cx.fillText(ITEMS[pu.k].g, 0, -1); }
   else { cx.fillStyle = '#0b1218'; cx.beginPath(); cx.arc(0, -3, 6, 0, 7); cx.fill(); cx.fillStyle = '#c8d6e4'; cx.beginPath(); cx.arc(0, -4, 4.6, Math.PI, 0); cx.lineTo(3.4, 0); cx.lineTo(-3.4, 0); cx.fill();   // skull icon
     cx.fillStyle = '#4dffd0'; cx.fillRect(-3, -4.6, 2, 1.6); cx.fillRect(1, -4.6, 2, 1.6); }
+  cx.restore();
+}
+function drawC4(c) {
+  const e = c.e, q0 = squadPos(), qe = P(e.x, e.wz - G.dist), hh = (HITH[e.t] || 40) * .55 * qe.s * e.sc;
+  const x = c.stuck ? qe.x + 5 * qe.s * e.sc : q0.x + (qe.x - q0.x) * c.ft, y = c.stuck ? qe.y - hh : q0.y - 30 + (qe.y - hh - q0.y + 30) * c.ft - Math.sin(c.ft * Math.PI) * 50, s = Math.max(.8, qe.s * 1.2);
+  cx.save(); cx.translate(x, y); cx.fillStyle = '#2a2f26'; cx.fillRect(-7 * s, -4 * s, 14 * s, 8 * s); cx.fillStyle = '#6a7458'; cx.fillRect(-7 * s, -4 * s, 14 * s, 2 * s);
+  if (c.stuck && Math.sin(G.t * (6 + (3.2 - c.fuse) * 5)) > 0) { cx.fillStyle = '#ff2a2a'; cx.fillRect(-2 * s, -1 * s, 4 * s, 3 * s); glow(0, 0, 2.2 * s, '#ff2a2a'); }
+  cx.restore();
+}
+function drawBeam(b) { // the M-25 discharge: a column of violet-white plasma down the lane
+  const a = clamp(b.t / b.max, 0, 1), q0 = P(b.x, 0), q1 = P(b.x, 1400), w0 = 52 * q0.s * 1.4 * (.5 + a), w1 = 52 * q1.s * 1.4 * (.5 + a);
+  cx.save(); cx.globalCompositeOperation = 'lighter';
+  for (const [k, col] of [[1, `rgba(150,60,255,${.4 * a})`], [.55, `rgba(205,140,255,${.6 * a})`], [.22, `rgba(255,245,255,${.95 * a})`]]) { cx.fillStyle = col; cx.beginPath(); cx.moveTo(q0.x - w0 * k, q0.y); cx.lineTo(q0.x + w0 * k, q0.y); cx.lineTo(q1.x + w1 * k, q1.y); cx.lineTo(q1.x - w1 * k, q1.y); cx.fill(); }
+  cx.restore();
+}
+function drawFallout(f) {
+  const q = P(f.x, f.wz - G.dist), rx = f.r * LANE * q.s * 1.1, ry = Math.max(4, rx * .3), fade = clamp(f.t / 3, 0, 1) * clamp((f.t0 - f.t) * 3, 0, 1), pl = .5 + .5 * Math.sin(G.t * 2.4 + f.sd);
+  cx.save(); cx.globalCompositeOperation = 'lighter'; cx.fillStyle = `rgba(80,230,70,${(.12 + .08 * pl) * fade})`; cx.beginPath(); cx.ellipse(q.x, q.y, rx, ry, 0, 0, 7); cx.fill();
+  cx.fillStyle = `rgba(190,255,120,${(.08 + .08 * pl) * fade})`; cx.beginPath(); cx.ellipse(q.x, q.y, rx * .55, ry * .55, 0, 0, 7); cx.fill();
+  for (let i = 0; i < 4; i++) { const t = (G.t * .35 + i * .25 + hash(f.sd * 7 + i)) % 1; cx.fillStyle = `rgba(160,255,140,${(1 - t) * .5 * fade})`; cx.fillRect(q.x + (hash(f.sd * 3 + i) - .5) * rx * 1.4 - 1, q.y - t * 60 * q.s - 1, 2, 2); }
+  cx.restore();
+}
+function drawFlare(f) { // a red signal flare burning on the road, smoke rising, and the barrage circle
+  const q = P(f.x, f.wz - G.dist), s = q.s, rx = 105 * s * 1.15, ry = Math.max(5, rx * .3), fl = .7 + .3 * Math.sin(G.t * 21), a = clamp(f.life / 1, 0, 1);
+  cx.save(); cx.globalAlpha = a; cx.strokeStyle = `rgba(255,70,50,${.4 + .3 * Math.sin(G.t * 6)})`; cx.lineWidth = 2; cx.beginPath(); cx.ellipse(q.x, q.y, rx * 1.12, ry * 1.12, 0, 0, 7); cx.stroke();
+  cx.globalCompositeOperation = 'lighter'; glow(q.x, q.y - 4 * s, 3.6 * s * fl, '#ff3a2a'); cx.globalAlpha = a; cx.fillStyle = `rgba(255,90,60,${.08 * fl})`; cx.beginPath(); cx.ellipse(q.x, q.y, rx, ry, 0, 0, 7); cx.fill();
+  cx.globalCompositeOperation = 'source-over';
+  for (let i = 0; i < 6; i++) { const t = (G.t * .5 + i / 6) % 1; cx.fillStyle = `rgba(255,${90 + 60 * t | 0},${70 + 80 * t | 0},${(1 - t) * .3})`; cx.beginPath(); cx.arc(q.x + Math.sin(t * 5 + i) * 6 * s, q.y - t * 150 * s, (4 + t * 16) * s, 0, 7); cx.fill(); }
   cx.restore();
 }
 function drawScrapChunk(c) {
@@ -2049,6 +2194,10 @@ function render() {
   for (const e of G.en) { const z = e.wz - G.dist; if (z < 1500 && z > -120 && !e.dead) items.push({ z, f: () => drawEnemy(e) }); }
   for (const Dh of G.deaths) items.push({ z: Dh.e.wz - G.dist, f: () => drawBossDeath(Dh) });
   for (const w of G.waves) items.push({ z: 1e6, f: () => drawEmpWave(w) });
+  if (G.beam) items.push({ z: 1e6, f: () => drawBeam(G.beam) });
+  for (const f of G.fallout) { const z = f.wz - G.dist; if (z < 1500 && z > -100) items.push({ z: z + 1, f: () => drawFallout(f) }); }
+  for (const f of G.flares) { const z = f.wz - G.dist; if (z < 1500 && z > -100) items.push({ z, f: () => drawFlare(f) }); }
+  for (const c of G.c4) if (!c.dead) items.push({ z: c.e.wz - G.dist - 1, f: () => drawC4(c) });
   for (const h of G.haz) { const z = h.wz - G.dist; if (z < 1500 && z > -140) items.push({ z: z + 1, f: () => drawHaz(h) }); }
   for (const c of G.scr) { const z = c.wz - G.dist; if (z < 1200 && z > -20) items.push({ z, f: () => drawScrapChunk(c) }); }
   for (const pu of G.pups) { const z = pu.wz - G.dist; if (z < 1500 && z > -30) items.push({ z, f: () => drawPowerup(pu) }); }
@@ -2152,12 +2301,17 @@ function drawHUD() {
   // specialist squad members
   cx.textAlign = 'left'; cx.font = `11px ${FONT}`; let cxp = 14;
   for (const k of CLS) { if (!G.cls[k]) continue; const t = CLASS[k].name + ' x' + G.cls[k]; cx.fillStyle = CLASS[k].col; cx.fillText(t, cxp, H - 40); cxp += cx.measureText(t).width + 10; }
-  // EMP button
-  const ex = W - 56, ey = H - 70, ready = G.emp >= 100;
-  cx.fillStyle = 'rgba(0,0,0,.55)'; cx.beginPath(); cx.arc(ex, ey, 34, 0, 7); cx.fill();
-  cx.strokeStyle = ready ? '#6dffb5' : '#3a6b8a'; cx.lineWidth = 6; cx.beginPath(); cx.arc(ex, ey, 30, -Math.PI / 2, -Math.PI / 2 + 6.283 * G.emp / 100); cx.stroke();
-  cx.textAlign = 'center'; cx.font = `15px ${FONT}`; cx.fillStyle = ready ? '#6dffb5' : '#7aa'; cx.fillText('EMP', ex, ey - (ready ? 5 : 0));
-  if (ready) { cx.font = `9px ${FONT}`; cx.globalAlpha = .6 + .4 * Math.sin(T * 7); cx.fillText('DOUBLE TAP', ex, ey + 10); cx.globalAlpha = 1; }
+  // tactical item slot
+  { const ex = W - 56, ey = H - 70, it = G.item, d = it && ITEMS[it.k], col = d ? d.col : '#3a6b8a';
+    cx.fillStyle = 'rgba(0,0,0,.55)'; cx.beginPath(); cx.arc(ex, ey, 34, 0, 7); cx.fill();
+    cx.strokeStyle = col; cx.lineWidth = 4; cx.globalAlpha = d ? .55 + .45 * Math.sin(T * 5) * .5 + .2 : .5; cx.beginPath(); cx.arc(ex, ey, 30, 0, 7); cx.stroke(); cx.globalAlpha = 1;
+    cx.textAlign = 'center';
+    if (d) {
+      cx.font = `${d.g.length > 2 ? 15 : 19}px ${FONT}`; cx.fillStyle = col; cx.fillText(d.g, ex, ey - 3);
+      for (let i = 0; i < it.n; i++) { cx.fillRect(ex - (it.n - 1) * 5 + i * 10 - 3, ey + 7, 6, 6); }
+      cx.font = `8px ${FONT}`; cx.fillStyle = '#9fb4c4'; cx.fillText('USE', ex, ey + 25);
+    } else { cx.font = `10px ${FONT}`; cx.fillStyle = '#5a7a8a'; cx.fillText('NO ITEM', ex, ey + 3); }
+    if (d) { cx.font = `9px ${FONT}`; cx.fillStyle = col; cx.textAlign = 'right'; cx.fillText(d.name, ex + 34, ey - 42); } }
   if (G.alert && !G.warn) { const a = G.alert, al = clamp(Math.min(a.t, 2.4 - a.t + .0) * 3, 0, 1); cx.save(); cx.globalAlpha = al; cx.textAlign = 'center'; cx.textBaseline = 'middle'; cx.font = `13px ${FONT}`;
     const tw = cx.measureText(a.txt).width + 34; cx.fillStyle = 'rgba(40,8,8,.72)'; cx.fillRect(W / 2 - tw / 2, 82, tw, 22); cx.fillStyle = '#ff5a4a'; cx.fillRect(W / 2 - tw / 2, 82, 3, 22); cx.fillRect(W / 2 + tw / 2 - 3, 82, 3, 22);
     cx.fillStyle = '#ffd0c8'; cx.fillText((a.fly ? '▲ ' : '') + a.txt, W / 2, 94); cx.restore(); }

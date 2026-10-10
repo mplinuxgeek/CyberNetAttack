@@ -1,12 +1,12 @@
 # Cyber Net Attack
 
 A Terminator-inspired squad runner for the browser (HTML5 canvas, no build step, no dependencies). Run up a ruined lane, steer the
-squad through gates to grow it, auto-fire at the machines, dodge their fire, double-tap for an EMP pulse, and destroy the sector boss.
+squad through gates to grow it, auto-fire at the machines, dodge their fire, pick up special weapons from supply crates and fire them from the item slot, and destroy the sector boss.
 No timers, no energy, no purchases. Android build: see `ANDROID.md`.
 
 ## Run
 `python3 tools/serve.py --port 8080` then open http://localhost:8080 (any static server works; `file://` works too).
-Controls: drag / move the mouse (or A/D, arrows) to steer; double-tap or double-click (or Space/E) for the EMP; P/Esc pauses.
+Controls: drag / move the mouse (or A/D, arrows) to steer; tap the item slot, double-tap or double-click (or Space/E) to use the held special item; P/Esc pauses.
 
 ## Layout
 | path | what |

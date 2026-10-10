@@ -9,7 +9,7 @@ global.performance={now:()=>Date.now()};
 let rafcb;global.requestAnimationFrame=f=>{rafcb=f};
 global.setTimeout=(f)=>{f()};
 let src=fs.readFileSync((process.argv[2]||require('path').join(__dirname,'..','game.js')),'utf8')+`
-;globalThis.__t={setPause,showSettings,sanitizeSave,endRun,activateBuff,dropCrate,bossShielded,hurtEnemy,fireEMP,render,airStrike,hurt0:0,armoryBuy,armoryDown,UPS,showArmory,activateGuard,buzz,mk,update,ET,keys,kill,startLevel,applyGate,volley,showSquad,genLevel,CLS,CLASS,airStrike,clsTotal,hurt,get save(){return save},get G(){return G}};`;
+;globalThis.__t={setPause,showSettings,sanitizeSave,endRun,activateBuff,dropCrate,bossShielded,hurtEnemy,useItem,fireEMP,render,airStrike,hurt0:0,armoryBuy,armoryDown,UPS,showArmory,activateGuard,buzz,mk,update,ET,keys,kill,startLevel,applyGate,volley,showSquad,genLevel,CLS,CLASS,airStrike,clsTotal,hurt,ITEMS,get save(){return save},get G(){return G}};`;
 eval(src); const t=globalThis.__t; let pass=0,fail=0;
 const check=(n,c,i)=>{ if(c){pass++;console.log('PASS',n)} else {fail++;console.log('FAIL',n,i||'')} };
 function fresh(lv,loadout){ t.save.loadout=loadout; t.save.unlocked={heavy:1,tech:1,medic:1,shot:1,mark:1,officer:1,signal:1}; t.startLevel(lv); return t.G; }
@@ -140,7 +140,7 @@ for(const ty of ['tank','behemoth','ogre']){ const r=laneTest(ty); check(ty+' st
 // EMP: machines stop for 5 s, flyers crash and explode
 { const G=fresh(3,[]); G.n=40; G.gates=[]; G.en=[]; const gr=t.mk('grunt',G.dist+300,.2,1), tk=t.mk('tank',G.dist+250,-.3,1), ae=t.mk('aerostat',G.dist+260,0,1), gu=t.mk('gunner',G.dist+180,.5,1), nb=t.mk('grunt',G.dist+330,-.1,1);
   for(const e of [gr,tk,ae,gu,nb]){ e.hp=e.max=1e6; } ae.hp=ae.max=500; G.en.push(gr,tk,ae,gu,nb);
-  for(let i=0;i<10;i++){ G.n=40; G.fcd=1e9; t.update(1/60); } G.emp=100; const z0=[gr.wz,tk.wz,gu.wz], hit0=G.n; t.fireEMP();
+  for(let i=0;i<10;i++){ G.n=40; G.fcd=1e9; t.update(1/60); } G.item={k:'pulse',n:3}; const z0=[gr.wz,tk.wz,gu.wz], hit0=G.n; t.useItem();
   check('nothing is stunned the instant the pulse fires', ![gr,tk,gu,nb].some(e=>e.stun>0));
   for(let i=0;i<60*1.3;i++){ G.n=40; G.fcd=1e9; t.update(1/60); }
   check('EMP stuns every machine once the wavefront has passed', [gr,tk,gu,nb].every(e=>e.stun>3), [gr.stun,tk.stun,gu.stun,nb.stun]);
@@ -148,20 +148,20 @@ for(const ty of ['tank','behemoth','ogre']){ const r=laneTest(ty); check(ty+' st
   for(let i=0;i<60*1.5;i++){ G.n=40; G.fcd=1e9; t.update(1/60); }
   check('stunned machines do not move for the whole stun', [gr,tk,gu].every((e,i)=>Math.abs(e.wz-z0[i])<2 || e.wz>=z0[i]-2), [gr.wz-z0[0],tk.wz-z0[1],gu.wz-z0[2]]);
   check('the drone crashed and blew up', ae.dead, ae.hp+' crash '+ae.crash);
-  for(let i=0;i<60*3;i++){ G.n=40; G.fcd=1e9; t.update(1/60); }
+  for(let i=0;i<60*7;i++){ G.n=40; G.fcd=1e9; t.update(1/60); }
   check('stun wears off and they move again', gr.stun<=0 && gr.wz<z0[0]-1, gr.wz-z0[0]); }
 { const G=fresh(3,[]); G.n=40; G.gates=[]; G.en=[]; const g1=t.mk('gunship',G.dist+300,0,1), n1=t.mk('grunt',G.dist+300,0.02,1); g1.hp=g1.max=1e5; n1.hp=n1.max=30; G.en.push(g1,n1);
-  for(let i=0;i<10;i++){ G.n=40; G.fcd=1e9; t.update(1/60); } G.emp=100; t.fireEMP(); for(let i=0;i<60*2.2;i++){ G.n=40; G.fcd=1e9; t.update(1/60); }
+  for(let i=0;i<10;i++){ G.n=40; G.fcd=1e9; t.update(1/60); } G.item={k:'pulse',n:3}; t.useItem(); for(let i=0;i<60*2.2;i++){ G.n=40; G.fcd=1e9; t.update(1/60); }
   check('a crashing gunship dies in the fireball and hurts what is beneath it', g1.dead && n1.hp<30, 'gunship dead '+g1.dead+' grunt hp '+n1.hp); }
 { const G=fresh(3,[]); G.n=40; G.gates=[]; G.en=[]; const g2=t.mk('gunship',G.dist+300,0,1,{boss:true}); g2.hp=g2.max=1e5; g2.scaled=true; g2.base0=1e5; G.en.push(g2);
-  for(let i=0;i<10;i++){ G.n=40; G.fcd=1e9; t.update(1/60); } G.emp=100; t.fireEMP(); const h0=g2.hp; for(let i=0;i<60*2.2;i++){ G.n=40; G.fcd=1e9; t.update(1/60); }
+  for(let i=0;i<10;i++){ G.n=40; G.fcd=1e9; t.update(1/60); } G.item={k:'pulse',n:3}; t.useItem(); const h0=g2.hp; for(let i=0;i<60*2.2;i++){ G.n=40; G.fcd=1e9; t.update(1/60); }
   check('a gunship boss crashes, takes 30% and survives', !g2.dead && g2.hp<h0*.75 && g2.crashed, g2.hp/h0);
   for(let i=0;i<60*5;i++){ G.n=40; G.fcd=1e9; t.update(1/60); }
   check('...and lifts off again after the stun', g2.crash===undefined && (g2.rise===undefined||g2.rise>0), 'crash '+g2.crash+' rise '+g2.rise); }
-{ const G=fresh(3,[]); G.n=40; G.gates=[]; G.en=[]; const sg=t.mk('grunt',G.dist+8,0,1); sg.hp=sg.max=1e6; G.en.push(sg); G.px=0;G.tx=0; G.emp=100; t.fireEMP(); const n0=G.n; for(let i=0;i<30;i++){ G.n=40; G.fcd=1e9; t.update(1/60); } check('a stunned machine does no melee damage', !sg.dead && G.n>=40); }
+{ const G=fresh(3,[]); G.n=40; G.gates=[]; G.en=[]; const sg=t.mk('grunt',G.dist+8,0,1); sg.hp=sg.max=1e6; G.en.push(sg); G.px=0;G.tx=0; G.item={k:'pulse',n:3}; t.useItem(); const n0=G.n; for(let i=0;i<30;i++){ G.n=40; G.fcd=1e9; t.update(1/60); } check('a stunned machine does no melee damage', !sg.dead && G.n>=40); }
 // the pulse is a travelling wave
-{ const G=fresh(3,[]); G.n=40; G.gates=[]; G.en=[]; const nearE=t.mk('grunt',G.dist+150,0,1), farE=t.mk('grunt',G.dist+700,0,1), sideE=t.mk('grunt',G.dist+150,.85,1);
-  for(const e of [nearE,farE,sideE]){ e.hp=e.max=1e6; e.active=true; } G.en.push(nearE,farE,sideE); G.px=0; G.tx=0; G.emp=100; t.fireEMP();
+{ const G=fresh(3,[]); G.n=40; G.gates=[]; G.en=[]; const nearE=t.mk('grunt',G.dist+150,0,1), farE=t.mk('grunt',G.dist+500,0,1), sideE=t.mk('grunt',G.dist+150,.85,1);
+  for(const e of [nearE,farE,sideE]){ e.hp=e.max=1e6; e.active=true; } G.en.push(nearE,farE,sideE); G.px=0; G.tx=0; G.item={k:'pulse',n:3}; t.useItem();
   const bolt={rz:600,rz0:600,h0:30,big:false,x:0,vx:0,dmg:1}; G.bolts.push(bolt);
   let tNear=null,tFar=null,tSide=null,boltGone=null; for(let i=0;i<60*2;i++){ G.n=40; G.fcd=1e9; t.update(1/60); const s=i/60;
     if(tNear===null&&nearE.stun>0) tNear=s; if(tFar===null&&farE.stun>0) tFar=s; if(tSide===null&&sideE.stun>0) tSide=s; if(boltGone===null&&!G.bolts.includes(bolt)) boltGone=s; }
@@ -190,7 +190,7 @@ for(const ty of ['tank','behemoth','ogre']){ const r=laneTest(ty); check(ty+' st
   check('machines resume without teleporting after the stun', maxjump<25 && gj<60, 'maxjump '+maxjump.toFixed(1)+' hover drift '+gj.toFixed(1)); }
 { const G=fresh(5,[]); G.n=60; G.gates=[]; G.en=[]; const pre=t.mk('tank',G.dist+260,0,1), boss=t.mk('ogre',G.dist+420,0,1,{boss:true}); pre.hp=pre.max=1e6; boss.hp=boss.max=5000; G.en.push(pre,boss);
   t.hurtEnemy(boss,1000); check('the boss takes no damage while the pre-boss lives', boss.hp===5000 && t.bossShielded(boss));
-  G.emp=100; t.fireEMP(); for(let i=0;i<120;i++){ G.n=60; G.fcd=1e9; t.update(1/60); } check('EMP leaves the shielded boss alone', Math.abs(boss.hp/boss.max-1)<1e-9 && !(boss.stun>0) && (boss.plate===undefined||boss.plate===boss.plateMax), boss.hp/boss.max);
+  G.item={k:'pulse',n:3}; t.useItem(); for(let i=0;i<120;i++){ G.n=60; G.fcd=1e9; t.update(1/60); } check('EMP leaves the shielded boss alone', Math.abs(boss.hp/boss.max-1)<1e-9 && !(boss.stun>0) && (boss.plate===undefined||boss.plate===boss.plateMax), boss.hp/boss.max);
   pre.hp=0; t.kill(pre); for(let i=0;i<10;i++){ G.n=60; G.fcd=1e9; t.update(1/60); } check('...then the boss becomes vulnerable', !t.bossShielded(boss)); const hb=boss.hp+(boss.plate||0); t.hurtEnemy(boss,500); check('and damage lands', boss.hp+(boss.plate||0)<hb); }
 { const G=fresh(5,[]); G.n=60; G.gates=[]; G.en=[]; const boss=t.mk('ogre',G.dist+420,0,1,{boss:true}); boss.hp=boss.max=1e5; G.en.push(boss); boss.hp=boss.max*.4; const f0=boss.hp/boss.max;
   for(let i=0;i<260;i++){ G.n=60; G.fcd=1e9; boss.fcd=99; t.update(1/60); } check('a boss that is already hurt is not restored to full when it sizes up', boss.hp/boss.max<f0+.02, (boss.hp/boss.max).toFixed(2)+' vs '+f0); }
@@ -224,4 +224,35 @@ for(const ty of ['tank','behemoth','ogre']){ const r=laneTest(ty); check(ty+' st
   t.setPause(true); check('Back from pause settings leaves the game paused', G.paused===true); }
 // no radiation or slag pits any more: levels only carry unexploded ordnance
 { const kinds=new Set(); for(let lv=1;lv<=14;lv++) for(let k=0;k<4;k++) for(const h of t.genLevel(lv).haz) kinds.add(h.k); check('levels contain only unexploded ordnance as a ground hazard', kinds.size===1 && kinds.has('uxo'), [...kinds]); }
+// ---- phase 1: the tactical item slot
+const run=(G,sec,n)=>{ for(let i=0;i<60*sec;i++){ G.n=n||40; G.fcd=1e9; t.update(1/60); } };
+const arena=(lv,...en)=>{ const G=fresh(lv,[]); G.n=40; G.gates=[]; G.en=[]; G.px=0; G.tx=0; for(const e of en){ e.active=true; G.en.push(e); } return G; };
+{ const G=fresh(2,[]); check('a run starts holding a pulse grenade bundle', G.item && G.item.k==='pulse' && G.item.n===2);
+  G.n=40; G.gates=[]; G.en=[]; t.useItem(); check('using a charge uses one up', G.item && G.item.n===1); run(G,.5); t.useItem(); check('the last charge empties the slot', G.item===null); check('an empty slot does nothing', t.useItem()===false);
+  for(const k of Object.keys(t.ITEMS)){ G.pups.push({k,x:0,wz:G.dist+8}); run(G,.3); check('crate gives '+k, G.item && G.item.k===k && G.item.n===t.ITEMS[k].n, JSON.stringify(G.item)); }
+  const G2=fresh(3,[]); check('supply crates are planned on the road', G2.pupPlan.filter(p=>p.k==='supply').length===2);
+  let drops=0; for(let i=0;i<200;i++){ const g=fresh(4,[]); g.pups.length=0; const e=t.mk('tank',g.dist+300,0,1); t.dropCrate(e); if(g.pups.length) drops++; } check('big machines sometimes drop crates', drops>20 && drops<140, drops);
+  let kinds=new Set(); for(let i=0;i<300;i++){ const g=fresh(6,[]); g.pups.length=0; t.dropCrate(t.mk('tank',g.dist+300,0,1)); g.pups.forEach(p=>kinds.add(p.k)); } check('...and the drops include special weapons', ['pulse','c4','flare','spike','cannon'].filter(k=>kinds.has(k)).length>=3, [...kinds]); }
+{ const gr=t.mk('grunt',1,0,1), nb=t.mk('grunt',2,.1,1); const G=arena(3,gr,nb); gr.wz=G.dist+200; nb.wz=G.dist+700; gr.hp=gr.max=nb.hp=nb.max=1e6; G.item={k:'pulse',n:3}; t.useItem(); run(G,.6);
+  check('pulse grenades stun endoskeletons for 8 s', gr.stun>7 && gr.stun<=8, gr.stun); check('...but only in a wide radius, not the whole road', !(nb.stun>0), nb.stun); }
+{ const gr=t.mk('grunt',1,0,1), tk=t.mk('tank',2,.3,1), fl=t.mk('aerostat',3,-.3,1), bs=t.mk('ogre',4,0,1,{boss:true}); const G=arena(5,gr,tk,fl,bs);
+  gr.wz=G.dist+300; tk.wz=G.dist+500; fl.wz=G.dist+400; bs.wz=G.dist+900; tk.hp=tk.max=5000; fl.hp=fl.max=300; bs.hp=bs.max=20000; bs.plateMax=bs.plate=4000; gr.hp=gr.max=1e5;
+  G.item={k:'nuke',n:1}; t.useItem(); const n0=G.n; run(G,.1); check('nothing dies before the shockwave arrives', !gr.dead && !tk.dead);
+  run(G,1.6); check('a mini-nuke destroys ground forces', gr.dead && tk.dead); check('...and brings down flyers', fl.dead, fl.hp);
+  check('...strips 80% of boss plating once the blockers are gone', bs.plate<=bs.plateMax*.21 && bs.hp<bs.max, bs.plate+' '+bs.hp);
+  check('it leaves fallout trails and never hurts the squad', G.fallout.length>=6 && G.n===n0, G.fallout.length+' n '+G.n); check('the slot is empty afterwards', G.item===null);
+  const e3=t.mk('grunt',1,G.px,1); e3.wz=G.dist+G.fallout[0].wz-G.dist; e3.x=G.fallout[0].x; e3.hp=e3.max=1e5; e3.active=true; G.en.push(e3); const h0=e3.hp; run(G,2); check('fallout burns machines standing in it', e3.hp<h0, e3.hp); }
+{ const tk=t.mk('tank',1,0,1); const G=arena(3,tk); tk.wz=G.dist+400; tk.hp=tk.max=3000; G.item={k:'c4',n:3}; t.useItem(); check('C4 uses a charge to throw a pack', G.item.n===2 && G.c4.length===1);
+  run(G,.7); check('the pack sticks to the machine', G.c4[0] && G.c4[0].stuck); check('...and does not go off by itself straight away', tk.hp===tk.max, tk.hp);
+  check('using the slot again detonates it without costing a charge', t.useItem() && G.item.n===2, G.item.n); run(G,.1); check('massive damage to the machine', tk.hp<tk.max*.65, tk.hp/tk.max); check('the pack is gone', G.c4.length===0);
+  const t2=t.mk('tank',2,.4,1); t2.wz=G.dist+450; t2.hp=t2.max=3000; t2.active=true; G.en.push(t2); t.useItem(); run(G,4); check('a stuck pack goes off on its fuse', t2.hp<t2.max*.9 || tk.hp<tk.max*.4, t2.hp/t2.max); }
+{ const inL=t.mk('tank',1,0,1), inL2=t.mk('grunt',2,.02,1), side=t.mk('tank',3,.7,1), bs=t.mk('ogre',4,0,1,{boss:true}); const G=arena(3,inL,inL2,side,bs);
+  inL.wz=G.dist+300; inL2.wz=G.dist+450; side.wz=G.dist+900; bs.wz=G.dist+700; inL.hp=inL.max=side.hp=side.max=4000; inL2.hp=inL2.max=2000; bs.hp=bs.max=9000;
+  G.item={k:'cannon',n:1}; G.bolts.push({rz:200,rz0:200,h0:30,big:false,x:0,vx:0,dmg:1}); t.useItem(); run(G,.1);
+  check('the plasma cannon pierces everything in the lane', inL.dead && inL2.dead, inL.hp+' '+inL2.hp); check('...including the boss behind', bs.hp<bs.max*.85, bs.hp/bs.max); check('...but leaves the next lane alone', !side.dead && side.hp===side.max); check('...and clears enemy fire in its path', G.bolts.length===0); }
+{ const gr=t.mk('grunt',1,.2,1), tk=t.mk('tank',2,-.3,1); const G=arena(3,tk); G.item={k:'spike',n:1}; check('the spike needs a target', t.useItem()===false && G.item && G.item.n===1);
+  G.en.push(gr); gr.wz=G.dist+250; gr.active=true; gr.hp=gr.max=100; const kills0=G.scrap; check('the spike converts an endoskeleton', t.useItem() && gr.dead, ''); check('...which joins the squad as the reprogrammed unit', G.guard && !G.guard.dead); check('...and does not drop scrap', G.scr.length===0 && G.item===null);
+  const G2=arena(3,t.mk('tank',1,0,1)); G2.en[0].wz=G2.dist+250; G2.item={k:'spike',n:1}; check('machines cannot be reprogrammed', t.useItem()===false); }
+{ const a=[]; for(let i=0;i<5;i++){ const g=t.mk('grunt',i,.1*i-.2,1); g.hp=g.max=60; a.push(g); } const far=t.mk('grunt',9,.0,1); far.hp=far.max=60; const G=arena(3,...a,far); a.forEach((g,i)=>{ g.wz=G.dist+500+i*10; }); far.wz=G.dist+1200;
+  G.item={k:'flare',n:1}; t.useItem(); run(G,1.0); check('the barrage waits for the flare to be spotted', a.every(g=>!g.dead)); run(G,5); check('105mm shells destroy the marked group', a.filter(g=>g.dead).length>=3, a.map(g=>g.hp)); check('...and spare what is far away', !far.dead && far.hp===far.max); check('no flares linger', G.flares.length===0); }
 console.log(pass+' passed, '+fail+' failed');
