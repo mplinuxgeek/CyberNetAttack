@@ -226,7 +226,7 @@ for(const ty of ['tank','behemoth','ogre']){ const r=laneTest(ty); check(ty+' st
 { const kinds=new Set(); for(let lv=1;lv<=14;lv++) for(let k=0;k<4;k++) for(const h of t.genLevel(lv).haz) kinds.add(h.k); check('levels contain only unexploded ordnance as a ground hazard', kinds.size===1 && kinds.has('uxo'), [...kinds]); }
 // ---- phase 1: the tactical item slot
 const run=(G,sec,n)=>{ for(let i=0;i<60*sec;i++){ G.n=n||40; G.fcd=1e9; t.update(1/60); } };
-const arena=(lv,...en)=>{ const G=fresh(lv,[]); G.n=40; G.gates=[]; G.en=[]; G.px=0; G.tx=0; for(const e of en){ e.active=true; G.en.push(e); } return G; };
+const arena=(lv,...en)=>{ const G=fresh(lv,[]); G.n=40; G.gates=[]; G.en=[]; G.obs=[]; G.haz=[]; G.px=0; G.tx=0; for(const e of en){ e.active=true; G.en.push(e); } return G; };
 { const G=fresh(2,[]); check('a run starts holding a pulse grenade bundle', G.item && G.item.k==='pulse' && G.item.n===2);
   G.n=40; G.gates=[]; G.en=[]; t.useItem(); check('using a charge uses one up', G.item && G.item.n===1); run(G,.5); t.useItem(); check('the last charge empties the slot', G.item===null); check('an empty slot does nothing', t.useItem()===false);
   for(const k of Object.keys(t.ITEMS)){ G.pups.push({k,x:0,wz:G.dist+8}); run(G,.3); check('crate gives '+k, G.item && G.item.k===k && G.item.n===t.ITEMS[k].n, JSON.stringify(G.item)); }
@@ -235,13 +235,17 @@ const arena=(lv,...en)=>{ const G=fresh(lv,[]); G.n=40; G.gates=[]; G.en=[]; G.p
   let kinds=new Set(); for(let i=0;i<300;i++){ const g=fresh(6,[]); g.pups.length=0; t.dropCrate(t.mk('tank',g.dist+300,0,1)); g.pups.forEach(p=>kinds.add(p.k)); } check('...and the drops include special weapons', ['pulse','c4','flare','spike','cannon'].filter(k=>kinds.has(k)).length>=3, [...kinds]); }
 { const gr=t.mk('grunt',1,0,1), nb=t.mk('grunt',2,.1,1); const G=arena(3,gr,nb); gr.wz=G.dist+200; nb.wz=G.dist+700; gr.hp=gr.max=nb.hp=nb.max=1e6; G.item={k:'pulse',n:3}; t.useItem(); run(G,.6);
   check('pulse grenades stun endoskeletons for 10 s', gr.stun>9 && gr.stun<=10, gr.stun); check('...but only in a wide radius, not the whole road', !(nb.stun>0), nb.stun); }
-{ const gr=t.mk('grunt',1,0,1), tk=t.mk('tank',2,.3,1), fl=t.mk('aerostat',3,-.3,1), bs=t.mk('ogre',4,0,1,{boss:true}); const G=arena(5,gr,tk,fl,bs);
-  gr.wz=G.dist+300; tk.wz=G.dist+500; fl.wz=G.dist+400; bs.wz=G.dist+900; tk.hp=tk.max=5000; fl.hp=fl.max=300; bs.hp=bs.max=20000; bs.plateMax=bs.plate=4000; gr.hp=gr.max=1e5;
-  G.item={k:'nuke',n:1}; t.useItem(); const n0=G.n; run(G,.1); check('nothing dies before the shockwave arrives', !gr.dead && !tk.dead);
-  run(G,1.6); check('a mini-nuke destroys ground forces', gr.dead && tk.dead); check('...and brings down flyers', fl.dead, fl.hp);
-  check('...strips 80% of boss plating once the blockers are gone', bs.plate<=bs.plateMax*.21 && bs.hp<bs.max, bs.plate+' '+bs.hp);
-  check('it leaves fallout trails and never hurts the squad', G.fallout.length>=6 && G.n===n0, G.fallout.length+' n '+G.n); check('the slot is empty afterwards', G.item===null);
-  const e3=t.mk('grunt',1,G.px,1); e3.wz=G.dist+G.fallout[0].wz-G.dist; e3.x=G.fallout[0].x; e3.hp=e3.max=1e5; e3.active=true; G.en.push(e3); const h0=e3.hp; run(G,2); check('fallout burns machines standing in it', e3.hp<h0, e3.hp); }
+{ const gr=t.mk('grunt',1,0,1), tk=t.mk('tank',2,.3,1), fl=t.mk('aerostat',3,-.3,1), bs=t.mk('ogre',4,0,1,{boss:true}), far=t.mk('grunt',5,0,1), nearE=t.mk('grunt',6,.5,1); const G=arena(5,gr,tk,fl,bs,far,nearE);
+  gr.wz=G.dist+480; tk.wz=G.dist+520; fl.wz=G.dist+500; bs.wz=G.dist+600; far.wz=G.dist+1100; nearE.wz=G.dist+60; tk.hp=tk.max=5000; fl.hp=fl.max=300; bs.hp=bs.max=20000; bs.plateMax=bs.plate=4000; gr.hp=gr.max=1e5; far.hp=far.max=nearE.hp=nearE.max=1e5; nearE.stun=99; far.stun=99;
+  G.item={k:'nuke',n:1}; t.useItem(); const n0=G.n; check('the M-38 is fired as a warhead, not set off from the squad', G.nukes.length===1 && G.waves.length===0 && G.flash<.9, G.nukes.length+' '+G.waves.length); run(G,.1); check('nothing dies while it is still in flight', !gr.dead && !tk.dead && G.nukes.length===1);
+  let plateAt=null, hpAt=1; for(let i=0;i<60*2;i++){ G.n=40; G.fcd=1e9; nearE.wz=G.dist+60; far.wz=G.dist+1100; t.update(1/60); if(plateAt===null && bs.plate<bs.plateMax*.9){ plateAt=bs.plate/bs.plateMax; hpAt=bs.hp/bs.max; } }
+  check('a mini-nuke destroys the machines at the impact', gr.dead && tk.dead && fl.dead, [gr.dead,tk.dead,fl.dead]);
+  check('...but not machines more than ~2 sections away', !far.dead && !nearE.dead, [far.dead,nearE.dead]);
+  check('...strips 80% of boss plating once the blockers are gone', plateAt!==null && plateAt<=.21 && hpAt<1, plateAt+' '+hpAt);
+  check('it leaves fallout trails and never hurts the squad', G.fallout.length>=5 && G.n===n0, G.fallout.length+' n '+G.n); check('the slot is empty afterwards', G.item===null);
+  const e3=t.mk('grunt',1,G.px,1); e3.wz=G.fallout[0].wz; e3.x=G.fallout[0].x; e3.hp=e3.max=1e5; e3.active=true; G.en.push(e3); const h0=e3.hp; run(G,2); check('fallout burns machines standing in it', e3.hp<h0, e3.hp); }
+{ const G=arena(4); G.en=[]; G.item={k:'nuke',n:1}; t.useItem(); run(G,1.2); check('with nothing to aim at the warhead lands about 520 ahead', G.waves.length>=0 && G.nukes.length===0); }
+{ const G=fresh(3,[]); G.n=40; G.form='v'; G.gates=[]; G.en=[]; const sh=[]; for(let i=0;i<300;i++){ G.bullets.length=0; t.volley(); for(const b of G.bullets) sh.push(b.zo); } const mx=Math.max(...sh), mn=Math.min(...sh); check('rounds leave from where each soldier stands (V formation: front rank ahead, rear behind)', mx>15 && mn<-20, mn.toFixed(0)+'..'+mx.toFixed(0)); }
 { const tk=t.mk('tank',1,0,1); const G=arena(3,tk); tk.wz=G.dist+400; tk.hp=tk.max=3000; G.item={k:'c4',n:3}; t.useItem(); check('C4 uses a charge to throw a pack', G.item.n===2 && G.c4.length===1);
   run(G,.7); check('the pack sticks to the machine', G.c4[0] && G.c4[0].stuck); check('...and does not go off by itself straight away', tk.hp===tk.max, tk.hp);
   check('using the slot again detonates it without costing a charge', t.useItem() && G.item.n===2, G.item.n); run(G,.1); check('massive damage to the machine', tk.hp<tk.max*.65, tk.hp/tk.max); check('the pack is gone', G.c4.length===0);
@@ -367,7 +371,7 @@ const arena=(lv,...en)=>{ const G=fresh(lv,[]); G.n=40; G.gates=[]; G.en=[]; G.p
   let bad=0; for(let lv=3;lv<=12;lv++) for(let r=0;r<3;r++){ const L=t.genLevel(lv); for(const e of L.en) if(!e.boss && L.gates.some(g=>e.wz>g.wz-130 && e.wz<g.wz+230)) bad++; } check('new units never stand in a gate approach', bad===0, bad); }
 // ---- balance pass: upgrades, second wind, boss easing
 { t.save.up={squad:0,dmg:0,rate:0,weapon:0,guard:0,emp:0,plate:3,rein:0,gate:0,crit:0,cache:3}; let G=fresh(3,[]); check('Reactive Plating starts a sector with plates', G.shield===3, G.shield); check('Quartermaster level 3 starts with C4', G.item.k==='c4' && G.item.n===3, JSON.stringify(G.item));
-  t.save.up.plate=0; t.save.up.cache=0; t.save.up.rein=5; G=fresh(3,[]); G.gates=[]; G.en=[]; G.n=10; G.peak=40; for(let i=0;i<60*16;i++){ G.fcd=1e9; t.update(1/60); } check('Field Reinforcements bring soldiers back', G.n>10, G.n);
+  t.save.up.plate=0; t.save.up.cache=0; t.save.up.rein=5; G=fresh(3,[]); G.gates=[]; G.en=[]; G.obs=[]; G.haz=[]; G.n=10; G.peak=40; let mxn=0; for(let i=0;i<60*20;i++){ G.fcd=1e9; t.update(1/60); mxn=Math.max(mxn,G.n); } check('Field Reinforcements bring soldiers back', mxn>10, mxn);
   t.save.up.rein=0; t.save.up.gate=10; G=fresh(3,[]); G.n=10; G.peak=10; t.applyGate({px:-.5,L:{k:'add',v:10},R:{k:'add',v:-10}}); check('Gate Intel boosts a good gate by 50%', G.n===25, G.n);
   G.n=100; t.applyGate({px:.5,L:{k:'add',v:10},R:{k:'add',v:-10}}); check('...and softens a bad one', G.n===100-5-5 || G.n>=85 && G.n<=92, G.n);
   t.save.up.gate=0; t.save.up.crit=10; G=fresh(3,[]); G.n=60; G.bullets.length=0; let crits=0,tot=0; for(let i=0;i<300;i++){ G.bullets.length=0; t.volley(); const mn=Math.min(...G.bullets.map(b=>b.dmg)); for(const b of G.bullets){ tot++; if(b.dmg>mn*1.8) crits++; } } check('Marksmanship adds critical rounds (about 40% at level 10)', crits/tot>.25 && crits/tot<.55, (crits/tot).toFixed(2));

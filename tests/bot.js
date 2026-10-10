@@ -105,7 +105,7 @@ function useItems(G) {
     case 'flare': go = us.filter(e => e.wz - G.dist > 160).length >= 5 || big.length >= 1 && us.length >= 3; break;
     case 'spike': go = !(G.guard && !G.guard.dead) && us.some(e => (e.t === 'grunt' || e.t === 'gunner') && e.wz - G.dist > 60 && e.wz - G.dist < 500); break;
     case 'cannon': go = lane.length >= 3 || lane.some(e => t.bigFoe(e) || e.boss); break;
-    case 'nuke': go = us.length >= 12 || (boss && t.bossShielded(boss) && big.length >= 2); break;
+    case 'nuke': { const zone = us.filter(e => e.wz - G.dist > 380 && e.wz - G.dist < 760); go = zone.length >= 8 || (boss && zone.some(e => e.boss) && big.length >= 1); break; }   // it lands 400+ px ahead and reaches about 340 px around that point
   }
   if (go && t.useItem()) lastItem = G.t;
 }

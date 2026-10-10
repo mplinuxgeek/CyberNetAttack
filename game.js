@@ -459,7 +459,7 @@ function startLevel(lv, opt) {
     dist: 0, spd: 0, px: 0, tx: 0,
     n: 6 + 2 * save.up.squad, tier: save.up.weapon, rateG: 1, dmgG: 1,
     fcd: .3, bullets: [], bolts: [], parts: [], texts: [],
-    form: save.form, scrap: 0, kills: 0, item: { k: QM[U('cache')][0], n: QM[U('cache')][1] }, shield: U('plate'), reinT: 0, c4: [], flares: [], fallout: [], beam: null, shake: 0, flash: 0, hurtFlash: 0,
+    form: save.form, scrap: 0, kills: 0, item: { k: QM[U('cache')][0], n: QM[U('cache')][1] }, shield: U('plate'), reinT: 0, c4: [], flares: [], fallout: [], nukes: [], beam: null, shake: 0, flash: 0, hurtFlash: 0,
     guard: null, gx: 0, pups: [], pupPlan: lvl.pups.map(p => ({ k: p.k, x: p.x, wz: p.wz, done: false })),
     cls: Object.fromEntries(CLS.map(k => [k, 0])), sig: 7, scr: [], haz: lvl.haz, obs: lvl.obs, slow: 1, env: ENVS[SECT[(lv - 1) % SECT.length]] || null, dk: 0, rn: 0, storm: 0, rockets: [], strikes: [], lt: [], warn: null, mz: 0, rcd: 2, peak: 6 + 2 * save.up.squad,
     ts: 1, t: 0, later: [], deaths: [], waves: [], alert: null, over: false, won: false, endT: 0, paused: false,
@@ -499,6 +499,7 @@ function slotOf(i, shown) { // where the i-th soldier stands: x offset in lane u
   if (f === 'wall') return { ox: (i % 10 - 4.5) * .06, oz: -Math.floor(i / 10) * 5 + 8 };
   const r = Math.sqrt(i + .5); return { ox: r * Math.cos(i * 2.39996) * .052, oz: r * Math.sin(i * 2.39996) * 4.6 };
 }
+function frontZ() { const n = Math.min(G.n, 40); let z = -1e9; for (let i = 0; i < n; i++) z = Math.max(z, slotOf(i, n).oz); return (n ? z : 0) + 7; }
 function cycleForm() { if (!G || G.over || G.paused) return; const i = (FORM_ORDER.indexOf(G.form) + 1) % FORM_ORDER.length; G.form = FORM_ORDER[i]; save.form = G.form; persist(); const q = squadPos(); addText(q.x, q.y - 100, FORMS[G.form].name + ' FORMATION', '#cfe8ff'); sfx.tick(); }
 function squadHalf() { return (.04 * Math.sqrt(Math.min(G.n, 40)) + .035) * formK().half; }
 const demoK = () => (G && G.cls.demo > 0 ? 1.35 : 1);   // demolitions: splash damage and blast radius
@@ -544,7 +545,7 @@ const ITEMS = {
   flare:  { name: 'SIGNAL FLARE',       g: 'SF', col: '#ff5a4a', n: 1, w: 3, desc: 'calls a 105mm barrage' },
   spike:  { name: 'REPROGRAMMING SPIKE', g: 'RS', col: '#8fe8a0', n: 1, w: 3, desc: 'turns an endoskeleton to your side' },
   cannon: { name: 'M-25 PLASMA CANNON', g: 'M25', col: '#c86bff', n: 1, w: 2, desc: 'piercing beam down the lane' },
-  nuke:   { name: 'M-38 MINI-NUKE',     g: 'M38', col: '#ffe24a', n: 1, w: 1, desc: 'destroys every machine ahead; bosses lose plating' },
+  nuke:   { name: 'M-38 MINI-NUKE',     g: 'M38', col: '#ffe24a', n: 1, w: 1, desc: 'fired at the thickest group ahead; wipes out everything near the impact' },
 };
 const ipow = () => 1 + .2 * save.up.emp;
 function rollItem(lv) {
@@ -703,10 +704,16 @@ function kill(e) {
   }
 }
 
-const EMP_SPEED = 780, PULSE_RANGE = 680, NUKE_SPEED = 1500, NUKE_RANGE = 1500;   // shockwaves travel outward at these world px per second
+const EMP_SPEED = 780, PULSE_RANGE = 680, NUKE_SPEED = 1500, NUKE_RANGE = 340;   // shockwaves travel outward at these world px per second; the M-38's blast reaches 340 px from where the warhead lands (about two sections of enemies)
 const BIPED = new Set(['grunt', 'gunner', 'runner', 't700', 't400']);   // the endoskeletons: pulse grenades hold these for longer
 const waveSpeed = w => (w.kind === 'nuke' ? NUKE_SPEED : EMP_SPEED);
-function launchWave(kind, range) { G.waves.push({ t: 0, x: G.px, z: G.dist, hit: new Set(), kind, range }); }
+function launchWave(kind, range, x, z) { G.waves.push({ t: 0, x: x === undefined ? G.px : x, z: z === undefined ? G.dist : z, hit: new Set(), kind, range }); }
+function nukeBlast(x, z) { // the warhead lands: a flash, a shockwave from the impact point and fallout around it. The squad is never in the blast.
+  const R = NUKE_RANGE * demoK(); G.flash = 1; G.shake = 22; sfx.emp(); sfx.boom(); launchWave('nuke', R, x, z); addText(W / 2, 330, 'M-38 DETONATION', ITEMS.nuke.col); buzz([200, 60, 200]);
+  for (const o of G.obs) { if (o.dead) continue; if (o.k === 'overpass') { if (Math.abs(o.wz - z) < R + 200) collapseStart(o); } else if (Math.abs(o.wz - z) < R && Math.abs(o.x - x) < R / LANE + o.hw) obsBlast(o.x, o.wz, 1e4); }
+  for (let i = 0; i < 5; i++) G.fallout.push({ x: clamp(x + rnd(-.2, .2), -.8, .8), wz: z + (i - 2) * 85, r: (.26 + rnd(0, .08)) * demoK(), t: 14 + rnd(0, 3), t0: 17, sd: Math.random() * 99 });
+  const q = P(x, z - G.dist); addParts(q.x, q.y - 40 * q.s, 40, '#ffe9a0', 340, .9); addLight(q.x, q.y - 40 * q.s, 260 * q.s + 60, 'rgba(255,240,180,', .7, true);
+}
 function useItem() { // fire whatever the tactical slot holds; returns whether it did anything
   if (!G || G.over || G.paused || state !== 'play') return false;
   const it = G.item; if (!it) return false;
@@ -717,7 +724,7 @@ function useItem() { // fire whatever the tactical slot holds; returns whether i
 }
 function fireEMP() { return useItem(); }
 function empHit(e) { // what a pulse grenade does to one machine
-  if (bossShielded(e)) { e.flash = .15; return; }   // the pulse does nothing to a shielded boss
+  if (bossShielded(e)) { e.flash = .15; return false; }   // the pulse does nothing to a shielded boss
   const d = (30 + G.lv * 6) * ipow();
   if (!ET[e.t].fly) e.hp -= (e.boss ? e.max * .04 + d : d) * (1 - armorOf(e));
   e.flash = .2;
@@ -726,7 +733,7 @@ function empHit(e) { // what a pulse grenade does to one machine
   if (e.hp <= 0) kill(e);
 }
 function nukeHit(e) { // the warhead's shockwave: every machine is vaporised, bosses lose their plating
-  if (bossShielded(e)) { e.flash = .15; return; }
+  if (bossShielded(e)) { e.flash = .15; return false; }   // (false: try again next frame, once the machine in front has been destroyed)
   const d = ET[e.t], q = P(e.x, e.wz - G.dist);
   addSparks(q.x, q.y - (HITH[e.t] || 40) * q.s * e.sc, 14, q.y, true); addParts(q.x, q.y - 30 * q.s, 14, '#ffe9a0', 280, .6); addLight(q.x, q.y - 30 * q.s, 110 * q.s * e.sc + 30, 'rgba(255,240,180,', .4);
   e.flash = .3;
@@ -736,10 +743,10 @@ function nukeHit(e) { // the warhead's shockwave: every machine is vaporised, bo
 }
 function empStep(dt) {
   for (const w of G.waves) {
-    w.t += dt; const r = waveSpeed(w) * w.t, hitFn = w.kind === 'nuke' ? nukeHit : empHit;
+    w.t += dt; const r = Math.min(waveSpeed(w) * w.t, w.range), hitFn = w.kind === 'nuke' ? nukeHit : empHit;
     for (const e of G.en.slice()) {
       if (e.dead || w.hit.has(e)) continue;
-      if (Math.hypot((e.x - w.x) * LANE, e.wz - w.z) <= r) { w.hit.add(e); hitFn(e); }
+      if (Math.hypot((e.x - w.x) * LANE, e.wz - w.z) <= r) { w.hit.add(e); if (hitFn(e) === false) w.hit.delete(e); }
     }
     G.bolts = G.bolts.filter(b => Math.hypot((b.x - w.x) * LANE, G.dist + b.rz - w.z) > r);   // enemy fire is swept away as the ring passes
   }
@@ -759,6 +766,8 @@ function empStep(dt) {
   }
   if (G.c4.length) G.c4 = G.c4.filter(c => !c.dead);
   if (G.beam) { G.beam.t -= dt; if (G.beam.t <= 0) G.beam = null; }
+  for (const n of G.nukes) { n.wz += 900 * dt; n.x += (n.tx - n.x) * Math.min(1, dt * 2.5); if (n.wz >= n.tz) { n.dead = true; nukeBlast(n.tx, n.tz); } else if (G.parts.length < 400 && Math.random() < .8) { const q = P(n.x, n.wz - G.dist); pushPart({ x: q.x + rnd(-2, 2), y: q.y - 36 * q.s, vx: rnd(-8, 8), vy: rnd(-6, 6), life: .6, max: .6, col: Math.random() < .5 ? '#d0d6dc' : '#ffb02e', r: 3, g: -10 }); } }
+  if (G.nukes.length) G.nukes = G.nukes.filter(n => !n.dead);
   for (const f of G.flares) f.life -= dt;
   if (G.flares.length) G.flares = G.flares.filter(f => f.life > 0);
 }
@@ -772,10 +781,12 @@ function c4Blow(c) {
 }
 const USE = {
   pulse() { bark('u_pulse', 'Pulse out!', 8000); G.flash = .3; G.shake = 8; sfx.emp(); launchWave('pulse', PULSE_RANGE); addText(W / 2, 330, 'PULSE GRENADE', ITEMS.pulse.col); return true; },
-  nuke() {
+  nuke() { // the warhead is fired down the road at the thickest knot of machines (never nearer than 400 px), and goes off where it lands
     bark('u_nuke', 'Get down! Warhead!', 8000);
-    G.flash = 1; G.shake = 22; sfx.emp(); sfx.boom(); launchWave('nuke', NUKE_RANGE * demoK()); for (const o of G.obs) { if (o.dead) continue; if (o.k === 'overpass') collapseStart(o); else if (o.wz - G.dist < NUKE_RANGE) obsBlast(o.x, o.wz, 1e4); } addText(W / 2, 330, 'M-38 DETONATION', ITEMS.nuke.col); buzz([200, 60, 200]);
-    for (let i = 0; i < 8; i++) G.fallout.push({ x: clamp(G.px + rnd(-.25, .25), -.8, .8), wz: G.dist + 160 + i * 105, r: (.26 + rnd(0, .08)) * demoK(), t: 14 + rnd(0, 3), t0: 17, sd: Math.random() * 99 });
+    let bx = G.px, bz = G.dist + 520, bn = -1;
+    for (const e of G.en) { if (e.dead) continue; const rel = e.wz - G.dist; if (rel < 380 || rel > 760) continue; let n = 0; for (const o of G.en) if (!o.dead && Math.hypot((o.x - e.x) * LANE, o.wz - e.wz) < NUKE_RANGE) n += (bigFoe(o) ? 3 : 1) + (o.boss ? 5 : 0); if (n > bn) { bn = n; bx = e.x; bz = e.wz; } }
+    G.nukes.push({ x: G.px, wz: G.dist + 10, tx: clamp(bx, -.85, .85), tz: Math.max(bz, G.dist + 400) });
+    sfx.rocket(); addText(W / 2, 330, 'M-38 AWAY', ITEMS.nuke.col); G.shake = Math.max(G.shake, 8);
     return true;
   },
   c4() {
@@ -961,18 +972,19 @@ function volley() {
   const each = total / B;
   const shown = Math.min(G.n, 40);
   for (let i = 0; i < B; i++) {
-    const k = Math.floor(Math.random() * shown), ox = slotOf(k, shown).ox;   // a random fighter of the formation takes this shot, from his own spot
+    const k = Math.floor(Math.random() * shown), sl = slotOf(k, shown), ox = sl.ox, zo = sl.oz + 7;   // a random fighter of the formation takes this shot, from his own spot (rounds leave from where he stands, not from the squad's centre)
     const x = clamp(G.px + ox + rnd(-w.spread, w.spread), -.95, .95);
-    pushShot({ x, dmg: each * (Math.random() < .04 * U('crit') ? 2.5 : 1), w, hit: [], vx: 0, tg: aimTarget(x, 8, SQUAD_CONE * formK().cone, true) }, 'px', 8);   // soldiers lean their shots toward a machine just off their line, but still have to be steered at the rest
+    pushShot({ x, dmg: each * (Math.random() < .04 * U('crit') ? 2.5 : 1), w, hit: [], vx: 0, tg: aimTarget(x, zo, SQUAD_CONE * formK().cone, true) }, 'px', zo);   // soldiers lean their shots toward a machine just off their line, but still have to be steered at the rest
   }
   const base = w.dmg * (1 + .1 * save.up.dmg) * G.dmgG;
+  const fz = frontZ();   // specialists fire from the front rank
   if (G.cls.shot > 0) { // shotgunners: a spread of short-range pellets, brutal up close
     const np = Math.min(18, 3 * G.cls.shot), pw = { name: 'pellet', pierce: false, splash: 0, col: '#ffd27a', spread: 0 };
-    for (let i = 0; i < np; i++) pushShot({ x: G.px + rnd(-.2, .2), rng: 300, dmg: base * .55 * Math.max(1, Math.min(2.5, 1 + G.n / 40)), w: pw, hit: [] }, 'px', 8);
+    for (let i = 0; i < np; i++) pushShot({ x: G.px + rnd(-.2, .2), rng: 300, dmg: base * .55 * Math.max(1, Math.min(2.5, 1 + G.n / 40)), w: pw, hit: [] }, 'px', fz);
   }
   if (G.cls.mark > 0) { // marksmen: armour-piercing rounds that go through everything in line
     const nm = Math.min(4, G.cls.mark), mw = { name: 'sniper', pierce: true, splash: 0, col: '#b9a8ff', spread: 0 };
-    for (let i = 0; i < nm; i++) pushShot({ x: G.px + (i - (nm - 1) / 2) * .05, dmg: base * 2.6, w: mw, pen: true, hit: [] }, 'px', 8);
+    for (let i = 0; i < nm; i++) pushShot({ x: G.px + (i - (nm - 1) / 2) * .05, dmg: base * 2.6, w: mw, pen: true, hit: [] }, 'px', fz);
   }
   if (G.guard && !G.guard.dead) { // the reprogrammed unit picks its own target and shoots diagonally at it
     const tg = aimTarget(G.gx, GZ);
@@ -1045,7 +1057,7 @@ function fireSnipers() { // scout snipers: a thermal-scoped round at the weak po
   for (const e of G.en) { if (e.dead || bossShielded(e)) continue; const rel = e.wz - G.dist; if (rel < 60 || rel > 900 || Math.abs(e.x - G.px) > .9) continue; const sc = (e.boss ? 3 : bigFoe(e) ? 2 : ET[e.t].armor ? 1 : 0) * 1000 - rel; if (sc > bs) { bs = sc; tg = e; } }
   G.snTg = tg; if (!tg) return false;
   const base = WEAPONS[G.tier].dmg * (1 + .1 * save.up.dmg) * G.dmgG, w = { name: 'sniper', pierce: false, splash: 0, col: '#ff9ad0', spread: 0 };
-  for (let i = 0; i < sn; i++) pushShot({ x: G.px + (i - (sn - 1) / 2) * .04, dmg: base * 3.2, w, pen: true, crit: 2.5, hit: [], tg, vx: 0 }, 'px', 8);
+  for (let i = 0; i < sn; i++) pushShot({ x: G.px + (i - (sn - 1) / 2) * .04, dmg: base * 3.2, w, pen: true, crit: 2.5, hit: [], tg, vx: 0 }, 'px', frontZ());
   sfx.sniper(); return true;
 }
 function harvestGrab(e) {
@@ -2352,6 +2364,11 @@ function drawC4(c) {
   if (c.stuck && Math.sin(G.t * (6 + (3.2 - c.fuse) * 5)) > 0) { cx.fillStyle = '#ff2a2a'; cx.fillRect(-2 * s, -1 * s, 4 * s, 3 * s); glow(0, 0, 2.2 * s, '#ff2a2a'); }
   cx.restore();
 }
+function drawNuke(n) { // the M-38 on its way: a fat warhead with a long fire trail
+  const q = P(n.x, n.wz - G.dist), s = q.s * 2.4, tr = P(n.x, n.wz - G.dist - 90);
+  cx.save(); cx.globalCompositeOperation = 'lighter'; streak(tr.x, tr.y - 40 * tr.s, q.x, q.y - 40 * q.s, 9 * q.s + 3, '255,140,40', .5); streak(tr.x, tr.y - 40 * tr.s, q.x, q.y - 40 * q.s, 3.2 * q.s + 1, '255,244,200', .9); cx.restore();
+  cx.save(); cx.translate(q.x, q.y - 40 * q.s); cx.fillStyle = '#9aa3ac'; cx.fillRect(-3 * s, -8 * s, 6 * s, 14 * s); cx.fillStyle = '#e8c23a'; cx.fillRect(-3 * s, -3 * s, 6 * s, 2.4 * s); cx.fillStyle = '#c0392b'; cx.beginPath(); cx.moveTo(-3 * s, -8 * s); cx.lineTo(0, -13 * s); cx.lineTo(3 * s, -8 * s); cx.fill(); cx.restore();
+}
 function drawBeam(b) { // the M-25 discharge: a column of violet-white plasma down the lane
   const a = clamp(b.t / b.max, 0, 1), q0 = P(b.x, 0), q1 = P(b.x, 1400), w0 = 52 * q0.s * 1.4 * (.5 + a), w1 = 52 * q1.s * 1.4 * (.5 + a);
   cx.save(); cx.globalCompositeOperation = 'lighter';
@@ -2786,6 +2803,7 @@ function render() {
   for (const Dh of G.deaths) items.push({ z: Dh.e.wz - G.dist, f: () => drawBossDeath(Dh) });
   for (const o of G.obs) { const z = o.wz - G.dist; if (z < 1500 && z > -90) items.push({ z: o.k === 'overpass' ? z + 40 : z, f: () => drawObs(o) }); }   // (behind the squad the projection flips sign: never draw there) }
   for (const w of G.waves) items.push({ z: 1e6, f: () => drawEmpWave(w) });
+  for (const n of G.nukes) items.push({ z: n.wz - G.dist, f: () => drawNuke(n) });
   if (G.beam) items.push({ z: 1e6, f: () => drawBeam(G.beam) });
   for (const f of G.fallout) { const z = f.wz - G.dist; if (z < 1500 && z > -100) items.push({ z: z + 1, f: () => drawFallout(f) }); }
   for (const f of G.flares) { const z = f.wz - G.dist; if (z < 1500 && z > -100) items.push({ z, f: () => drawFlare(f) }); }
