@@ -1,0 +1,7 @@
+{
+  "name": "cyber-net-attack",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A Terminator-inspired squad runner (HTML5 canvas).",
+  "scripts": { "test": "node tests/run.js", "sim": "node tests/run.js --sim", "serve": "python3 tools/serve.py --port 8080", "manifest": "python3 tools/build_manifest.py assets/sprites", "deploy": "./deploy.sh -u martin -p 8088" }
+}

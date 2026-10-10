@@ -1,0 +1,7 @@
+{
+  "appId": "net.cybernetattack.game",
+  "appName": "Cyber Net Attack",
+  "webDir": "www",
+  "server": { "androidScheme": "https" },
+  "android": { "allowMixedContent": false }
+}

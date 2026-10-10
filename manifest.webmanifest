@@ -1,0 +1,16 @@
+{
+  "name": "Cyber Net Attack",
+  "short_name": "Cyber Net",
+  "description": "A squad runner against the machines. No timers, no energy, no purchases.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#050507",
+  "theme_color": "#050507",
+  "icons": [
+    { "src": "assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "assets/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sprite prompts</title>
+<style>
+  :root{--bg:#0b1220;--panel:#111b2e;--line:#22314d;--ink:#cfe0f5;--dim:#7f97ba;--hi:#6ff3ff;--warn:#ffb86b}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,sans-serif;display:flex;height:100vh}
+  nav{width:270px;flex:none;background:var(--panel);border-right:1px solid var(--line);overflow-y:auto;padding:10px 0}
+  nav h1{font-size:15px;margin:6px 16px 10px}
+  nav h2{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--dim);margin:14px 16px 4px;font-weight:600}
+  nav button{display:block;width:100%;text-align:left;background:none;border:0;border-left:3px solid transparent;color:var(--ink);font:inherit;padding:6px 16px;cursor:pointer}
+  nav button:hover{background:#17253d}
+  nav button.on{background:#1b2c4a;border-left-color:var(--hi);color:#fff}
+  nav small{color:var(--dim);display:block;font-size:11px}
+  main{flex:1;overflow-y:auto;padding:18px 26px 60px}
+  main h2{margin:0 0 2px;font-size:20px}
+  .sub{color:var(--dim);margin-bottom:14px}
+  .box{background:var(--panel);border:1px solid var(--line);border-radius:8px;margin:14px 0}
+  .box>header{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--line);font-weight:600}
+  .box>header span{flex:1}
+  .box pre{margin:0;padding:12px;white-space:pre-wrap;word-wrap:break-word;font:12.5px/1.5 ui-monospace,Consolas,monospace;color:#dbe8fb;max-height:420px;overflow:auto}
+  .btn{background:#23407a;border:1px solid #3a63b5;color:#fff;border-radius:6px;padding:4px 12px;font:inherit;cursor:pointer}
+  .btn:hover{background:#2c4f96}.btn.done{background:#1d6b45;border-color:#2e9a67}
+  .big{padding:8px 18px;font-weight:600}
+  .meta{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;padding:10px 14px;font-size:13px}
+  .meta b{color:var(--dim);font-weight:600}
+  code{background:#0d1626;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font:12px ui-monospace,Consolas,monospace}
+  .tips{padding:10px 14px 12px 30px;margin:0;color:#c7d8f0}
+  .tips li{margin:3px 0}
+  @media(max-width:760px){body{flex-direction:column;height:auto}nav{width:auto;max-height:42vh;border-right:0;border-bottom:1px solid var(--line)}main{overflow:visible}}
+</style></head>
+<body>
+<nav id="nav"><h1>Sprite prompts</h1></nav>
+<main id="main"></main>
+<script>
+// ---------------------------------------------------------------- shared text
+const STYLE = '16-bit retro pixel art in the dark, weathered, gritty style of Terminator 2D: No Fate. Hard 1px dark outlines, limited palette, hand-pixelled look, no blur, no anti-aliasing, no gradients, no airbrush. Match the attached reference design exactly (shapes, colours, details).';
+const BACKGROUND = 'perfectly flat solid fuchsia #FF00FF. Nothing else. No ground shadow, no floor, no dust, no smoke, no sparks, no muzzle flash, no light beams or cones, no glow or halo around lights, no gradient, no grid, no border, no text, no labels. Glowing parts (eyes, sensors, lenses) are drawn as flat bright pixels on the character or machine only.';
+
+const WALK = 'a true two-legged walk where BOTH legs move and alternate, repeating frame by frame (frame 6 flows back into frame 1):\n' +
+  '  Frame 1: right foot forward, heel touching the ground; left leg behind, toe pushing off.\n' +
+  '  Frame 2: weight on the right leg; left foot leaves the ground, left knee bends and lifts.\n' +
+  '  Frame 3: right leg straight and planted; left leg swings forward past it.\n' +
+  '  Frame 4: left foot forward, heel touching the ground; right leg behind, toe pushing off.\n' +
+  '  Frame 5: weight on the left leg; right foot leaves the ground, right knee bends and lifts.\n' +
+  '  Frame 6: left leg straight and planted; right leg swings forward past it.\n' +
+  'The planted foot must change between frames 1-3 and 4-6. Arms swing opposite to the legs. The body rises slightly in the passing frames.';
+
+const RUN = 'a true running cycle where BOTH legs move and alternate, repeating frame by frame (frame 6 flows back into frame 1):\n' +
+  '  Frame 1: right foot forward touching down, left leg behind.\n' +
+  '  Frame 2: weight on the right leg, left knee lifts and swings forward.\n' +
+  '  Frame 3: right leg straight and pushing off, left leg stretched forward.\n' +
+  '  Frame 4: left foot forward touching down, right leg behind.\n' +
+  '  Frame 5: weight on the left leg, right knee lifts and swings forward.\n' +
+  '  Frame 6: left leg straight and pushing off, right leg stretched forward.\n' +
+  'The planted foot must change between frames 1-3 and 4-6. Arms swing opposite to the legs (the rifle arm moves less). Keep the head, kit, backpack and weapon identical in every frame.';
+
+const SAME = 'Same details, same damage, same weapons in every frame; only the animated parts change.';
+
+// ---------------------------------------------------------------- masters
+function machineMaster(u) {
+  return 'A 2D game sprite sheet of ONE ' + (u.kind || 'machine') + ' only: ' + u.desc + '\n' + STYLE + '\n\n' +
+  'LAYOUT: 2 rows x ' + u.frames + ' columns (' + 2 * u.frames + ' cells), all the same size, evenly spaced, no overlap, no borders or dividers. The subject is the same size and scale in every cell and stands on the same ground line in every row' + (u.flying ? ' (flying: the same height line)' : '') + '. ' + SAME + '\n' +
+  '  Top row (' + u.frames + ' frames): viewed straight from the front, facing the camera (heading straight toward the viewer).\n' +
+  '  Bottom row (' + u.frames + ' frames): the same subject viewed from the front-right three-quarter angle (heading toward the viewer and to the right).\n\n' +
+  'ANIMATION: ' + u.anim + '\n\n' +
+  'BACKGROUND: ' + BACKGROUND;
+}
+function squadMaster(u) {
+  return 'A 2D game sprite sheet of ONE soldier only: ' + u.desc + '\n' + STYLE + '\n\n' +
+  'LAYOUT: ONE horizontal row of 19 cells, left to right, all the same size, evenly spaced, no overlap, no borders. The soldier is the same height and scale in every cell, feet on the same ground line, same equipment, same weapon hand in every cell.\n' +
+  '  Cell 1: front view, standing still, facing the camera.\n' +
+  '  Cells 2-7 (6 frames): running AWAY from the camera, seen from directly behind (back view).\n' +
+  '  Cells 8-13 (6 frames): running away and to the RIGHT, seen from the back-right three-quarter angle.\n' +
+  '  Cells 14-19 (6 frames): running away and to the LEFT, seen from the back-left three-quarter angle.\n\n' +
+  'ANIMATION: ' + RUN + '\n\n' +
+  'BACKGROUND: ' + BACKGROUND;
+}
+
+// ---------------------------------------------------------------- units
+const SQUAD_IMPORT = 'tools/import_strip.py sheet.png NAME --groups s:1,n:6,ne:6,nw:6 --bg fuchsia --tol 150 --dilate 0';
+const MACH_IMPORT = n => 'tools/import_strip.py sheet.png NAME --groups s:' + n + ',se:' + n + ' --rows 2 --bg fuchsia --tol 150 --dilate 0 --fringe 22';
+const U = [
+ // ---- Resistance squad
+ { g: 'Resistance squad', id: 'resistance_rifleman', name: 'Rifleman - steel helmet', m: 'squad', imp: SQUAD_IMPORT, desc: 'a Resistance rifleman of a post-apocalyptic war, about 6 ft tall: adult man, light tan skin, stubble, round steel helmet with camo netting, olive woodland camo jacket and trousers with rolled sleeves, black chest webbing with magazine pouches, thigh cargo pockets, worn black boots, small olive rucksack with a rolled bedroll, dark grey carbine held at the ready (slung across the chest while running, muzzle pointing left).' },
+ { g: 'Resistance squad', id: 'resistance_goggles', name: 'Rifleman - goggles, backpack', m: 'squad', imp: SQUAD_IMPORT, desc: 'a Resistance rifleman, about 6 ft tall: helmet with camo cover and goggles pushed up on the front, cooler dark-green camo, red-and-white patch on both shoulders, black webbing, large brown rucksack with side pouches and a strapped-on bedroll clearly visible from behind, brown boots, carbine held across the chest.' },
+ { g: 'Resistance squad', id: 'resistance_captain', name: 'Cap - field cap, neckerchief', m: 'squad', imp: SQUAD_IMPORT, desc: 'a Resistance squad leader, about 6 ft tall: lean man, dark brown skin, short beard, floppy olive field cap with a stitched brim, bright faded-red neckerchief, olive-green shirt with sleeves rolled, canvas satchel on a shoulder strap, utility belt with pouches, olive trousers, brown boots. He carries only a pistol (held low in his right hand while running) and no rifle.' },
+ { g: 'Resistance squad', id: 'resistance_shotgunner', name: 'Shotgunner - bandana, braid', m: 'squad', imp: SQUAD_IMPORT, desc: 'a Resistance shotgunner, about 6 ft tall: young woman, long brown braid down her back, olive-green bandana tied at the back of her head, sleeveless dark olive tactical vest over bare arms, green camo trousers, ammo pouches on the belt, brown boots, a pump-action shotgun held in both hands across her body.' },
+ { g: 'Resistance squad', id: 'resistance_signaller', name: 'Signaller - headset, antenna', m: 'squad', imp: SQUAD_IMPORT, desc: 'a Resistance radio operator, about 6 ft tall: man with dark brown skin and a short beard, black over-ear headset with a boom microphone, olive field jacket and trousers, utility belt, dark grey radio backpack with a tall thin black antenna ending in a cyan light dot (clearly visible from behind in every view), brown boots. He carries no rifle.' },
+ { g: 'Resistance squad', id: 'resistance_tech', name: 'Tech Operative', m: 'squad', imp: SQUAD_IMPORT, desc: 'a Resistance tech operative, about 6 ft tall: slim man in a dark navy technical suit with grey panel seams, short dark cap, aviator-style goggles with CYAN lenses, black gloves and boots, a flat black back unit with glowing cyan indicator lights (visible from behind), a silver EMP charge with a cyan slot in the right hand, nothing in the left hand. No rifle.' },
+ { g: 'Resistance squad', id: 'resistance_heavy', name: 'Ordnance Gunner', m: 'squad', imp: SQUAD_IMPORT + ' --h 58', desc: 'a heavy Resistance ordnance gunner, about 6 ft tall, stocky: helmet with a flat visor, scarf over the lower face, rust-red and olive plate armour over camo (chest plate, big rounded shoulder pauldrons, forearm guards, thigh and knee plates), a belt of brass rounds across the chest, a thick olive rocket launcher with an orange-banded warhead strapped to his back and pointing up over the right shoulder (visible from behind in every view), heavy boots.' },
+ { g: 'Resistance squad', id: 'resistance_medic', name: 'Scavenger (medic) - NEEDED', m: 'squad', imp: SQUAD_IMPORT, desc: 'a Resistance scavenger medic, about 6 ft tall: bearded weathered man, tan canvas hood and wrapped scarf over a battered olive helmet, layered brown and tan rags and jacket, two leather straps crossing the chest, patched knees, worn brown boots, an enormous patched rucksack stacked with a bedroll, a tin pot, a rolled tarp and a canteen, a lumpy burlap sack in the left hand, a white-and-red medical cross patch on the backpack (visible from behind). No rifle.' },
+
+ // ---- Machine infantry
+ { g: 'Machine infantry', id: 't800', name: 'Cyber-Endo (grunt)', m: 'machine', frames: 6, imp: MACH_IMPORT(6), kind: 'character', desc: 'a chrome T-800-style endoskeleton about 6 ft tall: skull face with a cheekbone grille and RED glowing eye sockets, exposed rib cage, spine and pelvis, thin hydraulic pistons on the limbs, bare scratched chrome metal with blue highlights, no clothes, no weapon, arms swinging naturally.', anim: WALK },
+ { g: 'Machine infantry', id: 't800_reprogrammed', name: 'Reprogrammed Unit', m: 'machine', frames: 6, imp: MACH_IMPORT(6), kind: 'character', desc: 'a chrome T-800-style endoskeleton about 6 ft tall, reprogrammed to fight for the Resistance: scratched dull silver, grey hydraulic pistons, exposed cables, CYAN glowing eye sockets (not red), teal-cyan wiring and a faint cyan plate on the chest, tattered grey cloth strips hanging from the waist, a matte black rotary minigun with a short ammo drum held at the hip in both hands, barrels pointing forward.', anim: WALK },
+ { g: 'Machine infantry', id: 't800_minigun', name: 'Infiltrator - exposed', m: 'machine', frames: 6, imp: MACH_IMPORT(6), kind: 'character', desc: 'a mostly bare chrome endoskeleton about 6 ft tall in a torn brown cloth vest and ragged brown shorts, red glowing eyes, carrying an assault rifle with an under-barrel launcher held across the chest in both hands.', anim: WALK },
+ { g: 'Machine infantry', id: 't800_crawler', name: 'Endo-Crawler', m: 'machine', frames: 6, imp: MACH_IMPORT(6), kind: 'character', desc: 'a chrome endoskeleton torso with the legs missing below the pelvis (clean broken pelvis, short dangling wires), dragging itself forward along the ground on both arms, head raised, RED glowing eyes. About 3 ft long and 2 ft high.', anim: 'a crawl cycle repeating frame by frame (frame 6 flows into frame 1): the arms alternate - frame 1 right arm reaches forward, left arm pushes behind; 2 right hand plants and pulls, torso slides forward; 3 left arm reaches forward; 4 left hand plants and pulls, torso slides forward; 5 right arm reaches forward again; 6 both hands planted, torso rises slightly then lowers. Head bobs slightly. Keep the wires attached and short.' },
+
+ // ---- Heavy machines
+ { g: 'Heavy machines', id: 't47', name: 'Siege Walker', m: 'machine', frames: 6, imp: MACH_IMPORT(6), desc: 'a heavy bipedal assault mech about 12 ft tall: dark gunmetal plate armour with orange rust streaks and scratches, wide rounded pauldron shoulders, a small helmet head with ONE red visor slot, a six-barrel rotary cannon at the end of EACH forearm, thick hydraulic legs, large armoured feet, vents and a small red light on the back.', anim: WALK.replace('Arms swing opposite to the legs. The body rises slightly in the passing frames.', 'The torso rocks slightly side to side with each step. The cannons, shoulders and head stay identical.') },
+ { g: 'Heavy machines', id: 't1', name: 'Tread Gunner', m: 'machine', frames: 4, imp: MACH_IMPORT(4), desc: 'an 8 ft tall tracked combat robot: two long caterpillar tracks with road wheels, a rounded armoured hull, an upright rounded torso block with two red eyes and a sensor head on top, a twin rotary cannon on each side of the torso, dark steel with rust.', anim: 'only the tracks and wheels move: the track links and road wheels advance one quarter of a link spacing each frame so the cycle loops seamlessly; the hull bobs 1 pixel up and down. Torso, head and cannons are identical.' },
+ { g: 'Heavy machines', id: 'hk_tank', name: 'HK Tank (large)', m: 'machine', frames: 4, imp: MACH_IMPORT(4), ref: 'the HK tank turnaround image (front / side / rear) - attach it as the design reference, together with the roster card', desc: 'a giant Hunter-Killer tracked tank, about 50 FEET tall (roughly eight times the height of a human soldier, towering over everything else on the battlefield). Dark weathered steel with rust and scratches. FOUR separate track assemblies: TWO at the FRONT (one left, one right, wide chunky caterpillar tracks with deep treads) and TWO at the BACK (one left, one right), so from the side you see a front track unit and a rear track unit on each side, angled up at the ends and joined by the hull. A low, wide, smoothly curved armoured hull between the tracks. On top, a central articulated neck column carrying a boxy sensor-head block with a glowing RED visor bar (flat red pixels, no glow outside) flanked by small round lights, and two long swept-back arms/booms that curve outward, each ending in a heavy twin-barrel cannon pod. Menacing, heavy, symmetrical from the front.', anim: 'only the tracks and wheels move: all FOUR track assemblies roll forward together, the tread links and road wheels advancing one quarter of a link spacing each frame so the cycle loops seamlessly, and the whole hull bobs 1 pixel up and down on the suspension. The head, neck, arms and cannon pods stay identical in every frame.' },
+ { g: 'Heavy machines', id: 'hk_aerial', name: 'Sky Hunter VTOL', m: 'machine', frames: 4, flying: true, imp: MACH_IMPORT(4), desc: 'an armoured VTOL gunship in hover: dark steel, two large ducted turbine fans on swept wings, underwing rocket pods, a dark blue cockpit canopy at the nose, twin tail fins, a red and a blue nose light.', anim: 'a hovering loop: the turbine fan blades rotate a quarter turn each frame (flat pixel blades, no blur), and the whole craft drifts up 1-2 pixels and back down across the 4 frames. Nothing else moves.' },
+ { g: 'Heavy machines', id: 'aerostat', name: 'Aerostat Scout', m: 'machine', frames: 4, flying: true, imp: MACH_IMPORT(4), desc: 'a small hover drone about 3 ft wide: dark gunmetal round armoured body with one red camera lens, two side arms with horizontal rotor discs, short dangling cables, a downward lens on the underside.', anim: 'the rotor discs turn a quarter each frame (flat blades, no blur disc), the body bobs 1-2 pixels, the cables swing 1 pixel. No light beam under the drone.' },
+ { g: 'Heavy machines', id: 'harvester', name: 'Scav-Harvester (boss)', m: 'machine', frames: 6, imp: MACH_IMPORT(6), desc: 'a hulking 50-60 ft tall rust-brown humanoid war machine drawn at heroic scale: small skull-like head, thick bundled hydraulic arms ending in large three-finger claws held low and relaxed in front (do NOT show the arms reaching out - the game animates the grab), a heavy cannon mounted over the RIGHT shoulder, exposed pipes and cables on the chest, heavy armoured legs.', anim: WALK.replace('Arms swing opposite to the legs. The body rises slightly in the passing frames.', 'Slow and heavy: the whole body rises and falls 2 pixels each step, the shoulder cannon rocks slightly, the arms swing a little opposite to the legs.') },
+ { g: 'Heavy machines', id: 'ogre', name: 'The Overmind (final boss)', m: 'machine', frames: 4, imp: MACH_IMPORT(4), desc: 'a squat armoured tracked fortress: wide dark steel hull with thick tracks, a domed central turret carrying a large glowing RED core lens (flat red pixels on the lens only, no glow outside), two side-mounted quad cannon clusters, a small twin turret on top, small red lights along the hull.', anim: 'the tracks roll a quarter link per frame; the core lens pulses between two reds (frames 1 and 3 brighter); the top turret rotates 2 pixels left then right; everything else is identical.' },
+];
+
+// ---------------------------------------------------------------- page
+const nav = document.getElementById('nav'), main = document.getElementById('main');
+let cur = null;
+let lastG = '';
+for (const u of U) {
+  if (u.g !== lastG) { const h = document.createElement('h2'); h.textContent = u.g; nav.appendChild(h); lastG = u.g; }
+  const b = document.createElement('button'); b.innerHTML = u.name + '<small>' + u.id + (u.m === 'squad' ? ' - 19 frames, 1 row' : ' - 2 rows x ' + u.frames) + '</small>'; b.onclick = () => show(u.id); b.id = 'b-' + u.id; nav.appendChild(b);
+}
+function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+function copy(text, btn) {
+  const done = () => { const t = btn.textContent; btn.textContent = 'Copied'; btn.classList.add('done'); setTimeout(() => { btn.textContent = t; btn.classList.remove('done'); }, 1400); };
+  if (navigator.clipboard && window.isSecureContext) { navigator.clipboard.writeText(text).then(done, () => fallback()); } else fallback();
+  function fallback() { const ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = 0; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); done(); } catch (e) { btn.textContent = 'Select + Ctrl+C'; } ta.remove(); }
+}
+function box(title, text, id) { return '<div class="box"><header><span>' + title + '</span><button class="btn" data-copy="' + id + '">Copy</button></header><pre id="' + id + '">' + esc(text) + '</pre></div>'; }
+function show(id) {
+  const u = U.find(x => x.id === id); cur = u;
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.id === 'b-' + id));
+  const master = u.m === 'squad' ? squadMaster(u) : machineMaster(u);
+  const split = master.indexOf('\n'), head = master.slice(0, split);
+  const imp = u.imp.replace('NAME', u.id);
+  main.innerHTML = '<h2>' + u.name + '</h2><div class="sub">' + u.g + ' &middot; unit id <code>' + u.id + '</code></div>' +
+    '<div class="box"><div class="meta"><b>Sheet</b><span>' + (u.m === 'squad' ? 'one row of 19: front idle + 6 run frames each from behind, back-right and back-left' : '2 rows x ' + u.frames + ': front view on top, front-right three-quarter below') + '</span>' +
+    '<b>Reference</b><span>' + (u.ref ? u.ref : 'attach this unit\'s card from the roster image (<code>2d art.jpeg</code>)') + '</span><b>Import</b><span><code>' + esc(imp) + '</code></span></div></div>' +
+    '<div class="box"><header><span>Full prompt (paste this)</span><button class="btn big" data-copy="full">Copy full prompt</button></header><pre id="full">' + esc(master) + '</pre></div>' +
+    box('1. Initial (general) prompt - layout, style, animation, background', (u.m === 'squad' ? generalPart(u, 'squad') : generalPart(u, 'machine')), 'gen') +
+    box('2. Unit-specific prompt - the subject description', 'Subject: ' + u.desc + (u.m === 'squad' ? '' : '\n\nAnimation for this unit: ' + u.anim), 'uni') +
+    '<div class="box"><header><span>Check the result before spending more credits</span></header><ul class="tips">' + checks(u).map(t => '<li>' + t + '</li>').join('') + '</ul></div>';
+  main.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => copy(document.getElementById(b.dataset.copy).textContent, b));
+  main.scrollTop = 0; history.replaceState(null, '', '#' + id);
+}
+function generalPart(u, kind) {   // the master prompt with the unit-specific text removed
+  const m = (kind === 'squad' ? squadMaster : machineMaster)(Object.assign({}, u, { desc: '[UNIT DESCRIPTION - see section 2]', anim: u.m === 'squad' ? '' : '[ANIMATION - see section 2]' }));
+  return m;
+}
+function checks(u) {
+  const c = ['Fuchsia background only: no shadows, glow, beams, grids, text or borders.', 'Same character size and ground line in every cell.'];
+  if (u.m === 'squad') c.unshift('Cells 2-7: the front foot must swap sides between frames 1 and 4 (a planted foot that never changes = a limp; regenerate).', 'Count the cells: 1 + 6 + 6 + 6 = 19. The back-right and back-left rows must really be turned, not copies of the back view.', 'The backpack / antenna / weapon must be visible in the back views.');
+  else if (u.frames === 6) c.unshift('Top row: the front foot must swap sides between frames 1 and 4, and the planted foot must differ between frames 1-3 and 4-6.', 'Both rows show the same machine with the same details.');
+  else c.unshift('Tracks / rotors / fans must visibly advance each frame; nothing else should move.', 'Both rows show the same machine with the same details.');
+  return c;
+}
+show((location.hash || '').slice(1) && U.find(x => x.id === location.hash.slice(1)) ? location.hash.slice(1) : U[0].id);
+</script></body></html>

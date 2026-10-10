@@ -1,0 +1,28 @@
+<!doctype html><html><body style="margin:0;background:transparent"><div id="msg" style="position:fixed;left:8px;top:8px;font:14px sans-serif;color:#9cf;z-index:2"></div><canvas id="c"></canvas>
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js","three/addons/":"./node_modules/three/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+const q=new URLSearchParams(location.search), file=q.get('f')||'rifleman_a.glb', batch=q.get('x')==='1', msg=document.getElementById('msg'), N=+(q.get('n')||12), S=+(q.get('s')||512), off=+(q.get('off')||0), elev=+(q.get('el')||12);
+if(location.protocol==='file:'){ msg.innerHTML='Open through a web server, not file://<br>cd tools/render3d &amp;&amp; python3 -m http.server 8000 &nbsp;then&nbsp; http://localhost:8000/render.html'; throw new Error('file://'); }
+msg.textContent='loading '+file+' ...';
+const cv=document.getElementById('c'); cv.width=S*N; cv.height=S;
+const r=new THREE.WebGLRenderer({canvas:cv,alpha:true,antialias:false,preserveDrawingBuffer:true}); r.setSize(S*N,S,false); r.setScissorTest(true); r.setClearColor(0,0);
+r.outputColorSpace=THREE.SRGBColorSpace; r.toneMapping=THREE.NoToneMapping;
+new GLTFLoader().load(file,g=>{
+  const m=g.scene; const box=new THREE.Box3().setFromObject(m), ctr=box.getCenter(new THREE.Vector3()), sz=box.getSize(new THREE.Vector3());
+  m.position.sub(new THREE.Vector3(ctr.x,box.min.y,ctr.z)); const sc=new THREE.Scene(); const pivot=new THREE.Group(); pivot.add(m); sc.add(pivot);
+  m.traverse(o=>{ if(o.isMesh){ if(!o.geometry.attributes.normal) o.geometry.computeVertexNormals(); const mt=o.material; o.material=new THREE.MeshLambertMaterial({map:mt.map||null,vertexColors:!!o.geometry.attributes.color,color:0xffffff}); if(mt.map){mt.map.colorSpace=THREE.SRGBColorSpace;} }});
+  sc.add(new THREE.HemisphereLight(0xb8c8e8,0x20242c,1.25));
+  const key=new THREE.DirectionalLight(0xffffff,1.6); key.position.set(-2,3,4); sc.add(key);
+  const rim=new THREE.DirectionalLight(0x7aa8ff,1.2); rim.position.set(3,2,-3); sc.add(rim);
+  const H=sz.y*1.08, cam=new THREE.OrthographicCamera(-H*.5,H*.5,H*.5,-H*.5,.1,50);
+  const e=elev*Math.PI/180, R=6;
+  for(let i=0;i<N;i++){
+    pivot.rotation.y=(off+i*360/N)*Math.PI/180;      // turn the model, camera stays put
+    cam.position.set(0,sz.y*.5+R*Math.sin(e),R*Math.cos(e)); cam.lookAt(0,sz.y*.5,0);
+    r.setViewport(i*S,0,S,S); r.setScissor(i*S,0,S,S); r.render(sc,cam);
+  }
+  document.title='READY'; msg.textContent=batch?'':file+' - '+N+' views (add ?f=model.glb&n=12&el=20 to change)'; msg.innerHTML+=' &nbsp;<a style="color:#fc6" href="?f=rifleman_a.glb">rifleman_a</a> <a style="color:#fc6" href="?f=rifleman_b.glb">rifleman_b</a>'; if(!batch){ document.body.style.background='#1e2a3c'; cv.style.cssText='width:100vw;height:auto;display:block;margin-top:40px'; }
+},undefined,e=>{document.title='ERR '+e; msg.textContent='failed to load '+file+': '+e});
+</script></body></html>
