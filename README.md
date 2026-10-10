@@ -6,7 +6,9 @@ No timers, no energy, no purchases. Android build: see `ANDROID.md`.
 
 ## Run
 `python3 tools/serve.py --port 8080` then open http://localhost:8080 (any static server works; `file://` works too).
-Controls: drag / move the mouse (or A/D, arrows) to steer; tap the item slot, double-tap or double-click (or Space/E) to use the held special item; P/Esc pauses.
+Controls: drag / move the mouse (or A/D, arrows) to steer; tap the item slot, double-tap or double-click (or Space/E) to use the held special item; F cycles the squad formation (free, V, column, wall); P/Esc pauses.
+
+Endless Survival (main menu) chains sectors until the squad is lost. Scores are kept on the device and, when the game is served by `tools/serve.py`, on a shared leaderboard (`/api/scores`, stored in `scores.json` next to the server).
 
 ## Layout
 | path | what |

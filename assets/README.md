@@ -21,6 +21,12 @@ resistance_rifleman, resistance_goggles, resistance_captain, resistance_shotgunn
 resistance_heavy, resistance_medic (art still needed), t800, t800_infiltrator, t800_minigun, t800_crawler, t800_reprogrammed,
 hk_tank, t1, hk_aerial, aerostat, t47, harvester, ogre.
 
+## Placeholder sprites (art still needed)
+New classes reuse existing soldiers until they get their own sheets: GRENADIER uses `resistance_heavy`, TECH-COM HACKER `resistance_tech`,
+SCOUT SNIPER `resistance_goggles`, DEMOLITIONS `resistance_captain`; FIELD MEDIC wants `resistance_medic`. To give one its own look,
+drop the unit folder in and change `spr` in `CLASS` (game.js). Phase 3 enemies (T-1000, T-700, HK-Centurion, HK-Drone Scout,
+Hunter-Killer Minelayer, T-400) are not in the game yet: they need sprite sheets first (see ROADMAP.md).
+
 ## Adding art
 1. Generate a sheet (prompts: `docs/prompt_builder.html`), flat fuchsia background.
 2. `tools/import_strip.py sheet.png <unit> --groups s:6,se:6 --rows 2 --bg fuchsia --tol 150 --dilate 0 --height 230 --h 150 --fringe 22`

@@ -3,8 +3,20 @@
 
 const W = 480, H = 800, HOR = 190, PY = 655, LANE = 205, K = 0.0058;
 const cv = document.getElementById('c');
-const RS = 1.4;   // render scale: world stays 480x800, canvas renders at 672x1120 so painted sprites stay crisp
-cv.width = Math.round(W * RS); cv.height = Math.round(H * RS);
+let RS = 1.4;   // render scale: the world is always 480x800; the canvas backing store is 480*RS by 800*RS
+function setRS() { // match the backing store to the physical pixels the canvas is shown at (Retina phones, zoomed windows, CRT mode), in 0.05 steps so 3:5 holds exactly
+  let rs = 1.4;
+  try {
+    const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 0, cssW = cv.clientWidth || (cv.getBoundingClientRect && cv.getBoundingClientRect().width) || 0;
+    if (dpr && cssW) { const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches; rs = clamp(Math.round(cssW * dpr / W / .05) * .05, 1, coarse ? 1.6 : 2); }
+  } catch (e) {}
+  RS = Math.round(rs * 20) / 20;
+  const w = Math.round(W * RS), h = Math.round(H * RS);
+  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+  return { w, h, rs: RS };
+}
+setRS();
+if (typeof window !== 'undefined' && window.addEventListener) { let rt = 0; const re = () => { clearTimeout(rt); rt = setTimeout(setRS, 150); }; window.addEventListener('resize', re); window.addEventListener('orientationchange', re); }
 const cx = cv.getContext('2d');
 const $ = id => document.getElementById(id);
 const rnd = (a, b) => a + Math.random() * (b - a);
@@ -20,7 +32,7 @@ try {
   const s = JSON.parse(localStorage.getItem(SAVE_KEY));
   if (s) { save = Object.assign(save, s); save.up = Object.assign({ squad: 0, dmg: 0, rate: 0, weapon: 0, emp: 0, guard: 0 }, s.up || {}); save.unlocked = Object.assign({ heavy: 1, tech: 1 }, s.unlocked || {}); if (!Array.isArray(save.loadout)) save.loadout = ['heavy', 'tech']; save.stars = Object.assign({}, s.stars || {}); save.paid = Object.assign({}, s.paid || {}); for (const k of Object.keys(save.up)) save.paid[k] = Math.max(save.paid[k] || 0, save.up[k]); }   // paid = highest level ever bought for each upgrade
 } catch (e) {}
-function applyCRT() { const w = document.getElementById('wrap'); if (w && w.classList) w.classList.toggle('crt', !!save.crt); }
+function applyCRT() { const w = document.getElementById('wrap'); if (w && w.classList) w.classList.toggle('crt', !!save.crt); setRS(); }
 function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} }
 
 // ---------------------------------------------------------------- data
@@ -146,8 +158,17 @@ function audio() {
   } catch (e) { return null; }
 }
 // browsers keep audio locked until the page has had a click / key / touch: unlock (and re-unlock after the tab was hidden) on every such event
-function unlockAudio() { const a = audio(); if (a && a.state !== 'running') { try { a.resume().then(() => { if (state === 'menu') musicStart(); }); } catch (e) {} } else if (a && state === 'menu') musicStart(); }
-for (const ev of ['pointerdown', 'touchstart', 'click', 'keydown']) window.addEventListener(ev, unlockAudio, true);
+let resuming = false;
+function audioWake() { if (state === 'menu') musicStart(); else if (state === 'play' && G && !G.paused) ambStart(); }   // whatever should be sounding in this screen starts once the context really runs
+function unlockAudio() { // Safari: a context can be 'suspended' or 'interrupted' and its resume() promise may never settle if called without a gesture; never stack calls, always re-arm
+  const a = audio(); if (!a) return;
+  if (a.state === 'running') { audioWake(); return; }
+  if (resuming) return; resuming = true;
+  const done = () => { resuming = false; if (a.state === 'running') audioWake(); };
+  try { const p = a.resume(); if (p && p.then) p.then(done, done); else done(); } catch (e) { resuming = false; }
+  setTimeout(() => { resuming = false; }, 1200);
+}
+for (const ev of ['pointerdown', 'touchstart', 'touchend', 'click', 'keydown', 'pageshow', 'focus']) window.addEventListener(ev, unlockAudio, true);
 document.addEventListener('visibilitychange', () => { if (document.hidden) { try { if (AC && AC.state === 'running') AC.suspend(); } catch (e) {} } else unlockAudio(); });   // no audio (or battery) spent while the tab is hidden
 function audioStatus() { return !AC ? 'not started yet' : AC.state === 'running' ? 'running (' + AC.sampleRate + ' Hz)' : AC.state + ' - tap or click the page, then try again'; }
 function nz(at, dur, o) { // a burst of filtered noise: the body of gunshots, crunches, explosions and whooshes
@@ -401,6 +422,7 @@ const CITY = [makeCity(26, 70, 80, 160, .01), makeCity(22, 60, 60, 125, .035), m
 let decor = [], decorNext = 0, wallNext = 0;
 
 function startLevel(lv, opt) {
+  try { unlockAudio(); } catch (e) {}   // starting a sector is a gesture: a suspended context is woken here
   lv = Math.max(1, Math.min(999, Math.floor(lv) || 1));
   const lvl = genLevel(lv);
   const fails = opt && opt.endless ? 0 : save.fails[lv] || 0;
@@ -427,11 +449,16 @@ function startLevel(lv, opt) {
 }
 
 // ---------------------------------------------------------------- effects
+const PART_CAP = 420;
+function pushPart(p) { // one entry point for every particle: past the cap the oldest slots are recycled, so a chain of explosions can never grow the array (or the frame time) without bound
+  const a = G.parts;
+  if (a.length < PART_CAP) a.push(p); else { G.pi = ((G.pi || 0) + 1) % PART_CAP; a[G.pi] = p; }
+}
 function addParts(x, y, n, col, spd, life, g) {
   if (!G) return;
-  for (let i = 0; i < n && G.parts.length < 400; i++) {
+  for (let i = 0; i < n; i++) {
     const a = rnd(0, 6.283), v = rnd(.2, 1) * spd;
-    G.parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - spd * .3, life: rnd(.5, 1) * life, max: life, col, r: rnd(1.5, 3.5), g: g || 300 });
+    pushPart({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - spd * .3, life: rnd(.5, 1) * life, max: life, col, r: rnd(1.5, 3.5), g: g || 300 });
   }
 }
 function addText(x, y, txt, col, sz) { if (G.texts.length > 40) G.texts.shift(); G.texts.push({ x, y, txt, col: col || '#fff', life: 1, sz }); }
@@ -521,9 +548,9 @@ function trimClasses() {
 }
 function addSparks(x, y, n, gy, big) { // bouncing orange/yellow sparks: metal on metal
   const cols = ['#ffb02e', '#ffe08a', '#ff7a1a', '#fff3b0'];
-  for (let i = 0; i < n && G.parts.length < 420; i++) {
+  for (let i = 0; i < n; i++) {
     const an = -Math.PI / 2 + rnd(-1.2, 1.2), v = rnd(110, 300) * (big ? 1.35 : 1);
-    G.parts.push({ x, y, vx: Math.cos(an) * v, vy: Math.sin(an) * v, life: rnd(.22, .42), max: .42, col: cols[i % 4], r: 2, g: 760, st: 1, by: gy });
+    pushPart({ x, y, vx: Math.cos(an) * v, vy: Math.sin(an) * v, life: rnd(.22, .42), max: .42, col: cols[i % 4], r: 2, g: 760, st: 1, by: gy });
   }
 }
 function addLight(x, y, r, col, life, ground) { if (G.lt.length < 36) G.lt.push({ x, y, r, col, life, max: life, gr: !!ground }); }
@@ -563,7 +590,7 @@ function dismember(e) { // endoskeletons lose an arm, then their legs, as they a
   const f = e.hp / e.max, q = P(e.x, e.wz - G.dist), hy = q.y - 34 * q.s * e.sc;
   if (!e.armOff && f < .66) {
     e.armOff = true; addSparks(q.x, hy, 12, q.y, true);
-    if (G.parts.length < 380) G.parts.push({ x: q.x + 6 * q.s, y: hy, vx: rnd(-70, 70), vy: -90, life: .9, max: .9, col: '#9aa4ae', r: 3.4, g: 300, by: q.y });
+    if (G.parts.length < 380) pushPart({ x: q.x + 6 * q.s, y: hy, vx: rnd(-70, 70), vy: -90, life: .9, max: .9, col: '#9aa4ae', r: 3.4, g: 300, by: q.y });
     if (e.t === 'gunner') addText(q.x, hy - 20, 'WEAPON ARM GONE', '#ffa05a');
   }
   if (!e.legOff && f < .33) {
@@ -839,6 +866,7 @@ function applyGateOpt(o, bonus) {
   addParts(q.x, q.y - 40, 14, '#fff', 200, .5);
 }
 function applyGate(g) {
+  if (g.applied) return; g.applied = true;   // one crossing, one outcome: however wide the squad is, a gate only ever fires once
   const side = g.px < 0 ? 'L' : 'R', other = side === 'L' ? 'R' : 'L';
   applyGateOpt(g[side]);
   if (G.cls.tech > 0 && Math.abs(g.px) < .05 * G.cls.tech && gateGood(g[other])) applyGateOpt(g[other], true); // tech operatives widen gate collection
@@ -992,7 +1020,7 @@ function enemyShoot(e, sideSign) { // bolts leave the weapon's muzzle (not the m
     G.bolts.push({ rz, rz0: rz, h0, big: !mg && !!(d.volley || d.block), mg, x: bx, vx: (ax - bx) / tt, dmg });
     const q = P(bx, rel), my = q.y - h0 * q.s;   // muzzle flash right at the barrel
     addParts(q.x, my, 5, mg ? '#ffd27a' : '#e0c8ff', 110, .16, 0); addLight(q.x, my, (d.block ? 38 : 24) * q.s + 7, mg ? 'rgba(255,190,90,' : 'rgba(190,140,255,', .12, false);
-    G.parts.push({ x: q.x, y: my, vx: 0, vy: 0, life: .09, max: .09, fl: mg ? '255,210,120' : '200,160,255', r: Math.max(5, 12 * q.s * e.sc), g: 0, sd: Math.random() * 99 });
+    pushPart({ x: q.x, y: my, vx: 0, vy: 0, life: .09, max: .09, fl: mg ? '255,210,120' : '200,160,255', r: Math.max(5, 12 * q.s * e.sc), g: 0, sd: Math.random() * 99 });
   }
   e.muz = .12; if (d.mg) sfx.mg(); else sfx.zap(!!(d.volley || d.block));
 }
@@ -1120,7 +1148,7 @@ function update(dt) {
     r.pz = r.wz; r.wz += (r.gren ? 430 : 520) * dt;
     if (r.tgt && !r.tgt.dead) r.x += clamp(r.tgt.x - r.x, -1, 1) * dt * 1.4;
     const rq = P(r.x, r.wz - G.dist);
-    if (G.parts.length < 400) G.parts.push({ x: rq.x + rnd(-1, 1), y: rq.y - 30 * rq.s, vx: rnd(-10, 10), vy: rnd(-10, 10), life: .5, max: .5, col: Math.random() < .5 ? '#5a626e' : '#ffb02e', r: 2.4, g: -10 });
+    if (G.parts.length < 400) pushPart({ x: rq.x + rnd(-1, 1), y: rq.y - 30 * rq.s, vx: rnd(-10, 10), vy: rnd(-10, 10), life: .5, max: .5, col: Math.random() < .5 ? '#5a626e' : '#ffb02e', r: 2.4, g: -10 });
     if (r.wz - G.dist > 900) { r.dead = true; continue; }
     { const gt = G.gates.find(g => !g.used && g.wz >= r.pz && g.wz <= r.wz + 4); if (gt) { r.dead = true; const gq = P(r.x, gt.wz - G.dist); addParts(gq.x, gq.y - 40 * gq.s, 6, '#ffb040', 160, .3); continue; } }   // gates stop rockets too
     for (const e of G.en) {
@@ -1147,14 +1175,14 @@ function update(dt) {
       e.scaled = true;
       if (e.boss) { // boss health is sized from your actual damage output: the fight lasts ~25s + 3s per sector whatever your power level
         const base = e.hp, T = 16 + 2.5 * G.lv; e.base0 = base;   // total (health + plating) takes roughly T seconds of accurate fire
-        const fr = e.max > 0 ? clamp(e.hp / e.max, 0, 1) : 1; e.hp = e.max = Math.max(base * .25, squadDps() * T * .75 / Math.max(.4, 1 - armorOf(e)) / (1 + (d.plate || 0))) * G.assist; e.hp *= fr;   // keep whatever damage it already has
+        const fr = e.max > 0 ? clamp(e.hp / e.max, 0, 1) : 1; e.hp = e.max = bossSize(e, d, base); e.hp *= fr;   // keep whatever damage it already has
       } else { const k = clamp(Math.pow(squadDps() / 150, .7), .4, 6); e.hp *= k; e.max *= k; }
       if (e.boss) e.str = clamp(1 + G.n / 160, 1, 1.8);   // and hit harder / fire faster / call more reinforcements against a big squad
       if (d.plate) { const pf = e.plateMax ? e.plate / e.plateMax : 1; e.plateMax = e.max * d.plate; e.plate = e.plateMax * pf; }
       if (e.boss) { bark('boss', 'Boss contact! Hit it with everything!', 60000); G.warn = { t: 2.6, name: e.name || d.name || 'BOSS' }; G.shake = Math.max(G.shake, 14); G.flash = Math.max(G.flash, .35); sfx.siren(); }
     }
     if (e.boss && e.scaled && !G.over) { // keep tracking your firepower: if the squad or weapon grows later (late multiplier gates, upgrades) the boss grows with it, never shrinks
-      const tgt = Math.max((e.base0 || e.max) * .25, squadDps() * (16 + 2.5 * G.lv) * .75 / Math.max(.4, 1 - armorOf(e)) / (1 + (d.plate || 0))) * G.assist;
+      const tgt = bossSize(e, d, e.base0 || e.max);
       if (tgt > e.max * 1.02) {
         const f = e.hp / e.max; e.max = tgt; e.hp = f * tgt;
         if (e.plateMax) { const pf = e.plate / e.plateMax; e.plateMax = tgt * d.plate; e.plate = pf * e.plateMax; }
@@ -1167,7 +1195,7 @@ function update(dt) {
     const gate = gateBefore(e);   // the nearest unused gate between the squad and this enemy
     if (gate && G.dist < gate.wz - 380) continue;   // machines stay put until the squad is nearly at the gate in front of them
     if (!e.active) { if (rel < 900) { e.active = true; toughen(e); if (e.t === 'grunt' || e.t === 'gunner') bark('t800', 'T-800 incoming!', 40000); if (!e.boss && bigFoe(e) && G.t - (G.lastAlert || -9) > 3.5) { G.lastAlert = G.t; G.alert = { t: 2.4, txt: (ET[e.t].name || '').toUpperCase() + ' INCOMING', fly: !!ET[e.t].fly }; if (BARKS[e.t]) bark('b_' + e.t, BARKS[e.t], 20000); } } else continue; }
-    if (e.t === 'gunner' && e.hp < e.max * .6 && Math.random() < dw * 5) { const q1 = P(e.x, rel); G.parts.push({ x: q1.x + rnd(-3, 3), y: q1.y - 48 * q1.s, vx: rnd(-8, 8), vy: -28, life: .8, max: .8, col: '#2a2f38', r: 3, g: -18 }); }
+    if (e.t === 'gunner' && e.hp < e.max * .6 && Math.random() < dw * 5) { const q1 = P(e.x, rel); pushPart({ x: q1.x + rnd(-3, 3), y: q1.y - 48 * q1.s, vx: rnd(-8, 8), vy: -28, life: .8, max: .8, col: '#2a2f38', r: 3, g: -18 }); }
     if (e.crash !== undefined || e.rise !== undefined) { // an EMP'd flyer drops out of the sky and blows up on impact
       if (e.crash !== undefined) {
         e.crash += dt; const q2 = P(e.x, rel), hgt = (e.t === 'gunship' ? 120 : 22) * q2.s * e.sc * (1 - clamp(e.crash / .8, 0, 1));
@@ -1351,8 +1379,8 @@ function update(dt) {
   G.bolts = G.bolts.filter(b => !b.dead);
 
   // dust kicked up by the squad's boots and by big machines' feet and tracks
-  if (G.spd > 10 && !G.over && save.fx !== 'low' && G.parts.length < 330 && Math.random() < .5) { const q = squadPos(), hw = squadHalf() * LANE; G.parts.push({ x: q.x + rnd(-hw, hw), y: q.y + rnd(-4, 6), vx: rnd(-12, 12), vy: rnd(-16, -6), life: .7, max: .7, col: '#6a7488', r: rnd(2, 4.5), g: -4 }); }
-  if (save.fx !== 'low' && G.parts.length < 330) for (const e of G.en) { if (e.dead || e.stun > 0 || !(e.t === 'heavy' || e.t === 'tank' || e.t === 'behemoth' || e.t === 'ogre' || e.t === 'harvester') || e.wz - G.dist > 700 || e.wz - G.dist < 20 || Math.random() > .14) continue; const q = P(e.x, e.wz - G.dist), w = 26 * q.s * e.sc; G.parts.push({ x: q.x + rnd(-w, w), y: q.y + rnd(-2, 3), vx: rnd(-10, 10), vy: rnd(-12, -4), life: .8, max: .8, col: '#556072', r: rnd(2, 5) * Math.max(.6, q.s * 2), g: -3 }); }
+  if (G.spd > 10 && !G.over && save.fx !== 'low' && G.parts.length < 330 && Math.random() < .5) { const q = squadPos(), hw = squadHalf() * LANE; pushPart({ x: q.x + rnd(-hw, hw), y: q.y + rnd(-4, 6), vx: rnd(-12, 12), vy: rnd(-16, -6), life: .7, max: .7, col: '#6a7488', r: rnd(2, 4.5), g: -4 }); }
+  if (save.fx !== 'low' && G.parts.length < 330) for (const e of G.en) { if (e.dead || e.stun > 0 || !(e.t === 'heavy' || e.t === 'tank' || e.t === 'behemoth' || e.t === 'ogre' || e.t === 'harvester') || e.wz - G.dist > 700 || e.wz - G.dist < 20 || Math.random() > .14) continue; const q = P(e.x, e.wz - G.dist), w = 26 * q.s * e.sc; pushPart({ x: q.x + rnd(-w, w), y: q.y + rnd(-2, 3), vx: rnd(-10, 10), vy: rnd(-12, -4), life: .8, max: .8, col: '#556072', r: rnd(2, 5) * Math.max(.6, q.s * 2), g: -3 }); }
   // fx
   for (const p of G.parts) {
     p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += p.g * dt;
@@ -1797,6 +1825,10 @@ function lightBeams(e, q, rel, ss, spread, len, wid, alpha) { // spotlights leav
   }
 }
 const hsh = k => { const v = Math.sin(k * 127.1 + 311.7) * 43758.5453; return v - Math.floor(v); };   // cheap deterministic noise 0..1
+function bossSize(e, d, base) { // boss health: sized to the squad's firepower, with a floor from the sector's base value, but never more than a bounded time-to-kill whatever the sector number
+  const dps = squadDps(), ak = Math.max(.4, 1 - armorOf(e)), pk = 1 + (d.plate || 0), byDps = dps * (16 + 2.5 * G.lv) * .75 / ak / pk, cap = dps * Math.min(150, 45 + 3 * G.lv) * ak / pk;   // (cap: the real time-to-kill, armour and plating included)
+  return Math.min(Math.max(base * .25, byDps), Math.max(cap, byDps)) * G.assist;
+}
 function toughen(e) { // Endos are built to take a beating: when one comes within reach its armour is sized to the squad's firepower, so a pack always takes a few seconds to cut down
   if (e.tough || (e.t !== 'grunt' && e.t !== 'gunner')) return; e.tough = true;
   const f = e.t === 'gunner' ? .6 : .3, hp = Math.max(e.max, squadDps() * f) * G.assist;
@@ -2296,7 +2328,7 @@ function drawObs(o) {
     cx.fillStyle = '#c0291a'; cx.fillRect(q.x - bw * .95, q.y - bh * .75, bw * .16, bh * .22); cx.fillRect(q.x + bw * .79, q.y - bh * .75, bw * .16, bh * .22);
     cx.strokeStyle = '#2b1f16'; cx.lineWidth = Math.max(1, s * .8); cx.strokeRect(q.x - bw, q.y - bh * .78, bw * 2, bh * .5);
     if (dm > .35) { cx.strokeStyle = 'rgba(15,10,6,.8)'; cx.lineWidth = Math.max(1, s); cx.beginPath(); cx.moveTo(q.x - bw * .5, q.y - bh * .9); cx.lineTo(q.x - bw * .2, q.y - bh * .5); cx.moveTo(q.x + bw * .4, q.y - bh * 1.2); cx.lineTo(q.x + bw * .1, q.y - bh * .6); cx.stroke(); }
-    if (dm > .6 && Math.random() < .2 && G.parts.length < 380) G.parts.push({ x: q.x + rnd(-bw, bw) * .5, y: q.y - bh, vx: rnd(-6, 6), vy: -30, life: .8, max: .8, col: '#2a2d33', r: 3, g: -20 });
+    if (dm > .6 && Math.random() < .2 && G.parts.length < 380) pushPart({ x: q.x + rnd(-bw, bw) * .5, y: q.y - bh, vx: rnd(-6, 6), vy: -30, life: .8, max: .8, col: '#2a2d33', r: 3, g: -20 });
   } else if (k === 'sandbag') { // a low wall of sandbags
     const rows = 3, fl = o.hit > 0, dm = 1 - o.hp / o.max, vis = Math.max(1, Math.ceil(rows * (1 - dm * .6)));
     cx.fillStyle = 'rgba(0,0,0,.3)'; cx.beginPath(); cx.ellipse(q.x, q.y, w * 1.15, 4 * s, 0, 0, 7); cx.fill();
@@ -2571,6 +2603,7 @@ function drawGrade() {
 const ZOOMS = [1, 1.15, 1.3], ZNAMES = ['Wide', 'Close', 'Closer'];
 function zoomLevel() { if (save.zoom !== undefined) return save.zoom; return (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches) ? 1 : 0; }   // phones start on Close
 function camZ() { return ZOOMS[clamp(zoomLevel(), 0, 2)]; }
+const depthKey = e => (e.wz - G.dist) - (ET[e.t].fly ? 45 : 0);   // a hovering machine is drawn over ground units standing at about its depth (it is above them, and its sprite reaches over their heads)
 function render() {
   cx.setTransform(RS, 0, 0, RS, 0, 0);
   cx.clearRect(0, 0, W, H);
@@ -2584,7 +2617,7 @@ function render() {
   const items = [];
   for (const d of decor) { const z = d.wz - G.dist; if (z < 1500) items.push({ z, f: () => drawDecor(d) }); }
   for (const g of G.gates) { const z = g.wz - G.dist; if (!g.used && z < 1500 && z > -30) items.push({ z, f: () => drawGate(g) }); }
-  for (const e of G.en) { const z = e.wz - G.dist; if (z < 1500 && z > -120 && !e.dead) items.push({ z, f: () => drawEnemy(e) }); }
+  for (const e of G.en) { const z = e.wz - G.dist; if (z < 1500 && z > -120 && !e.dead) items.push({ z: depthKey(e), f: () => drawEnemy(e) }); }
   for (const Dh of G.deaths) items.push({ z: Dh.e.wz - G.dist, f: () => drawBossDeath(Dh) });
   for (const o of G.obs) { const z = o.wz - G.dist; if (z < 1500 && z > -90) items.push({ z: o.k === 'overpass' ? z + 40 : z, f: () => drawObs(o) }); }   // (behind the squad the projection flips sign: never draw there) }
   for (const w of G.waves) items.push({ z: 1e6, f: () => drawEmpWave(w) });
@@ -2611,7 +2644,7 @@ function render() {
     if (G.gflash > 0 && !G.over) { const um = upv && upv.muz, fx = um ? q.x + um[0] * upv.flip * ss : q.x + 16 * ss, fy = um ? q.y - um[1] * ss : q.y - 42 * ss; flare(fx, fy, 5.2 * ss + 1.5, '255,214,130', Math.floor(G.t * 24)); }
     const w = 38 * q.s, hy = q.y - (sprReady('t800_reprogrammed') ? 72 : 88) * ss, bh = Math.max(2.4, 4 * q.s);
     cx.fillStyle = '#012'; cx.fillRect(q.x - w / 2, hy, w, bh); cx.fillStyle = fr > .35 ? '#6ff3ff' : '#ff6a4a'; cx.fillRect(q.x - w / 2, hy, w * fr, bh);
-    if (fr < .5 && Math.random() < .25) G.parts.push({ x: q.x + rnd(-4, 4), y: q.y - 55 * ss, vx: rnd(-8, 8), vy: -26, life: .7, max: .7, col: '#2a2f38', r: 3, g: -18 });
+    if (fr < .5 && Math.random() < .25) pushPart({ x: q.x + rnd(-4, 4), y: q.y - 55 * ss, vx: rnd(-8, 8), vy: -26, life: .7, max: .7, col: '#2a2f38', r: 3, g: -18 });
   } });
   const shown = Math.min(G.n, 40);
   if (!G.over || G.won) for (let i = 0; i < shown; i++) {

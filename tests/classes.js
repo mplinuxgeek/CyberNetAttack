@@ -9,7 +9,7 @@ global.performance={now:()=>Date.now()};
 let rafcb;global.requestAnimationFrame=f=>{rafcb=f};
 global.setTimeout=(f)=>{f()};
 let src=fs.readFileSync((process.argv[2]||require('path').join(__dirname,'..','game.js')),'utf8')+`
-;globalThis.__t={setPause,showSettings,sanitizeSave,endRun,activateBuff,dropCrate,bossShielded,hurtEnemy,useItem,fireEMP,render,airStrike,hurt0:0,armoryBuy,armoryDown,UPS,showArmory,activateGuard,buzz,mk,update,ET,keys,kill,startLevel,applyGate,volley,showSquad,genLevel,CLS,CLASS,airStrike,clsTotal,hurt,ITEMS,cycleForm,FORMS,slotOf,squadHalf,explodeAt,enemyShoot,showSquad,bark,get state(){return state},get save(){return save},get G(){return G}};`;
+;globalThis.__t={setPause,showSettings,sanitizeSave,endRun,activateBuff,dropCrate,bossShielded,hurtEnemy,useItem,fireEMP,render,airStrike,hurt0:0,armoryBuy,armoryDown,UPS,showArmory,activateGuard,buzz,mk,update,ET,keys,kill,startLevel,applyGate,volley,showSquad,genLevel,CLS,CLASS,airStrike,clsTotal,hurt,ITEMS,cycleForm,FORMS,slotOf,squadHalf,explodeAt,enemyShoot,showSquad,bark,setRS,depthKey,squadDps,applyGate,addParts,unlockAudio,get state(){return state},get save(){return save},get G(){return G}};`;
 eval(src); const t=globalThis.__t; let pass=0,fail=0;
 const check=(n,c,i)=>{ if(c){pass++;console.log('PASS',n)} else {fail++;console.log('FAIL',n,i||'')} };
 function fresh(lv,loadout){ t.save.loadout=loadout; t.save.unlocked={heavy:1,tech:1,medic:1,shot:1,mark:1,officer:1,signal:1}; t.startLevel(lv); return t.G; }
@@ -331,4 +331,13 @@ const arena=(lv,...en)=>{ const G=fresh(lv,[]); G.n=40; G.gates=[]; G.en=[]; G.p
   G=t.G; check('winning a survival sector moves straight to the next with the squad carried over', t.state==='play' && G.lv===2 && G.endless.sectors===1 && G.n>=30 && G.cls.gren>=3 && G.item && G.item.k==='c4', G.lv+' n '+G.n);
   check('...keeping the totals', G.endless.kills===7 && G.endless.scrap>=50, JSON.stringify(G.endless));
   G.kills=5; G.scrap=20; G.n=0; G.over=true; G.won=false; const s0=t.save.scrap; t.endRun(); check('losing ends the run and banks the scrap', t.state==='end' && t.save.scrap>s0, t.save.scrap-s0); check('...and records a score', t.save.board.length>=1 && t.save.board[0].sec===1 && t.save.board[0].s>=1000, JSON.stringify(t.save.board[0])); t.endRun(); check('(banked only once)', t.save.board.length===1); }
+// ---- phase 6: fixes and engine
+{ const G=fresh(3,[]); G.n=100; G.peak=100; const g={px:-.001,L:{k:'add',v:10},R:{k:'add',v:20}}; t.applyGate(g); t.applyGate(g); check('a gate fires exactly once however wide the squad is', G.n===110, G.n);
+  G.n=300; G.peak=300; const g2={px:.0,L:{k:'add',v:5},R:{k:'add',v:7}}; t.applyGate(g2); check('...and only one option applies', G.n===307 || G.n===305, G.n); }
+{ const G=fresh(40,[]); G.n=10; G.peak=10; G.gates=[]; G.en=[]; const b=t.mk('tank',1,0,1,{boss:true}); b.hp=b.max=5e7; b.armor=.25; G.en.push(b); b.wz=G.dist+400; G.px=0; G.tx=0; for(let i=0;i<5;i++){ G.n=10; G.fcd=1e9; t.update(1/60); }
+  const dps=t.squadDps(), ttk=b.max/(dps*(1-.25)); check('late-sector boss health is capped to a bounded time-to-kill', ttk<=150*1.05, ttk.toFixed(0)+' s'); }
+{ const G=fresh(3,[]); for(let i=0;i<300;i++) t.addParts(100,100,40,'#fff',200,1); check('the particle buffer never exceeds its cap', G.parts.length<=420, G.parts.length); }
+{ const r=[]; for(const d of [1,1.25,1.5,2,2.625,3,4]){ window.devicePixelRatio=d; const o=t.setRS(); r.push(o.w*5===o.h*3 && Number.isInteger(o.w) && Number.isInteger(o.h)); } delete window.devicePixelRatio; t.save.crt=true; const o2=t.setRS(); check('the canvas keeps an exact 3:5 ratio at every pixel density, CRT or not', r.every(Boolean) && o2.w*5===o2.h*3, r.join()); t.save.crt=false; t.setRS(); }
+{ const G=arena(3); const hv=t.mk('harvester',1,0,1), gs=t.mk('gunship',2,0,1); hv.wz=G.dist+300; gs.wz=G.dist+320; check('a hovering gunship is drawn over a harvester at about its depth', t.depthKey(gs)<t.depthKey(hv)); const far=t.mk('gunship',3,0,1); far.wz=G.dist+400; check('...but not over one that is clearly nearer', t.depthKey(far)>t.depthKey(hv)); }
+{ let err=null; try{ t.unlockAudio(); t.unlockAudio(); }catch(e){ err=e.message; } check('waking audio is safe with no audio device', err===null, err); }
 console.log(pass+' passed, '+fail+' failed');

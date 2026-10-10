@@ -16,7 +16,7 @@
 - [x] **Electrified High-Voltage Power Lines**: Fallen grid cables dangling over the road that electrocute squad members and stun machines passing beneath them.
 - [x] **Tank Traps / Czech Hedgehogs**: Heavy steel X-barriers that block heavy tracked units (HK-Tank, T-1, Ogre) but allow light infantry and bipedal endos to squeeze through.
 
-## Phase 3: New Terminator Franchise Enemy Units
+## Phase 3: New Terminator Franchise Enemy Units (on hold: needs new sprite sheets)
 - [ ] **T-1000 Liquid Metal Prototype (Boss/Special Hunter)**: A deadly shape-shifting infiltrator that morphs between a runner blade stance and bullet-absorbing chrome form, immune to ballistics but vulnerable to plasma and mini-nukes.
 - [ ] **T-700 Heavy Endo (Reinforced Grunt)**: Bulky precursor endoskeleton between T-600 and T-800 with extra torso armor plating and dual arm-mounted sub-machine guns.
 - [ ] **HK-Centurion (Quad-Legged Heavy Walker)**: A massive 4-legged heavy walker boss equipped with dual gatling turrets and side-mounted mortar pods.
@@ -45,9 +45,9 @@
 - [x] **Low-Health Boss Glitch & Degradation**: As bosses take heavy damage (below 50% and 25% HP), dynamically reduce their forward/weave speed and weapon fire rate while introducing erratic glitching/twitching steering and blue electrical arc FX (reusing EMP stun arc particles).
 
 ## Phase 6: Bug Fixes & Engine Optimizations
-- [ ] **Gate Clashing Hitbox Overlap Fix**: Prevent simultaneous gate triggers when squad size spans wider than a single lane width.
-- [ ] **Boss Health Scaling Cap**: Fix extreme HP scaling bugs on high sector levels where boss health outpaces maximum possible squad DPS output.
-- [ ] **Audio Context Resume Deadlock**: Fix Web Audio Context suspension bug on mobile Safari when transitioning between level overlay menus and gameplay.
-- [ ] **Particle Buffer Overflow Safeguard**: Optimize particle array recycling (`G.parts`) during multi-rocket explosions to eliminate frame drops on lower-spec GPUs.
-- [ ] **High DPI Render Scaling Calibration**: Ensure `RS` canvas scaling retains 1:1 aspect ratio when switching between arcade CRT mode and standard crisp view on Retina displays.
-- [ ] **Projected Z-Depth Sorting Fix**: Correct z-index sorting order when airborne HK-Aerial units overlap large bipedal Harvesters during boss sector transitions.
+- [x] **Gate Clashing Hitbox Overlap Fix**: Prevent simultaneous gate triggers when squad size spans wider than a single lane width.
+- [x] **Boss Health Scaling Cap**: Fix extreme HP scaling bugs on high sector levels where boss health outpaces maximum possible squad DPS output.
+- [x] **Audio Context Resume Deadlock**: Fix Web Audio Context suspension bug on mobile Safari when transitioning between level overlay menus and gameplay.
+- [x] **Particle Buffer Overflow Safeguard**: Optimize particle array recycling (`G.parts`) during multi-rocket explosions to eliminate frame drops on lower-spec GPUs.
+- [x] **High DPI Render Scaling Calibration**: Ensure `RS` canvas scaling retains 1:1 aspect ratio when switching between arcade CRT mode and standard crisp view on Retina displays.
+- [x] **Projected Z-Depth Sorting Fix**: Correct z-index sorting order when airborne HK-Aerial units overlap large bipedal Harvesters during boss sector transitions.
