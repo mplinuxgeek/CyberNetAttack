@@ -21,7 +21,7 @@ function step(G,sec){ for(let i=0;i<Math.round(sec*60);i++){ G.fcd=99; t.update(
 { const G=fresh(2); check('the unit is NOT with the squad at the start', !G.guard, String(G.guard)); }
 { const G=fresh(1); check('every sector plans a power-up crate', G.pupPlan.some(p=>p.k==='guard'), `planned ${G.pupPlan.length}`); const G3=fresh(3); check('later sectors plan two', G3.pupPlan.filter(p=>p.k==='guard').length===2, `planned ${G3.pupPlan.length}`); }
 { const G=fresh(2); G.n=30; G.px=0; G.tx=0; G.pups=[{k:'guard',x:0,wz:G.dist+60}]; step(G,2.5);
-  check('driving over the crate brings the unit online', G.guard && !G.guard.dead && G.guard.hp>=G.guard.max-1.5 && G.pups.length===0, G.guard?`hp ${G.guard.hp}`:'none'); }
+  check('driving over the crate brings the unit online', G.guard && !G.guard.dead && G.guard.hp>=G.guard.max-1.5 && !G.pups.some(p=>p.k==='guard'), G.guard?`hp ${G.guard.hp}`:'none'); }
 { const G=fresh(2); G.n=30; G.px=.85; G.tx=.85; G.pups=[{k:'guard',x:-.6,wz:G.dist+60}]; step(G,2.5); check('steering clear of the crate misses it', !G.guard); }
 { const G=fresh(3); G.pupPlan=[{x:0,wz:G.dist+900,done:false},{x:.3,wz:G.dist+960,done:false}]; step(G,.5); check('only one crate is ever on the road at a time', G.pups.length===1, `crates ${G.pups.length}`); }
 { const G=fresh(3); t.activateGuard(); G.pupPlan=[{x:0,wz:G.dist+900,done:false}]; step(G,.5); check('no crate appears while a unit is active', G.pups.length===0, `crates ${G.pups.length}`); }

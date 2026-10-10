@@ -38,13 +38,20 @@ function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save));
 
 // ---------------------------------------------------------------- data
 const UPS = {
-  squad:  { name: 'Squad Size',      desc: '+2 starting fighters',          max: 15, cost: l => Math.round(50 * Math.pow(1.35, l)) },
-  dmg:    { name: 'Damage',          desc: '+10% weapon damage',            max: 20, cost: l => Math.round(70 * Math.pow(1.4, l)) },
-  rate:   { name: 'Fire Rate',       desc: '+6% fire rate',                 max: 20, cost: l => Math.round(70 * Math.pow(1.4, l)) },
+  squad:  { name: 'Squad Size',      desc: '+2 starting fighters',          max: 25, cost: l => Math.round(50 * Math.pow(1.3, l)) },
+  dmg:    { name: 'Damage',          desc: '+10% weapon damage',            max: 30, cost: l => Math.round(70 * Math.pow(1.3, l)) },
+  rate:   { name: 'Fire Rate',       desc: '+6% fire rate',                 max: 30, cost: l => Math.round(70 * Math.pow(1.3, l)) },
   weapon: { name: 'Starting Weapon', desc: 'Begin each run with a better gun. Max tier: Pulse-Plasma Rifle (40kW Output)', max: 4, cost: l => [200, 500, 1100, 2200][l] },
-  guard:  { name: 'Reprogrammed Unit', desc: '+25% alloy plating on the infiltrator unit leading your squad', max: 10, cost: l => Math.round(80 * Math.pow(1.4, l)) },
-  emp:    { name: 'Tactical Ordnance', desc: '+20% special-item power, supply crates drop more often', max: 10, cost: l => Math.round(90 * Math.pow(1.4, l)) },
+  guard:  { name: 'Reprogrammed Unit', desc: '+25% alloy plating on the infiltrator unit leading your squad', max: 15, cost: l => Math.round(80 * Math.pow(1.3, l)) },
+  emp:    { name: 'Tactical Ordnance', desc: '+20% special-item power, supply crates drop more often', max: 15, cost: l => Math.round(90 * Math.pow(1.3, l)) },
+  plate:  { name: 'Reactive Plating', desc: 'Start every sector with plates that each block one hit', max: 12, cost: l => Math.round(120 * Math.pow(1.35, l)) },
+  rein:   { name: 'Field Reinforcements', desc: 'Fallen soldiers are replaced by reserves, faster with each level', max: 10, cost: l => Math.round(100 * Math.pow(1.4, l)) },
+  gate:   { name: 'Gate Intel', desc: 'Good gates give 5% more, bad gates take 5% less', max: 10, cost: l => Math.round(90 * Math.pow(1.4, l)) },
+  crit:   { name: 'Marksmanship', desc: '+4% chance per level that a round lands for 2.5x damage', max: 10, cost: l => Math.round(110 * Math.pow(1.4, l)) },
+  cache:  { name: 'Quartermaster', desc: 'Start every sector with a better special item', max: 8, cost: l => Math.round(150 * Math.pow(1.5, l)) },
 };
+const U = k => save.up[k] | 0;   // upgrade level, tolerant of older saves and test harness saves
+const QM = [['pulse', 2], ['pulse', 3], ['pulse', 4], ['c4', 3], ['c4', 4], ['flare', 2], ['cannon', 1], ['cannon', 2], ['nuke', 1]];   // the starting item for each Quartermaster level
 const WEAPONS = [
   { name: 'Sidearm',       dmg: 3,   int: .30,  pierce: false, splash: 0,   col: '#bfe3ff', spread: .01 },
   { name: 'SMG',           dmg: 2.5, int: .13,  pierce: false, splash: 0,   col: '#ffe08a', spread: .03 },
@@ -326,7 +333,7 @@ function makeGate(z, lv) {
 }
 const INDUSTRIAL = new Set([1, 3, 4, 7]);   // Scrapyard, Reactor Ring, Foundry, Server Vault: maintenance droids
 function spawnWave(en, z, lv, p, wv, hpm) {
-  let n = Math.round(5 + lv * 1.1 + p * 5);
+  let n = Math.round(5 + Math.min(lv, 30) * 1.0 + p * 5);
   const swarm = wv % 3 === 0;
   if (swarm) n = Math.round(n * 1.6);
   const pat = swarm ? 'scatter' : ['scatter', 'line', 'wedge', 'columns', 'pincer'][(wv + lv) % 5];   // waves arrive in different formations
@@ -382,8 +389,10 @@ function addObstacles(obs, gates, en, L, lv) {
   }
 }
 const BOSS_KINDS = ['heavy', 'harvester', 'tank', 'gunship', 'ogre', 'centurion'];
+const hpScale = lv => lv <= 30 ? 1 + .2 * (lv - 1) : 6.8 + .06 * (lv - 30);   // enemy health grows steadily to sector 30, then gently: the squad keeps up
+const LS = (div, cap) => Math.min(cap, Math.floor(G.lv / div));   // per-hit damage growth with the sector, capped so a late hit never wipes a squad
 function genLevel(lv) {
-  const L = 2800 + lv * 260, hpm = 1 + .2 * (lv - 1);
+  const L = 2800 + 260 * Math.min(lv, 30), hpm = hpScale(lv);
   const gates = [], en = [];
   let z = 480, k = 0, wv = 0;
   while (z < L - 420) {
@@ -405,8 +414,10 @@ function genLevel(lv) {
   const pg = (frac) => gates.reduce((b, g) => Math.abs(g.wz + 95 - L * frac) < Math.abs(b.wz + 95 - L * frac) ? g : b, gates[0]);
   pups.push({ k: 'guard', x: rnd(-.55, .55), wz: pg(.3).wz + 95 });
   if (lv >= 3) pups.push({ k: 'guard', x: rnd(-.55, .55), wz: pg(.7).wz + 95 });
+  if (lv >= 2) pups.push({ k: 'supply', x: rnd(-.55, .55), wz: pg(.22).wz + 95 });
   pups.push({ k: 'supply', x: rnd(-.55, .55), wz: pg(.5).wz + 95 });   // tactical-item supply crates: one mid-sector, another late on from sector 3
   if (lv >= 3) pups.push({ k: 'supply', x: rnd(-.55, .55), wz: pg(.85).wz + 95 });
+  if (lv >= 6) pups.push({ k: 'supply', x: rnd(-.55, .55), wz: pg(.68).wz + 95 });
   const obs = []; addObstacles(obs, gates, en, L, lv);
   return { L, gates, en, haz, pups, obs };
 }
@@ -448,7 +459,7 @@ function startLevel(lv, opt) {
     dist: 0, spd: 0, px: 0, tx: 0,
     n: 6 + 2 * save.up.squad, tier: save.up.weapon, rateG: 1, dmgG: 1,
     fcd: .3, bullets: [], bolts: [], parts: [], texts: [],
-    form: save.form, scrap: 0, kills: 0, item: { k: 'pulse', n: 2 }, c4: [], flares: [], fallout: [], beam: null, shake: 0, flash: 0, hurtFlash: 0,
+    form: save.form, scrap: 0, kills: 0, item: { k: QM[U('cache')][0], n: QM[U('cache')][1] }, shield: U('plate'), reinT: 0, c4: [], flares: [], fallout: [], beam: null, shake: 0, flash: 0, hurtFlash: 0,
     guard: null, gx: 0, pups: [], pupPlan: lvl.pups.map(p => ({ k: p.k, x: p.x, wz: p.wz, done: false })),
     cls: Object.fromEntries(CLS.map(k => [k, 0])), sig: 7, scr: [], haz: lvl.haz, obs: lvl.obs, slow: 1, env: ENVS[SECT[(lv - 1) % SECT.length]] || null, dk: 0, rn: 0, storm: 0, rockets: [], strikes: [], lt: [], warn: null, mz: 0, rcd: 2, peak: 6 + 2 * save.up.squad,
     ts: 1, t: 0, later: [], deaths: [], waves: [], alert: null, over: false, won: false, endT: 0, paused: false,
@@ -528,8 +539,8 @@ function activateBuff(k) {
 }
 // ---- tactical items: one slot, picked up from crates (dropped by big machines or left on the road), used with a tap on the slot, a double tap or Space
 const ITEMS = {
-  pulse:  { name: 'PULSE GRENADES',     g: 'PG', col: '#6ff3ff', n: 3, w: 4, desc: 'stuns machines nearby' },
-  c4:     { name: 'C4 PACKS',           g: 'C4', col: '#ffb03a', n: 3, w: 3, desc: 'sticks to a machine; use again to detonate' },
+  pulse:  { name: 'PULSE GRENADES',     g: 'PG', col: '#6ff3ff', n: 4, w: 4, desc: 'stuns machines nearby' },
+  c4:     { name: 'C4 PACKS',           g: 'C4', col: '#ffb03a', n: 4, w: 3, desc: 'sticks to a machine; use again to detonate' },
   flare:  { name: 'SIGNAL FLARE',       g: 'SF', col: '#ff5a4a', n: 1, w: 3, desc: 'calls a 105mm barrage' },
   spike:  { name: 'REPROGRAMMING SPIKE', g: 'RS', col: '#8fe8a0', n: 1, w: 3, desc: 'turns an endoskeleton to your side' },
   cannon: { name: 'M-25 PLASMA CANNON', g: 'M25', col: '#c86bff', n: 1, w: 2, desc: 'piercing beam down the lane' },
@@ -549,8 +560,8 @@ function takeItem(k) {
   addParts(q.x, q.y - 30, 18, d.col, 220, .6); addLight(q.x, q.y - 40, 110, 'rgba(255,255,255,', .3);
 }
 function dropCrate(e) { // big machines sometimes drop a supply crate where they fall
-  const p = .3 * (1 + .08 * save.up.emp) * (1 + Math.min(.5, .15 * G.cls.tech));
-  if (G.pups.length < 3 && e.wz - G.dist > 30 && Math.random() < p) G.pups.push({ k: Math.random() < .5 ? (Math.random() < .55 ? 'rapid' : 'shield') : rollItem(G.lv), x: clamp(e.x, -.8, .8), wz: e.wz });
+  const p = .4 * (1 + .08 * save.up.emp) * (1 + Math.min(.5, .15 * G.cls.tech));
+  if (G.pups.length < 3 && e.wz - G.dist > 30 && Math.random() < p) G.pups.push({ k: G.n < G.peak * .5 && Math.random() < .4 ? 'nanite' : Math.random() < .5 ? (Math.random() < .55 ? 'rapid' : 'shield') : rollItem(G.lv), x: clamp(e.x, -.8, .8), wz: e.wz });
 }
 function activateGuard() {
   const mx = Math.round((5 + 1.2 * G.lv) * (1 + .25 * save.up.guard)), q = squadPos();
@@ -594,7 +605,12 @@ function hurt(amt, bx, quiet) {
   const q = squadPos();
   addParts(q.x + (bx || 0), q.y - 30, quiet ? 4 : 8, '#ff5a2a', 160, .5);
   addText(q.x, q.y - 80, '-' + amt, '#ff5a5a');
-  if (G.n <= 0) { G.n = 0; G.over = true; G.endT = 1.2; sfx.lose(); }
+  checkLost();
+}
+function checkLost() { // once per sector the reserves arrive instead of the squad being wiped out
+  if (G.n > 0 || G.over) return;
+  if (!G.wind) { G.wind = true; G.n = Math.max(5, Math.ceil(G.peak * .25)); G.shield = Math.max(G.shield || 0, 3); const q = squadPos(); addText(q.x, q.y - 120, 'SECOND WIND: RESERVES ARRIVE', '#6dffb5'); addParts(q.x, q.y - 30, 30, '#6dffb5', 260, .8); addLight(q.x, q.y - 40, 160, 'rgba(110,255,180,', .5); G.flash = Math.max(G.flash, .4); G.shake = Math.max(G.shake, 8); sfx.gate(); bark('wind', 'Reserves! We are still in this!', 20000); return; }
+  G.n = 0; G.over = true; G.endT = 1.2; sfx.lose();
 }
 
 const bigFoe = e => { const d = ET[e.t]; return !!(d.block || d.fly || d.tracked) && !d.swarm; };
@@ -660,7 +676,7 @@ function kill(e) {
   if (e.dead) return;
   if (!e.revived && (e.t === 'grunt' || e.t === 'gunner') && e.blast && (e.sure || Math.random() < .75)) { // only a blast (rocket, grenade, air strike, crashing flyer) takes the legs off: it keeps coming as a slow crawler
     e.revived = true; const q0 = P(e.x, e.wz - G.dist);
-    e.t = 'runner'; e.hp = e.max = Math.max(ET.runner.hp * (1 + .2 * (G.lv - 1)) * 2.2, (e.max || 0) * .3); e.flash = .12; e.crawl = true;
+    e.t = 'runner'; e.hp = e.max = Math.max(ET.runner.hp * hpScale(G.lv) * 2.2, (e.max || 0) * .3); e.flash = .12; e.crawl = true;
     addSparks(q0.x, q0.y - 22 * q0.s, 10, q0.y, true); addParts(q0.x, q0.y - 20 * q0.s, 8, '#9aa4ae', 160, .5);
     addText(q0.x, q0.y - 70 * q0.s, 'CRAWLING!', '#ff7a4a'); sfx.hit();
     return;
@@ -687,7 +703,7 @@ function kill(e) {
   }
 }
 
-const EMP_SPEED = 780, PULSE_RANGE = 560, NUKE_SPEED = 1500, NUKE_RANGE = 1500;   // shockwaves travel outward at these world px per second
+const EMP_SPEED = 780, PULSE_RANGE = 680, NUKE_SPEED = 1500, NUKE_RANGE = 1500;   // shockwaves travel outward at these world px per second
 const BIPED = new Set(['grunt', 'gunner', 'runner', 't700', 't400']);   // the endoskeletons: pulse grenades hold these for longer
 const waveSpeed = w => (w.kind === 'nuke' ? NUKE_SPEED : EMP_SPEED);
 function launchWave(kind, range) { G.waves.push({ t: 0, x: G.px, z: G.dist, hit: new Set(), kind, range }); }
@@ -706,7 +722,7 @@ function empHit(e) { // what a pulse grenade does to one machine
   if (!ET[e.t].fly) e.hp -= (e.boss ? e.max * .04 + d : d) * (1 - armorOf(e));
   e.flash = .2;
   const q = P(e.x, e.wz - G.dist); addSparks(q.x, q.y - (HITH[e.t] || 40) * q.s * e.sc, 10, q.y, true); addLight(q.x, q.y - 30 * q.s, 70 * q.s * e.sc + 20, 'rgba(110,210,255,', .3);
-  if (e.hp > 0 || ET[e.t].fly) { e.stun = BIPED.has(e.t) ? 8 : 5; e.stunT = G.t; { const dd = ET[e.t], rl = e.wz - G.dist; e.stunRel = (dd.hold && !dd.block && rl <= dd.hold + 60) ? rl : undefined; } if (ET[e.t].fly && e.crash === undefined && !e.crashed) e.crash = 0; }
+  if (e.hp > 0 || ET[e.t].fly) { e.stun = BIPED.has(e.t) ? 10 : 6; e.stunT = G.t; { const dd = ET[e.t], rl = e.wz - G.dist; e.stunRel = (dd.hold && !dd.block && rl <= dd.hold + 60) ? rl : undefined; } if (ET[e.t].fly && e.crash === undefined && !e.crashed) e.crash = 0; }
   if (e.hp <= 0) kill(e);
 }
 function nukeHit(e) { // the warhead's shockwave: every machine is vaporised, bosses lose their plating
@@ -714,7 +730,7 @@ function nukeHit(e) { // the warhead's shockwave: every machine is vaporised, bo
   const d = ET[e.t], q = P(e.x, e.wz - G.dist);
   addSparks(q.x, q.y - (HITH[e.t] || 40) * q.s * e.sc, 14, q.y, true); addParts(q.x, q.y - 30 * q.s, 14, '#ffe9a0', 280, .6); addLight(q.x, q.y - 30 * q.s, 110 * q.s * e.sc + 30, 'rgba(255,240,180,', .4);
   e.flash = .3;
-  if (e.boss) { if (e.plate > 0) e.plate *= .2; e.hp -= e.max * (e.plateMax ? .12 : .25); }
+  if (e.boss) { if (e.plate > 0) e.plate *= .2; e.hp -= e.max * (e.plateMax ? .2 : .4); }
   else e.hp = 0;   // airborne machines are brought down with the rest
   if (e.hp <= 0) kill(e);
 }
@@ -749,7 +765,7 @@ function empStep(dt) {
 function c4Blow(c) {
   if (c.dead) return; c.dead = true; const e = c.e;
   explodeAt(e.x, e.wz, 40, null); obsBlast(e.x, e.wz, 300);
-  const dmg = ((260 + 40 * G.lv) * ipow() + e.max * (e.boss ? .07 : .25)) * demoK();
+  const dmg = ((340 + 50 * G.lv) * ipow() + e.max * (e.boss ? .12 : .35)) * demoK();
   hurtEnemy(e, dmg, { ignoreArmor: true, plateMul: 2, explosive: true }); e.flash = .3;
   const q = P(e.x, e.wz - G.dist); addText(q.x, q.y - (HITH[e.t] || 60) * q.s * e.sc - 30, 'C4', '#ffb03a'); G.flash = Math.max(G.flash, .25); G.shake = Math.max(G.shake, 10);
   if (e.hp <= 0) kill(e);
@@ -777,7 +793,7 @@ const USE = {
     const dm = (500 + 60 * G.lv) * ipow();
     for (const e of G.en.slice().sort((a, b) => a.wz - b.wz)) {   // nearest first, so a machine in front is gone before the boss behind it is hit
       if (e.dead || e.wz - G.dist < 0 || Math.abs(e.x - G.px) > ET[e.t].hw * e.sc * .6 + .16) continue;
-      if (e.boss) hurtEnemy(e, dm + e.max * .12, { ignoreArmor: true, plateMul: 1.5, plasma: true }); else e.hp = 0;   // nothing but a boss survives the beam
+      if (e.boss) hurtEnemy(e, dm + e.max * .22, { ignoreArmor: true, plateMul: 1.5, plasma: true }); else e.hp = 0;   // nothing but a boss survives the beam
       e.flash = .3;
       const q = P(e.x, e.wz - G.dist); addSparks(q.x, q.y - (HITH[e.t] || 40) * q.s * e.sc, 16, q.y, true); addParts(q.x, q.y - 30 * q.s, 10, '#d9a0ff', 260, .5);
       if (e.hp <= 0) kill(e);
@@ -789,7 +805,7 @@ const USE = {
   spike() {
     bark('u_spike', 'Reprogramming!', 8000);
     let tg = null, best = 1e9;
-    for (const e of G.en) { if (e.dead || e.boss || (e.t !== 'grunt' && e.t !== 'gunner')) continue; const rel = e.wz - G.dist; if (rel < 40 || rel > 520 || rel >= best) continue; best = rel; tg = e; }
+    for (const e of G.en) { if (e.dead || e.boss || (e.t !== 'grunt' && e.t !== 'gunner' && e.t !== 't700')) continue; const rel = e.wz - G.dist; if (rel < 40 || rel > 560 || rel >= best) continue; best = rel; tg = e; }
     if (!tg) return false;
     const q = P(tg.x, tg.wz - G.dist), s0 = squadPos();
     tg.dead = true; G.kills++;   // the endoskeleton is taken over, not destroyed: no scrap, no wreck
@@ -802,9 +818,9 @@ const USE = {
     bark('u_flare', 'Danger close! Artillery inbound!', 8000);
     let bx = 0, bz = G.dist + 450, bn = -1;
     for (const e of G.en) { if (e.dead) continue; const rel = e.wz - G.dist; if (rel < 160 || rel > 800) continue; let n = 0; for (const o of G.en) if (!o.dead && Math.abs(o.x - e.x) < .5 && Math.abs(o.wz - e.wz) < 105) n += bigFoe(o) ? 3 : 1; if (n > bn) { bn = n; bx = e.x; bz = e.wz; } }
-    const f = { x: clamp(bx, -.7, .7), wz: bz, life: 5.2, t0: 5.2 }; G.flares.push(f);
-    const dmg = (75 + 9 * G.lv) * ipow();
-    for (let i = 0; i < 20; i++) G.later.push({ t: 1.7 + i * .12, f: () => explodeAt(clamp(f.x + rnd(-.5, .5), -.9, .9), f.wz + rnd(-105, 105), dmg, null) });
+    const f = { x: clamp(bx, -.7, .7), wz: bz, life: 5.4, t0: 5.4 }; G.flares.push(f);
+    const dmg = (90 + 11 * G.lv) * ipow();
+    for (let i = 0; i < 28; i++) G.later.push({ t: 1.7 + i * .1, f: () => explodeAt(clamp(f.x + rnd(-.55, .55), -.9, .9), f.wz + rnd(-120, 120), dmg, null) });
     addText(W / 2, 330, 'ARTILLERY INBOUND', ITEMS.flare.col); sfx.siren();
     return true;
   },
@@ -891,10 +907,10 @@ function applyGateOpt(o, bonus) {
   const q = squadPos(), yy = q.y - 90 - (bonus ? 22 : 0);
   if (o.k === 'add') {
     const v = Math.floor(o.v);
-    if (v >= 0) { G.n = Math.min(999, G.n + v); G.peak = Math.max(G.peak, G.n); sfx.gate(); addText(q.x, yy, '+' + v, '#6fb5ff'); }
-    else { const pen = v - Math.floor(G.n * .1); G.n += pen; trimClasses(); buzz([100, 40, 100]); sfx.bad(); addText(q.x, yy, String(pen), '#ff5a5a'); G.shake = 5; if (G.n <= 0) { G.n = 0; G.over = true; G.endT = 1; sfx.lose(); } }
+    if (v >= 0) { const gv = Math.round(v * (1 + .05 * U('gate'))); G.n = Math.min(999, G.n + gv); G.peak = Math.max(G.peak, G.n); sfx.gate(); addText(q.x, yy, '+' + gv, '#6fb5ff'); }
+    else { const pen = Math.round(v * (1 - .05 * U('gate'))) - Math.floor(G.n * .1 * (1 - .05 * U('gate'))); G.n += pen; trimClasses(); buzz([100, 40, 100]); sfx.bad(); addText(q.x, yy, String(pen), '#ff5a5a'); G.shake = 5; checkLost(); }
   } else if (o.k === 'mul') {
-    G.n = Math.min(999, Math.round(G.n * o.v)); G.peak = Math.max(G.peak, G.n); sfx.gate(); addText(q.x, yy, '×' + o.v, '#4dffa0');
+    G.n = Math.min(999, Math.round(G.n * o.v * (1 + .03 * U('gate')))); G.peak = Math.max(G.peak, G.n); sfx.gate(); addText(q.x, yy, '×' + o.v, '#4dffa0');
   } else if (o.k === 'wpn') {
     if (G.tier < 5) { G.tier++; addText(q.x, yy, WEAPONS[G.tier].name.toUpperCase(), '#ffd24a'); }
     else { G.n = Math.min(999, G.n + 8); G.peak = Math.max(G.peak, G.n); addText(q.x, yy, '+8', '#6fb5ff'); }
@@ -918,7 +934,7 @@ function squadDps() {
   const rate = (1 + .06 * save.up.rate) * G.rateG * (1 + Math.min(.3, .05 * G.cls.officer));
   const strike = G.cls.signal > 0 ? 90 * (1 + .1 * save.up.dmg) * G.dmgG * (1 + .25 * Math.min(4, G.cls.signal)) / Math.max(7, 16 - 2 * G.cls.signal) : 0;   // air strike dps on one target
   const gr = G.cls.gren > 0 ? Math.min(4, G.cls.gren) * 55 * (1 + .1 * save.up.dmg) * G.dmgG * rate / 1.7 : 0, sn = G.cls.sniper > 0 ? Math.min(4, G.cls.sniper) * base * 3.2 * rate / 1.5 : 0;
-  return (total + extra) / (w.int / rate) + strike + gr + sn;
+  return ((total + extra) / (w.int / rate) + strike + gr + sn) * (1 + .06 * U('crit'));
 }
 
 function aimTarget(x0, zo, cone, pick) { // a machine ahead of a shooter, inside a diagonal cone (default wide; the squad uses a narrow one so steering still matters)
@@ -947,7 +963,7 @@ function volley() {
   for (let i = 0; i < B; i++) {
     const k = Math.floor(Math.random() * shown), ox = slotOf(k, shown).ox;   // a random fighter of the formation takes this shot, from his own spot
     const x = clamp(G.px + ox + rnd(-w.spread, w.spread), -.95, .95);
-    pushShot({ x, dmg: each, w, hit: [], vx: 0, tg: aimTarget(x, 8, SQUAD_CONE * formK().cone, true) }, 'px', 8);   // soldiers lean their shots toward a machine just off their line, but still have to be steered at the rest
+    pushShot({ x, dmg: each * (Math.random() < .04 * U('crit') ? 2.5 : 1), w, hit: [], vx: 0, tg: aimTarget(x, 8, SQUAD_CONE * formK().cone, true) }, 'px', 8);   // soldiers lean their shots toward a machine just off their line, but still have to be steered at the rest
   }
   const base = w.dmg * (1 + .1 * save.up.dmg) * G.dmgG;
   if (G.cls.shot > 0) { // shotgunners: a spread of short-range pellets, brutal up close
@@ -988,7 +1004,7 @@ function detonateHaz(h, hitsSquad) {
   if (h.dead) return;
   h.dead = true;
   explodeAt(h.x, h.wz, 90, null);
-  if (hitsSquad && !G.over) hurt(2 + Math.floor(G.lv / 4), 0);
+  if (hitsSquad && !G.over) hurt(2 + LS(4, 6), 0);
 }
 function airStrike() { // signaller: bombs the nearest machines ahead
   const t = G.en.filter(e => !e.dead && e.wz - G.dist > 80 && e.wz - G.dist < 750).sort((a, b) => a.wz - b.wz).slice(0, 2 + Math.min(4, G.cls.signal));
@@ -1046,7 +1062,7 @@ function enemyShoot(e, sideSign) { // bolts leave the weapon's muzzle (not the m
   if (rel < 20) return;
   const gOn = G.guard && !G.guard.dead && rel > GZ + 25, aimX = gOn ? G.gx : G.px, m = MUZ[e.t] || { ox: 0, h: 30 };
   const cnt = d.burst ? 1 : Math.max(1, (d.volley || 1) + (e.enr ? 2 : 0) - (e.noL ? 1 : 0)), tt = (rel - (gOn ? GZ : 0)) / 170;
-  let dmg = d.dmg + (e.boss || d.block ? Math.floor(G.lv / 3) : 0);
+  let dmg = d.dmg + (e.boss || d.block ? LS(3, 6) : 0);
   if (e.boss) dmg = Math.max(1, Math.round(G.n * .015 + dmg * .45));   // boss hits scale with the size of your squad, but never wipe it in a few volleys
   for (let i = 0; i < cnt; i++) {
     const mg = !!d.mg, off = mg ? (i - (cnt - 1) / 2) * .06 + rnd(-.03, .03) : (i - (cnt - 1) / 2) * (cnt > 1 ? Math.min(.22, .56 / (cnt - 1)) : 0) + (d.burst ? rnd(-.16, .16) : 0);   // minigun bursts stay tight and trail one another   // fan never wider than ~.56, so there is always a gap to dodge into
@@ -1066,13 +1082,13 @@ function enemyShoot(e, sideSign) { // bolts leave the weapon's muzzle (not the m
 
 function mortarRound(e) { // the Centurion's side pods: shells land around the squad, one lane always left open
   const open = Math.floor(Math.random() * 3);
-  for (let i = 0; i < 3; i++) { if (i === open) continue; G.strikes.push({ x: clamp(G.px + (i - 1) * .36 + rnd(-.06, .06), -.88, .88), rz: rnd(6, 60), t: 1.8, max: 1.8, dmg: 2 + Math.floor(G.lv / 4), r: .16, fire: 0, storm: 1 }); }
+  for (let i = 0; i < 3; i++) { if (i === open) continue; G.strikes.push({ x: clamp(G.px + (i - 1) * .36 + rnd(-.06, .06), -.88, .88), rz: rnd(6, 60), t: 1.8, max: 1.8, dmg: 2 + LS(4, 6), r: .16, fire: 0, storm: 1 }); }
 }
 function strikeRound(e) { // sky hunter paints the ground: weave through the gap while it is still shooting
   const gx = clamp(G.px + rnd(-.5, .5), -.6, .6);
   for (let x = -.84; x <= .86; x += .28) {
     if (Math.abs(x - gx) < .38) continue;   // a wide safe corridor to weave into
-    G.strikes.push({ x, rz: rnd(4, 34), t: 1.35, max: 1.35, dmg: 2 + Math.floor(G.lv / 3), r: .14, fire: 0 });
+    G.strikes.push({ x, rz: rnd(4, 34), t: 1.35, max: 1.35, dmg: 2 + LS(3, 7), r: .14, fire: 0 });
   }
 }
 
@@ -1217,7 +1233,7 @@ function update(dt) {
     if (!e.scaled && rel < 450 && (d.block || d.fly || e.boss) && !d.swarm) { // big enemies size themselves to current firepower
       e.scaled = true;
       if (e.boss) { // boss health is sized from your actual damage output: the fight lasts ~25s + 3s per sector whatever your power level
-        const base = e.hp, T = 16 + 2.5 * G.lv; e.base0 = base;   // total (health + plating) takes roughly T seconds of accurate fire
+        const base = e.hp; e.base0 = base;   // total (health + plating) takes roughly T seconds of accurate fire
         const fr = e.max > 0 ? clamp(e.hp / e.max, 0, 1) : 1; e.hp = e.max = bossSize(e, d, base); e.hp *= fr;   // keep whatever damage it already has
       } else { const k = clamp(Math.pow(squadDps() / 150, .7), .4, 6); e.hp *= k; e.max *= k; }
       if (e.boss) e.str = clamp(1 + G.n / 160, 1, 1.8);   // and hit harder / fire faster / call more reinforcements against a big squad
@@ -1229,6 +1245,9 @@ function update(dt) {
       if (tgt > e.max * 1.02) {
         const f = e.hp / e.max; e.max = tgt; e.hp = f * tgt;
         if (e.plateMax) { const pf = e.plate / e.plateMax; e.plateMax = tgt * d.plate; e.plate = pf * e.plateMax; }
+      } else if (tgt < e.max * .92) { // the squad has shrunk: the boss eases down with it (5% a second, same fraction of health left) so it never becomes unkillable
+        const nm = Math.max(tgt, e.max * (1 - .05 * dt)), f = e.hp / e.max; e.max = nm; e.hp = f * nm;
+        if (e.plateMax) { const pf = e.plate / e.plateMax; e.plateMax = nm * d.plate; e.plate = pf * e.plateMax; }
       }
       e.str = Math.max(e.str || 1, clamp(1 + G.n / 160, 1, 1.8));
     }
@@ -1278,13 +1297,13 @@ function update(dt) {
     e.x = clamp(e.x, -.9, .9);
     // melee
     if (!d.hold && !G.over && G.guard && !G.guard.dead && rel <= GZ + 6 && rel > GZ - 12 && Math.abs(e.x - G.gx) < d.hw + .13) { // melee machines slam into the unit first
-      hurtGuard(1 + Math.floor(G.lv / 5)); e.dead = true; const gq = P(e.x, rel); addParts(gq.x, gq.y - 30 * gq.s, 8, '#9aa4ae', 160, .5); continue;
+      hurtGuard(1 + LS(5, 5)); e.dead = true; const gq = P(e.x, rel); addParts(gq.x, gq.y - 30 * gq.s, 8, '#9aa4ae', 160, .5); continue;
     }
     if (d.stab && rel <= 8 && !G.over && Math.abs(e.x - G.px) < d.hw + squadHalf() * .9) { // blades: it cuts into the squad and is thrown back by the rush, then comes again
-      hurt(2 + Math.floor(G.lv / 6), (e.x - G.px) * LANE); e.wz = G.dist + 130; e.stun = Math.max(e.stun || 0, .7); e.stunT = G.t; e.stunRel = undefined; const qs = P(e.x, 0); addSparks(qs.x, qs.y - 40, 14, qs.y, true); continue;
+      hurt(2 + LS(6, 5), (e.x - G.px) * LANE); e.wz = G.dist + 130; e.stun = Math.max(e.stun || 0, .7); e.stunT = G.t; e.stunRel = undefined; const qs = P(e.x, 0); addSparks(qs.x, qs.y - 40, 14, qs.y, true); continue;
     }
     if (!d.hold && rel <= 6 && !G.over) {
-      if (Math.abs(e.x - G.px) < d.hw + squadHalf() * .9) { hurt(1 + Math.floor(G.lv / 5), (e.x - G.px) * LANE); e.dead = true; addParts(P(e.x, 0).x, P(e.x, 0).y - 30, 8, '#9aa4ae', 160, .5); continue; }
+      if (Math.abs(e.x - G.px) < d.hw + squadHalf() * .9) { hurt(1 + LS(5, 5), (e.x - G.px) * LANE); e.dead = true; addParts(P(e.x, 0).x, P(e.x, 0).y - 30, 8, '#9aa4ae', 160, .5); continue; }
     }
     if (rel < -60) { e.dead = true; continue; }
     if (d.mines && !G.over && rel < 700 && rel > 120) { // minelayer: active proximity mines creep toward the squad
@@ -1318,8 +1337,8 @@ function update(dt) {
         e.sum -= dw;
         if (e.sum <= 0) {
           e.sum = (e.enr ? 6 : 9) / (e.str ? 1 + (e.str - 1) * .4 : 1);
-          const cnt = (e.t === 'ogre' ? 3 : 2) + Math.floor(G.n / 80);
-          for (let i = 0; i < cnt; i++) { const m = mk('grunt', e.wz - 20 - i * 10, clamp(e.x + rnd(-.5, .5), -.8, .8), (1 + .2 * (G.lv - 1)) * G.assist); m.active = true; toughen(m); G.en.push(m); }
+          const cnt = Math.min(8, (e.t === 'ogre' ? 3 : 2) + Math.floor(G.n / 80));
+          for (let i = 0; i < cnt; i++) { const m = mk('grunt', e.wz - 20 - i * 10, clamp(e.x + rnd(-.5, .5), -.8, .8), hpScale(G.lv) * G.assist); m.active = true; m.tough = true; m.hp = m.max = Math.max(m.max, squadDps() * .05 * G.assist); G.en.push(m); }   // a boss's reinforcements are fodder, not a wall that soaks the squad's whole output
         }
         if (d.mortar && !e.noR) { e.mrt = (e.mrt === undefined ? 4 : e.mrt) - dw; if (e.mrt <= 0) { e.mrt = e.enr ? 4.5 : 7; mortarRound(e); addText(W / 2, 150, 'MORTARS!', '#ff9a3a'); sfx.siren(); } }
         if ((e.t === 'ogre' || e.t === 'harvester') && e.enr && !e.noR) { // enraged ground bosses call down a barrage: weave through the gap while the markers burn
@@ -1354,6 +1373,10 @@ function update(dt) {
   }
   G.haz = G.haz.filter(h => !h.dead && h.wz - G.dist > -120);
 
+  if (G.n > 0 && G.n < G.peak && U('rein') > 0 && !G.over) { // field reinforcements: reserves rejoin on a timer
+    G.reinT += dt; const per = 26 - 2.2 * U('rein');
+    if (G.reinT >= per) { G.reinT = 0; const k = 1 + Math.floor(G.peak * .01 * U('rein') / 4); G.n = Math.min(G.peak, G.n + k); const q = squadPos(); addText(q.x + rnd(-30, 30), q.y - 100, '+' + k + ' REINFORCED', '#9ad0ff'); }
+  }
   // field medic: when the squad is nearly gone a nanite repair kit drops ahead of it
   if (G.cls.medic > 0 && !G.over) {
     G.kitCd = (G.kitCd || 0) - dt;
@@ -1609,7 +1632,7 @@ function showArmory(from) {
     rows += `<div style="display:flex;gap:.3em;align-items:stretch"><button class="dn" data-k="${k}" ${l <= 0 ? 'disabled' : ''} title="Downgrade (no refund)" style="width:2.2em;margin:.3em 0">−</button>
       <button class="row" data-k="${k}" ${maxed || (!free && save.scrap < c) ? 'disabled' : ''} style="flex:1">
       <span>${u.name}${extra}<br><small style="font-family:system-ui;font-weight:600;color:#9fb3c8">${u.desc}</small><br>
-      <span class="pips">${'■'.repeat(l)}${'▣'.repeat(Math.max(0, paid - l))}${'□'.repeat(u.max - Math.max(paid, l))}</span></span>
+      <span class="pips">${u.max > 12 ? 'Level ' + l + ' / ' + u.max + (paid > l ? ' (paid ' + paid + ')' : '') : '■'.repeat(l) + '▣'.repeat(Math.max(0, paid - l)) + '□'.repeat(u.max - Math.max(paid, l))}</span></span>
       <span>${maxed ? 'MAX' : free ? 'FREE' : c + ' ⚙'}</span></button></div>`;
   }
   ov(`<div class="panel"><h2>ARMORY</h2><div class="res">Scrap: ${save.scrap}</div>${rows}
@@ -1886,8 +1909,9 @@ function lightBeams(e, q, rel, ss, spread, len, wid, alpha) { // spotlights leav
   }
 }
 const hsh = k => { const v = Math.sin(k * 127.1 + 311.7) * 43758.5453; return v - Math.floor(v); };   // cheap deterministic noise 0..1
+const bossT = lv => 14 + 2 * Math.min(lv, 25);   // boss fight length (nominal seconds of the squad's full output): grows to sector 25, then stays
 function bossSize(e, d, base) { // boss health: sized to the squad's firepower, with a floor from the sector's base value, but never more than a bounded time-to-kill whatever the sector number
-  const dps = squadDps(), ak = Math.max(.4, 1 - armorOf(e)), pk = 1 + (d.plate || 0), byDps = dps * (16 + 2.5 * G.lv) * .75 / ak / pk, cap = dps * Math.min(150, 45 + 3 * G.lv) * ak / pk;   // (cap: the real time-to-kill, armour and plating included)
+  const dps = squadDps(), ak = Math.max(.4, 1 - armorOf(e)), pk = 1 + (d.plate || 0), byDps = dps * bossT(G.lv) * .75 / ak / pk, cap = dps * Math.min(150, 45 + 3 * G.lv) * ak / pk;   // (cap: the real time-to-kill, armour and plating included)
   return Math.min(Math.max(base * .25, byDps), Math.max(cap, byDps)) * G.assist;
 }
 function toughen(e) { // Endos are built to take a beating: when one comes within reach its armour is sized to the squad's firepower, so a pack always takes a few seconds to cut down
@@ -2458,7 +2482,7 @@ function envStep(dt) {
     if (G.stCd <= 0) { G.stCd = rnd(11, 16); G.squall = 4.5; addText(W / 2, 300, 'PLASMA STORM', '#ff8a3a'); sfx.siren(); }
     if (G.squall > 0) {
       G.squall -= dt; G.sqT = (G.sqT || 0) - dt;
-      if (G.sqT <= 0) { G.sqT = .9; const gx = clamp(G.px + rnd(-.5, .5), -.6, .6); for (let i = 0; i < 2; i++) { let x = rnd(-.85, .85); if (Math.abs(x - gx) < .4) x = gx + (x < gx ? -.45 : .45); G.strikes.push({ x: clamp(x, -.88, .88), rz: rnd(4, 40), t: 1.2, max: 1.2, dmg: 1 + Math.floor(G.lv / 6), r: .13, fire: 0, storm: 1 }); } }
+      if (G.sqT <= 0) { G.sqT = .9; const gx = clamp(G.px + rnd(-.5, .5), -.6, .6); for (let i = 0; i < 2; i++) { let x = rnd(-.85, .85); if (Math.abs(x - gx) < .4) x = gx + (x < gx ? -.45 : .45); G.strikes.push({ x: clamp(x, -.88, .88), rz: rnd(4, 40), t: 1.2, max: 1.2, dmg: 1 + LS(6, 5), r: .13, fire: 0, storm: 1 }); } }
     }
     G.storm = clamp((G.storm || 0) + ((G.squall > 0 ? 1 : 0) - (G.storm || 0)) * dt * 1.5, 0, 1);
   } else if (G.env === 'dark') {
@@ -2475,14 +2499,56 @@ function envStep(dt) {
 function drawEnv() {
   const t = G.t;
   if (G.env === 'storm' && (G.storm || 0) > .01) {
-    const k = G.storm; cx.fillStyle = `rgba(255,70,15,${.07 * k})`; cx.fillRect(0, 0, W, H);
+    const k = G.storm;
+    // Dynamic lightning / plasma thunderbolt flashes
+    const flash = (Math.sin(t * 14.3) > .92 && Math.cos(t * 7.1) > .4) ? (0.35 + 0.55 * Math.random()) * k : 0;
+    cx.fillStyle = `rgba(${255 * (1 - flash * 0.4)},${70 + flash * 150},${15 + flash * 240},${.07 * k + flash * 0.3})`;
+    cx.fillRect(0, 0, W, H);
+
+    // Lightning bolt rendering across sky/horizon
+    if (flash > 0.4) {
+      cx.save();
+      cx.strokeStyle = `rgba(220, 240, 255, ${flash})`;
+      cx.lineWidth = 2.5;
+      cx.beginPath();
+      let lx = W * (0.2 + hash(Math.floor(t * 10)) * 0.6), ly = 0;
+      cx.moveTo(lx, ly);
+      for (let step = 0; step < 5; step++) {
+        lx += (hash(step + Math.floor(t * 10)) - 0.5) * 60;
+        ly += (HOR + 20) / 5;
+        cx.lineTo(lx, ly);
+      }
+      cx.stroke();
+      cx.restore();
+    }
+
+    // Plasma particle wind
     cx.save(); cx.globalCompositeOperation = 'lighter'; cx.lineWidth = 1.6;
-    for (let i = 0; i < 46; i++) { const x = (hash(i) * W + t * 120 * (.5 + hash(i + 9))) % W, y = (hash(i + 3) * H + t * 300 * (.6 + hash(i + 5))) % H; cx.strokeStyle = `rgba(255,${120 + hash(i) * 100 | 0},40,${.55 * k})`; cx.beginPath(); cx.moveTo(x, y); cx.lineTo(x - 7, y - 16); cx.stroke(); }
+    for (let i = 0; i < 46; i++) {
+      const x = (hash(i) * W + t * 120 * (.5 + hash(i + 9))) % W, y = (hash(i + 3) * H + t * 300 * (.6 + hash(i + 5))) % H;
+      cx.strokeStyle = `rgba(255,${120 + hash(i) * 100 | 0},40,${.55 * k + flash * 0.3})`;
+      cx.beginPath(); cx.moveTo(x, y); cx.lineTo(x - 7, y - 16); cx.stroke();
+    }
     cx.restore();
   } else if (G.env === 'rain' && (G.rn || 0) > .01) {
-    const k = G.rn; cx.fillStyle = `rgba(40,255,70,${.05 * k})`; cx.fillRect(0, 0, W, H);
+    const k = G.rn;
+    const flash = (Math.sin(t * 9.7) > .95) ? 0.3 * k : 0;
+    cx.fillStyle = `rgba(${40 + flash * 180},${255 * (1 - flash * 0.2)},${70 + flash * 180},${.05 * k + flash * 0.25})`;
+    cx.fillRect(0, 0, W, H);
+    
+    // Dense angled rain streak passes
     cx.save(); cx.strokeStyle = `rgba(160,255,150,${.4 * k})`; cx.lineWidth = 1;
-    for (let i = 0; i < 110; i++) { const x = (hash(i) * (W + 80) + t * 60) % (W + 80) - 40, y = (hash(i + 3) * H + t * 640 * (.7 + hash(i + 7) * .5)) % H; cx.beginPath(); cx.moveTo(x, y); cx.lineTo(x - 4, y + 15); cx.stroke(); }
+    for (let i = 0; i < 110; i++) {
+      const x = (hash(i) * (W + 80) + t * 60) % (W + 80) - 40, y = (hash(i + 3) * H + t * 640 * (.7 + hash(i + 7) * .5)) % H;
+      cx.beginPath(); cx.moveTo(x, y); cx.lineTo(x - 4, y + 15); cx.stroke();
+      
+      // Ground rain splash ripples
+      if (y > HOR + 40 && i % 3 === 0) {
+        const splashR = 1.5 + hash(i + 13) * 3;
+        cx.strokeStyle = `rgba(180,255,170,${.35 * k})`;
+        cx.beginPath(); cx.ellipse(x, y + 15, splashR, splashR * 0.3, 0, 0, 7); cx.stroke();
+      }
+    }
     cx.restore();
   } else if (G.env === 'dark' && (G.dk || 0) > .01) {
     const k = G.dk, g = cx.createRadialGradient(W / 2, H - 250, 90, W / 2, H - 250, 560);
@@ -2647,7 +2713,7 @@ function drawBG(dist, pal) {
       const hx = hash(idx * 23 + j * 7 + 2) * 6 - 3, hz = hash(idx * 23 + j * 7 + 3) * BS, glow2 = hash(idx * 29 + j) < .3;
       cx.beginPath(); for (let v = 0; v < 6; v++) { const pq = P(hx + v * .12 * (j ? -1 : 1) + (hash(idx * 31 + v + j) - .5) * .06, z0 + hz + v * 5 + (hash(idx * 37 + v) - .5) * 5); if (!v) cx.moveTo(pq.x, pq.y); else cx.lineTo(pq.x, pq.y); }
       cx.strokeStyle = 'rgba(2,4,8,.7)'; cx.lineWidth = Math.max(1, 3 * P(hx, z0 + hz).s); cx.stroke();
-      if (glow2) { cx.strokeStyle = `rgba(255,${100 + 50 * Math.sin(T * 3 + idx)},30,${.35 + .2 * Math.sin(T * 2 + idx + j)})`; cx.lineWidth = Math.max(.8, 1.3 * P(hx, z0 + hz).s); cx.stroke(); }
+      if (glow2) { cx.strokeStyle = `rgba(255,${100 + 50 * Math.sin(T * 3 + idx)},30,${.35 + .2 * Math.sin(T * 2 + idx + j)})`; cx.lineWidth = Math.max(.8, 1.3 * P(hx, z0 + idx).s); cx.stroke(); }
     }
     if (hash(idx * 41 + 3) < .3) { // a standing puddle holding a little of the sky
       const hx = hash(idx * 43 + 1) * 5 - 2.5, hz = hash(idx * 43 + 2) * BS, pq = P(hx, z0 + hz), pw = (.14 + hash(idx * 43 + 3) * .2) * LANE * pq.s;
@@ -2655,9 +2721,35 @@ function drawBG(dist, pal) {
     }
     for (const sd of [-1, 1]) heap(sd * (1.08 + hash(idx * 7 + (sd > 0 ? 1 : 2)) * .1), z0 + hash(idx * 9 + 3) * BS, .24 + hash(idx * 13 + sd) * .14, 24 + hash(idx * 19 + sd) * 30, idx * 5 + sd);
   }
-  const fog = cx.createLinearGradient(0, HOR, 0, HOR + 110);
-  fog.addColorStop(0, 'rgba(70,115,170,.3)'); fog.addColorStop(1, 'rgba(70,115,170,0)');
-  cx.fillStyle = fog; cx.fillRect(0, HOR, W, 110);
+  
+  // Rolling horizon fog & ground mist layers
+  const fog = cx.createLinearGradient(0, HOR, 0, HOR + 130);
+  fog.addColorStop(0, 'rgba(70,115,170,.38)');
+  fog.addColorStop(0.5, 'rgba(50,90,140,.18)');
+  fog.addColorStop(1, 'rgba(70,115,170,0)');
+  cx.fillStyle = fog; cx.fillRect(0, HOR, W, 130);
+
+  // Animated rolling fog banks along the mid ground
+  for (let fIdx = 0; fIdx < 3; fIdx++) {
+    const fx = ((T * (12 + fIdx * 8) + fIdx * 160) % (W + 200)) - 100;
+    const fy = HOR + 15 + fIdx * 25;
+    cx.fillStyle = `rgba(60,100,150,${0.08 + fIdx * 0.03})`;
+    cx.beginPath();
+    cx.ellipse(fx, fy, 140 + fIdx * 30, 18 + fIdx * 6, 0, 0, 7);
+    cx.fill();
+  }
+}
+
+function drawGrade() {
+  drawEmbers(); // cold blue future-war grade: haze band, tint, vignette
+  cx.setTransform(RS, 0, 0, RS, 0, 0);
+  const hz = cx.createLinearGradient(0, HOR - 70, 0, HOR + 90);
+  hz.addColorStop(0, 'rgba(90,150,220,0)'); hz.addColorStop(.45, 'rgba(110,170,235,.22)'); hz.addColorStop(1, 'rgba(90,150,220,0)');
+  cx.fillStyle = hz; cx.fillRect(0, HOR - 70, W, 160);
+  cx.fillStyle = 'rgba(20,60,120,.09)'; cx.fillRect(0, 0, W, H);
+  const v = cx.createRadialGradient(W / 2, H * .55, H * .3, W / 2, H * .55, H * .75);
+  v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,4,12,.42)');
+  cx.fillStyle = v; cx.fillRect(0, 0, W, H);
 }
 
 function drawGrade() {

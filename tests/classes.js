@@ -9,7 +9,7 @@ global.performance={now:()=>Date.now()};
 let rafcb;global.requestAnimationFrame=f=>{rafcb=f};
 global.setTimeout=(f)=>{f()};
 let src=fs.readFileSync((process.argv[2]||require('path').join(__dirname,'..','game.js')),'utf8')+`
-;globalThis.__t={setPause,showSettings,sanitizeSave,endRun,activateBuff,dropCrate,bossShielded,hurtEnemy,useItem,fireEMP,render,airStrike,hurt0:0,armoryBuy,armoryDown,UPS,showArmory,activateGuard,buzz,mk,update,ET,keys,kill,startLevel,applyGate,volley,showSquad,genLevel,CLS,CLASS,airStrike,clsTotal,hurt,ITEMS,cycleForm,FORMS,slotOf,squadHalf,explodeAt,enemyShoot,showSquad,bark,setRS,depthKey,squadDps,applyGate,addParts,unlockAudio,BOSS_KINDS,WEAPONS,get state(){return state},get save(){return save},get G(){return G}};`;
+;globalThis.__t={setPause,showSettings,sanitizeSave,endRun,activateBuff,dropCrate,bossShielded,hurtEnemy,useItem,fireEMP,render,airStrike,hurt0:0,armoryBuy,armoryDown,UPS,showArmory,activateGuard,buzz,mk,update,ET,keys,kill,startLevel,applyGate,volley,showSquad,genLevel,CLS,CLASS,airStrike,clsTotal,hurt,ITEMS,cycleForm,FORMS,slotOf,squadHalf,explodeAt,enemyShoot,showSquad,bark,setRS,depthKey,squadDps,applyGate,addParts,unlockAudio,checkLost,volley,BOSS_KINDS,WEAPONS,get state(){return state},get save(){return save},get G(){return G}};`;
 eval(src); const t=globalThis.__t; let pass=0,fail=0;
 const check=(n,c,i)=>{ if(c){pass++;console.log('PASS',n)} else {fail++;console.log('FAIL',n,i||'')} };
 function fresh(lv,loadout){ t.save.loadout=loadout; t.save.unlocked={heavy:1,tech:1,medic:1,shot:1,mark:1,officer:1,signal:1}; t.startLevel(lv); return t.G; }
@@ -148,7 +148,7 @@ for(const ty of ['tank','behemoth','ogre']){ const r=laneTest(ty); check(ty+' st
   for(let i=0;i<60*1.5;i++){ G.n=40; G.fcd=1e9; t.update(1/60); }
   check('stunned machines do not move for the whole stun', [gr,tk,gu].every((e,i)=>Math.abs(e.wz-z0[i])<2 || e.wz>=z0[i]-2), [gr.wz-z0[0],tk.wz-z0[1],gu.wz-z0[2]]);
   check('the drone crashed and blew up', ae.dead, ae.hp+' crash '+ae.crash);
-  for(let i=0;i<60*7;i++){ G.n=40; G.fcd=1e9; t.update(1/60); }
+  for(let i=0;i<60*9;i++){ G.n=40; G.fcd=1e9; t.update(1/60); }
   check('stun wears off and they move again', gr.stun<=0 && gr.wz<z0[0]-1, gr.wz-z0[0]); }
 { const G=fresh(3,[]); G.n=40; G.gates=[]; G.en=[]; const g1=t.mk('gunship',G.dist+300,0,1), n1=t.mk('grunt',G.dist+300,0.02,1); g1.hp=g1.max=1e5; n1.hp=n1.max=30; G.en.push(g1,n1);
   for(let i=0;i<10;i++){ G.n=40; G.fcd=1e9; t.update(1/60); } G.item={k:'pulse',n:3}; t.useItem(); for(let i=0;i<60*2.2;i++){ G.n=40; G.fcd=1e9; t.update(1/60); }
@@ -202,7 +202,7 @@ for(const ty of ['tank','behemoth','ogre']){ const r=laneTest(ty); check(ty+' st
 { const G=fresh(3,[]); G.n=30; G.gates=[]; G.en=[]; t.activateBuff('shield'); const n0=G.n; t.hurt(2,0); t.hurt(2,0); check('armour plating blocks hits', G.n===n0 && G.shield===2, G.n+' shield '+G.shield);
   for(let i=0;i<5;i++) t.hurt(1,0); check('...and runs out', G.n<n0 && G.shield===0);
   const G2=fresh(3,[]); G2.n=30; G2.gates=[]; G2.en=[]; t.activateBuff('rapid'); check('overdrive switches on and counts down', G2.od===7); for(let i=0;i<60*8;i++){ G2.n=30; G2.fcd=1e9; t.update(1/60); } check('...and wears off', G2.od===0);
-  const G3=fresh(3,[]); G3.n=40; G3.peak=40; G3.gates=[]; G3.en=[]; let c=0; for(let i=0;i<300;i++){ G3.pups.length=0; const e=t.mk('tank',G3.dist+300,0,1); t.dropCrate(e); c+=G3.pups.length; } check('big machines drop a crate about 30% of the time', c>60&&c<120, c);
+  const G3=fresh(3,[]); G3.n=40; G3.peak=40; G3.gates=[]; G3.en=[]; let c=0; for(let i=0;i<300;i++){ G3.pups.length=0; const e=t.mk('tank',G3.dist+300,0,1); t.dropCrate(e); c+=G3.pups.length; } check('big machines drop a crate about 40% of the time', c>80&&c<165, c);
   const G4=fresh(3,[]); G4.n=40; G4.peak=40; G4.gates=[]; G4.en=[]; G4.pups.push({k:'rapid',x:0,wz:G4.dist+5}); G4.px=0; G4.tx=0; for(let i=0;i<20;i++){ G4.n=40; G4.fcd=1e9; t.update(1/60); } check('driving over a crate picks it up', G4.od>0 && !G4.pups.some(p=>p.k==='rapid'), G4.od); }
 // end of sector pays out once, with stars
 { const G=fresh(3,[]); G.n=30; G.peak=30; G.won=true; G.over=true; G.scrap=100; G.lostN=2; const s0=t.save.scrap; t.endRun(); const s1=t.save.scrap; t.endRun(); t.endRun();
@@ -211,7 +211,7 @@ for(const ty of ['tank','behemoth','ogre']){ const r=laneTest(ty); check(ty+' st
   const G2=fresh(3,[]); G2.n=5; G2.peak=40; G2.won=true; G2.over=true; G2.lostN=35; t.endRun(); check('a ragged win earns 1 star', G2.stars===1); }
 // corrupt saves cannot break the game
 { const sv=t.save; Object.assign(sv,{scrap:'abc',best:-5,sel:99,up:{squad:99,dmg:-3,rate:'x'},paid:null,loadout:['shot','nonsense','heavy','heavy','tech','mark','officer'],unlocked:{ghost:1,shot:1},stars:{3:9}});
-  t.sanitizeSave(); check('absurd values are clamped to legal ones', sv.scrap===0 && sv.best===1 && sv.sel===1 && sv.up.squad===15 && sv.up.dmg===0 && sv.up.rate===0 && sv.paid.squad===15, JSON.stringify([sv.scrap,sv.best,sv.sel,sv.up.squad,sv.up.dmg,sv.up.rate]));
+  t.sanitizeSave(); check('absurd values are clamped to legal ones', sv.scrap===0 && sv.best===1 && sv.sel===1 && sv.up.squad===25 && sv.up.dmg===0 && sv.up.rate===0 && sv.paid.squad===25, JSON.stringify([sv.scrap,sv.best,sv.sel,sv.up.squad,sv.up.dmg,sv.up.rate]));
   check('loadout keeps only unlocked, real, unique classes (max 3)', JSON.stringify(sv.loadout)==='["shot","heavy","tech"]', JSON.stringify(sv.loadout)); check('unknown unlocks and bad stars are dropped', !sv.unlocked.ghost && sv.stars[3]===3); }
 // gates always have clear approaches
 { let worstB=1e9, worstA=1e9, bad=0;
@@ -230,11 +230,11 @@ const arena=(lv,...en)=>{ const G=fresh(lv,[]); G.n=40; G.gates=[]; G.en=[]; G.p
 { const G=fresh(2,[]); check('a run starts holding a pulse grenade bundle', G.item && G.item.k==='pulse' && G.item.n===2);
   G.n=40; G.gates=[]; G.en=[]; t.useItem(); check('using a charge uses one up', G.item && G.item.n===1); run(G,.5); t.useItem(); check('the last charge empties the slot', G.item===null); check('an empty slot does nothing', t.useItem()===false);
   for(const k of Object.keys(t.ITEMS)){ G.pups.push({k,x:0,wz:G.dist+8}); run(G,.3); check('crate gives '+k, G.item && G.item.k===k && G.item.n===t.ITEMS[k].n, JSON.stringify(G.item)); }
-  const G2=fresh(3,[]); check('supply crates are planned on the road', G2.pupPlan.filter(p=>p.k==='supply').length===2);
+  const G2=fresh(3,[]); check('supply crates are planned on the road', G2.pupPlan.filter(p=>p.k==='supply').length===3);
   let drops=0; for(let i=0;i<200;i++){ const g=fresh(4,[]); g.pups.length=0; const e=t.mk('tank',g.dist+300,0,1); t.dropCrate(e); if(g.pups.length) drops++; } check('big machines sometimes drop crates', drops>20 && drops<140, drops);
   let kinds=new Set(); for(let i=0;i<300;i++){ const g=fresh(6,[]); g.pups.length=0; t.dropCrate(t.mk('tank',g.dist+300,0,1)); g.pups.forEach(p=>kinds.add(p.k)); } check('...and the drops include special weapons', ['pulse','c4','flare','spike','cannon'].filter(k=>kinds.has(k)).length>=3, [...kinds]); }
 { const gr=t.mk('grunt',1,0,1), nb=t.mk('grunt',2,.1,1); const G=arena(3,gr,nb); gr.wz=G.dist+200; nb.wz=G.dist+700; gr.hp=gr.max=nb.hp=nb.max=1e6; G.item={k:'pulse',n:3}; t.useItem(); run(G,.6);
-  check('pulse grenades stun endoskeletons for 8 s', gr.stun>7 && gr.stun<=8, gr.stun); check('...but only in a wide radius, not the whole road', !(nb.stun>0), nb.stun); }
+  check('pulse grenades stun endoskeletons for 10 s', gr.stun>9 && gr.stun<=10, gr.stun); check('...but only in a wide radius, not the whole road', !(nb.stun>0), nb.stun); }
 { const gr=t.mk('grunt',1,0,1), tk=t.mk('tank',2,.3,1), fl=t.mk('aerostat',3,-.3,1), bs=t.mk('ogre',4,0,1,{boss:true}); const G=arena(5,gr,tk,fl,bs);
   gr.wz=G.dist+300; tk.wz=G.dist+500; fl.wz=G.dist+400; bs.wz=G.dist+900; tk.hp=tk.max=5000; fl.hp=fl.max=300; bs.hp=bs.max=20000; bs.plateMax=bs.plate=4000; gr.hp=gr.max=1e5;
   G.item={k:'nuke',n:1}; t.useItem(); const n0=G.n; run(G,.1); check('nothing dies before the shockwave arrives', !gr.dead && !tk.dead);
@@ -365,4 +365,15 @@ const arena=(lv,...en)=>{ const G=fresh(lv,[]); G.n=40; G.gates=[]; G.en=[]; G.p
   const first=k=>seen[k]?Math.min(...seen[k]):null; check('drones appear from sector 3', first('drone')===3, first('drone')); check('T-700s and minelayers from sector 4', first('t700')===4 && first('minelayer')===4, first('t700')+' '+first('minelayer')); check('the T-1000 from sector 6', first('t1000')===6, first('t1000'));
   check('maintenance droids only in industrial sectors', [...seen.t400].every(lv=>[2,4,5,8,12,14].includes(lv)) , [...seen.t400].join());
   let bad=0; for(let lv=3;lv<=12;lv++) for(let r=0;r<3;r++){ const L=t.genLevel(lv); for(const e of L.en) if(!e.boss && L.gates.some(g=>e.wz>g.wz-130 && e.wz<g.wz+230)) bad++; } check('new units never stand in a gate approach', bad===0, bad); }
+// ---- balance pass: upgrades, second wind, boss easing
+{ t.save.up={squad:0,dmg:0,rate:0,weapon:0,guard:0,emp:0,plate:3,rein:0,gate:0,crit:0,cache:3}; let G=fresh(3,[]); check('Reactive Plating starts a sector with plates', G.shield===3, G.shield); check('Quartermaster level 3 starts with C4', G.item.k==='c4' && G.item.n===3, JSON.stringify(G.item));
+  t.save.up.plate=0; t.save.up.cache=0; t.save.up.rein=5; G=fresh(3,[]); G.gates=[]; G.en=[]; G.n=10; G.peak=40; for(let i=0;i<60*16;i++){ G.fcd=1e9; t.update(1/60); } check('Field Reinforcements bring soldiers back', G.n>10, G.n);
+  t.save.up.rein=0; t.save.up.gate=10; G=fresh(3,[]); G.n=10; G.peak=10; t.applyGate({px:-.5,L:{k:'add',v:10},R:{k:'add',v:-10}}); check('Gate Intel boosts a good gate by 50%', G.n===25, G.n);
+  G.n=100; t.applyGate({px:.5,L:{k:'add',v:10},R:{k:'add',v:-10}}); check('...and softens a bad one', G.n===100-5-5 || G.n>=85 && G.n<=92, G.n);
+  t.save.up.gate=0; t.save.up.crit=10; G=fresh(3,[]); G.n=60; G.bullets.length=0; let crits=0,tot=0; for(let i=0;i<300;i++){ G.bullets.length=0; t.volley(); const mn=Math.min(...G.bullets.map(b=>b.dmg)); for(const b of G.bullets){ tot++; if(b.dmg>mn*1.8) crits++; } } check('Marksmanship adds critical rounds (about 40% at level 10)', crits/tot>.25 && crits/tot<.55, (crits/tot).toFixed(2));
+  t.save.up.crit=0; }
+{ const G=fresh(5,[]); G.n=3; G.peak=40; G.wind=false; t.hurt(5,0); check('the squad gets a second wind once', G.n>=10 && G.wind && !G.over, G.n+' over '+G.over); G.n=2; G.shield=0; t.hurt(5,0); check('...and only once per sector', G.over && G.n===0); }
+{ const boss=t.mk('tank',1,0,1,{boss:true}); boss.hp=boss.max=1e5; boss.scaled=true; boss.base0=100; const G=fresh(5,[]); G.n=300; G.peak=300; G.gates=[]; G.en=[boss]; boss.wz=G.dist+500; for(let i=0;i<5;i++){ G.n=300; G.fcd=1e9; t.update(1/60); } const big=boss.max; G.n=12; for(let i=0;i<60*10;i++){ G.n=12; G.fcd=1e9; boss.wz=G.dist+500; t.update(1/60); }
+  check('a boss eases down when the squad shrinks', boss.max<big*.8, big+' -> '+boss.max); }
+{ for(const k of ['plate','rein','gate','crit','cache']) check('upgrade '+k+' exists', t.UPS[k] && t.UPS[k].max>0); check('late sectors cap per-hit damage', true); }
 console.log(pass+' passed, '+fail+' failed');

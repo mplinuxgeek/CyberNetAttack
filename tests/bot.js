@@ -78,7 +78,8 @@ function pilot(G) {
     if (gate.wz - G.dist < 120) ww = 3;   // commit
   }
   if (!want && tgt) { want = tgt.x; ww = tgt.boss ? .9 : .5; }
-  const pu = G.pups.filter(p => p.wz - G.dist > 30 && p.wz - G.dist < 520).sort((a, b) => a.wz - b.wz)[0];
+  const blockWz = Math.min(1e9, ...G.en.filter(e => !e.dead && (t.ET[e.t].block || e.boss)).map(e => e.wz - t.ET[e.t].hold - 60 + G.dist * 0));   // a crate behind a machine that stops the squad cannot be reached
+  const pu = G.pups.filter(p => p.wz - G.dist > 30 && p.wz - G.dist < 520 && p.wz < blockWz - 10).sort((a, b) => a.wz - b.wz)[0];
   if (pu && (!gate || gate.wz > pu.wz) && !G.sweep) { want = pu.x; ww = 1.1; }
   if (!want) { const sc = G.scr.filter(c => c.wz - G.dist > 0 && c.wz - G.dist < 360).sort((a, b) => a.wz - b.wz)[0]; if (sc) { want = sc.x; ww = .3; } }
   let best = 0, bc = 1e9;
@@ -87,8 +88,9 @@ function pilot(G) {
     if (want !== null) c += ww * 3 * Math.abs(xs[i] - want);
     if (c < bc) { bc = c; best = i; }
   }
-  G.tx = xs[best];
+  G.tx = xs[best]; DBG = `want ${want === null ? '-' : want.toFixed(2)} w${ww} tgt ${tgt ? tgt.t + (tgt.boss ? '*' : '') : '-'} cost ${bc.toFixed(1)} tx ${G.tx}`;
 }
+let DBG = '';
 
 let lastItem = -9;
 function useItems(G) {
@@ -109,7 +111,8 @@ function useItems(G) {
 }
 
 // ------------------------------------------------------------------ one attempt at a sector
-const ORDER = ['squad', 'dmg', 'rate', 'weapon', 'guard', 'emp'];
+const ORDER = Object.keys(t.UPS);   // every upgrade path, in the Armory's order
+const ABBR = { squad: 'Sq', dmg: 'Dm', rate: 'Fr', weapon: 'Wp', guard: 'Gu', emp: 'Or', plate: 'Pl', rein: 'Rn', gate: 'Gi', crit: 'Mk', cache: 'Qm' };
 function attempt(lv) {
   if (!ASSIST) save.fails[lv] = 0;
   t.startLevel(lv); let G = t.G; G.form = FORM;
@@ -119,12 +122,13 @@ function attempt(lv) {
     if (WHY && G.n < pn - 2) { const g = G.gates.find(g => !g.used); drops.push(`f${f} -${pn - G.n} dist ${G.dist.toFixed(0)} gate ${g ? Math.round(g.wz - G.dist) : '-'} near ${G.en.filter(e => !e.dead).sort((a, b) => a.wz - b.wz).slice(0, 2).map(e => e.t + '@' + Math.round(e.wz - G.dist)).join(',')}`); } pn = G.n;
     if (f % 4 === 0 && !G.sweep && !G.over) { pilot(G); useItems(G); }
     t.update(1 / 60);
+    if (WHY && f % 1200 === 0) { const b = G.en.find(e => e.boss && !e.dead && e.wz - G.dist < 800); if (b) console.log(`    boss t=${(f / 60) | 0}s hp ${(b.hp / b.max * 100).toFixed(0)}% plate ${b.plateMax ? (b.plate / b.plateMax * 100).toFixed(0) : '-'}% x ${b.x.toFixed(2)} px ${G.px.toFixed(2)} n ${G.n} dbg[${DBG}] bolts ${G.bolts.length} strikes ${G.strikes.length} en ${G.en.length}`); }
   }
   G = t.G;
-  if (WHY && !G.won) { console.log('    drops: ' + drops.slice(-5).join(' | ')); if (t.state === 'play') console.log('    stuck: dist ' + G.dist.toFixed(0) + '/' + G.L + ' spd ' + G.spd.toFixed(1) + ' en ' + G.en.filter(e => !e.dead).sort((a, b) => a.wz - b.wz).slice(0, 4).map(e => `${e.t}${e.boss ? '*' : ''}@${Math.round(e.wz - G.dist)} hp${Math.round(e.hp)}/${Math.round(e.max)}${e.form ? ' ' + e.form : ''}${e.stun > 0 ? ' stun' : ''}`).join(', ') + ' | gates ' + G.gates.filter(g => !g.used).length); }
+  if (WHY && !G.won) { console.log('    drops: ' + drops.slice(-5).join(' | ')); if (t.state === 'play') console.log('    stuck: dist ' + G.dist.toFixed(0) + '/' + G.L + ' spd ' + G.spd.toFixed(1) + ' en ' + G.en.filter(e => !e.dead).sort((a, b) => a.wz - b.wz).slice(0, 4).map(e => `${e.t}${e.boss ? '*' : ''}@${Math.round(e.wz - G.dist)} hp${Math.round(e.hp)}/${Math.round(e.max)}${e.form ? ' ' + e.form : ''}${e.stun > 0 ? ' stun' : ''}`).join(', ') + ' | gates ' + G.gates.filter(g => !g.used).length + ' | boss ' + G.en.filter(e => e.boss && !e.dead).map(e => `${e.t}@${Math.round(e.wz - G.dist)} hp${Math.round(e.hp)}/${Math.round(e.max)} plate${Math.round(e.plate || 0)}/${Math.round(e.plateMax || 0)} shielded ${t.bossShielded(e)} gl${e.gl} stun${e.stun || 0}`).join(';')); }
   return { won: !!G.won, frames: f, left: G.n, peak: G.peak, kills: G.kills, scrap: G.scrap, lost: G.lostN || 0, ms: Date.now() - t0, timeout: t.state === 'play' };
 }
-const upLine = () => ORDER.map(k => k[0].toUpperCase() + save.up[k]).join(' ');
+const upLine = () => ORDER.map(k => (ABBR[k] || k) + save.up[k]).join(' ');
 const T0 = Date.now(); let runs = 0, farmed = 0, rounds = 0; const hist = [];
 function log(s) { console.log(s); }
 function upgradeRound() {
