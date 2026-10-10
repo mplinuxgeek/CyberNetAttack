@@ -55,7 +55,15 @@
       const pu = G.pups.filter(p => p.wz - G.dist > 30 && p.wz - G.dist < 520 && p.wz < blockWz - 10).sort((a, b) => a.wz - b.wz)[0];
       if (pu && (!gate || gate.wz > pu.wz) && !G.sweep) { want = pu.x; ww = 1.1; }
       if (!want) { const sc = G.scr.filter(c => c.wz - G.dist > 0 && c.wz - G.dist < 360).sort((a, b) => a.wz - b.wz)[0]; if (sc) { want = sc.x; ww = .3; } }
-      let best = 0, bc = 1e9;
+      // anti-stall: held by a machine for 20 s without hurting it -> commit to it, dodge only what is really coming
+    if (blocking && tgt && (t.ET[tgt.t].block || tgt.boss)) {
+      const fr = (tgt.hp + (tgt.plate || 0)) / (tgt.max + (tgt.plateMax || 0));
+      if (stall.e !== tgt) stall = { e: tgt, t: G.t, fr, bold: 0 };
+      else if (G.t - stall.t >= 20) { if (stall.fr - fr < .01) stall.bold = G.t + 10; stall.t = G.t; stall.fr = fr; }
+    } else stall = { e: null, t: 0, fr: 1, bold: 0 };
+    const bold = G.t < stall.bold;
+    if (bold) { for (let i = 0; i < cost.length; i++) cost[i] *= .4; if (want !== null) ww = Math.max(ww, 1) * 3; }
+    let best = 0, bc = 1e9;
       for (let i = 0; i < xs.length; i++) {
         let c = cost[i] + .12 * Math.abs(xs[i] - G.px) * 6 + .02 * Math.abs(xs[i]);
         if (want !== null) c += ww * 3 * Math.abs(xs[i] - want);
@@ -83,8 +91,8 @@
     }
 
 
-    let DBG = '', WHYINFO = null;
-    return { pilot, useItems, gateValue, dbg: () => DBG, why: () => WHYINFO, why: () => WHYINFO, reset: () => { lastItem = -9; } };
+    let DBG = '', WHYINFO = null, stall = { e: null, t: 0, fr: 1, bold: 0 };
+    return { pilot, useItems, gateValue, dbg: () => DBG, why: () => WHYINFO, why: () => WHYINFO, reset: () => { lastItem = -9; stall = { e: null, t: 0, fr: 1, bold: 0 }; } };
   }
   if (typeof module !== 'undefined' && module.exports) module.exports = makeBot; else root.makeBot = makeBot;
 })(typeof window !== 'undefined' ? window : globalThis);
