@@ -26,11 +26,12 @@ const FONT = '"Arial Black", Impact, sans-serif';
 
 // ---------------------------------------------------------------- save
 const SAVE_KEY = 'cybernetattack.v1';
-let save = { scrap: 0, best: 1, sel: 1, mute: false, crt: false, fails: {},
+let save = { scrap: 0, best: 1, sel: 1, mute: false, crt: true, fails: {},
   up: { squad: 0, dmg: 0, rate: 0, weapon: 0, emp: 0, guard: 0 }, unlocked: { heavy: 1, tech: 1 }, loadout: ['heavy', 'tech'], paid: {}, stars: {} };
 try {
   const s = JSON.parse(localStorage.getItem(SAVE_KEY));
   if (s) { save = Object.assign(save, s); save.up = Object.assign({ squad: 0, dmg: 0, rate: 0, weapon: 0, emp: 0, guard: 0 }, s.up || {}); save.unlocked = Object.assign({ heavy: 1, tech: 1 }, s.unlocked || {}); if (!Array.isArray(save.loadout)) save.loadout = ['heavy', 'tech']; save.stars = Object.assign({}, s.stars || {}); save.paid = Object.assign({}, s.paid || {}); for (const k of Object.keys(save.up)) save.paid[k] = Math.max(save.paid[k] || 0, save.up[k]); }   // paid = highest level ever bought for each upgrade
+  if (s && s.crt === undefined) save.crt = true;
 } catch (e) {}
 function applyCRT() { const w = document.getElementById('wrap'); if (w && w.classList) w.classList.toggle('crt', !!save.crt); setRS(); }
 function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} }
