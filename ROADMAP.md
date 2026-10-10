@@ -16,13 +16,13 @@
 - [x] **Electrified High-Voltage Power Lines**: Fallen grid cables dangling over the road that electrocute squad members and stun machines passing beneath them.
 - [x] **Tank Traps / Czech Hedgehogs**: Heavy steel X-barriers that block heavy tracked units (HK-Tank, T-1, Ogre) but allow light infantry and bipedal endos to squeeze through.
 
-## Phase 3: New Terminator Franchise Enemy Units (on hold: needs new sprite sheets)
-- [ ] **T-1000 Liquid Metal Prototype (Boss/Special Hunter)**: A deadly shape-shifting infiltrator that morphs between a runner blade stance and bullet-absorbing chrome form, immune to ballistics but vulnerable to plasma and mini-nukes.
-- [ ] **T-700 Heavy Endo (Reinforced Grunt)**: Bulky precursor endoskeleton between T-600 and T-800 with extra torso armor plating and dual arm-mounted sub-machine guns.
-- [ ] **HK-Centurion (Quad-Legged Heavy Walker)**: A massive 4-legged heavy walker boss equipped with dual gatling turrets and side-mounted mortar pods.
-- [ ] **HK-Drone Scout (Swarm Flyers)**: Fast-flying micro-drones that attack in groups of 5, diving at squad members to detonate micro-charges.
-- [ ] **Hunter-Killer Minelayer**: A tracked armored vehicle that drops active proximity plasma mines in the squad's steering path.
-- [ ] **T-400 Maintenance Endo**: Weak, rusty maintenance droids spawned in industrial sectors that carry explosive fuel cells.
+## Phase 3: New Terminator Franchise Enemy Units (playable now with placeholder art; real sprite sheets still to come)
+- [x] **T-1000 Liquid Metal Prototype (Boss/Special Hunter)**: A deadly shape-shifting infiltrator that morphs between a runner blade stance and bullet-absorbing chrome form, immune to ballistics but vulnerable to plasma and mini-nukes.
+- [x] **T-700 Heavy Endo (Reinforced Grunt)**: Bulky precursor endoskeleton between T-600 and T-800 with extra torso armor plating and dual arm-mounted sub-machine guns.
+- [x] **HK-Centurion (Quad-Legged Heavy Walker)**: A massive 4-legged heavy walker boss equipped with dual gatling turrets and side-mounted mortar pods.
+- [x] **HK-Drone Scout (Swarm Flyers)**: Fast-flying micro-drones that attack in groups of 5, diving at squad members to detonate micro-charges.
+- [x] **Hunter-Killer Minelayer**: A tracked armored vehicle that drops active proximity plasma mines in the squad's steering path.
+- [x] **T-400 Maintenance Endo**: Weak, rusty maintenance droids spawned in industrial sectors that carry explosive fuel cells.
 
 ## Phase 4: Squad Classes & Tactical Synergies
 - [x] **Heavy Gunner / Grenadier Class**: Fires 40mm anti-armor grenade rounds that pop incoming Endoskeletons into crawlers.

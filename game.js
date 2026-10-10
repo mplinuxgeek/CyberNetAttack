@@ -49,7 +49,7 @@ const WEAPONS = [
   { name: 'SMG',           dmg: 2.5, int: .13,  pierce: false, splash: 0,   col: '#ffe08a', spread: .03 },
   { name: 'Assault Rifle', dmg: 5,   int: .16,  pierce: false, splash: 0,   col: '#ffd24a', spread: .015 },
   { name: 'Minigun',       dmg: 3.6, int: .065, pierce: false, splash: 0,   col: '#ffb02e', spread: .04 },
-  { name: 'Pulse-Plasma Rifle', dmg: 14,  int: .22,  pierce: false, splash: .2,  col: '#6dffb5', spread: .01 },
+  { name: 'Pulse-Plasma Rifle', dmg: 14,  int: .22,  pierce: false, splash: .2,  col: '#6dffb5', spread: .01, plasma: true },
   { name: 'Rail Cannon',   dmg: 40,  int: .5,   pierce: true,  splash: 0,   col: '#9a8cff', spread: 0 },
 ];
 const ET = {
@@ -62,6 +62,12 @@ const ET = {
   harvester:{ plate: .35, hp: 700, spd: 14, hw: .16, scrap: 400, emp: 0,  chase: .06, weave: .3, hold: 270, shoot: 3.0, dmg: 2, block: 1, armor: .2, grab: 1, name: 'Harvester' },
   heavy:    { hp: 650, armor: .25, plate: .5, spd: 18,  hw: .2,  scrap: 70,  emp: 25, chase: .1, weave: .35, hold: 110, shoot: 2.6, dmg: 2, block: 1, name: 'T-47' },
   tank:     { tracked: 1, hp: 1800, spd: 15, hw: .26, scrap: 240, emp: 50, chase: .05, weave: .3, hold: 190, shoot: 2.2, dmg: 2, block: 1, volley: 4, armor: .3, name: 'HK-Tank' },
+  t700:     { hp: 95, armor: .2, spd: 15, hw: .1, scrap: 24, emp: 8, chase: .1, hold: 280, shoot: 1.5, dmg: 1, mg: 1, volley: 2, name: 'T-700 Endoskeleton' },   // armour-plated precursor with an SMG on each arm
+  t1000:    { hp: 420, spd: 40, hw: .08, scrap: 110, emp: 20, chase: .3, stab: 1, show: 1, name: 'T-1000' },   // liquid metal: a charging blade stance, then bullet-proof chrome
+  drone:    { hp: 9, spd: 60, hw: .06, scrap: 6, emp: 1, chase: .45, fly: 1, swarm: 1, name: 'HK Scout Drone' },   // swarm flyers that dive at the squad
+  minelayer:{ tracked: 1, hp: 520, armor: .2, spd: 17, hw: .2, scrap: 120, emp: 30, chase: .05, weave: .3, hold: 300, block: 1, mines: 2.4, name: 'HK Minelayer' },
+  t400:     { hp: 11, spd: 13, hw: .09, scrap: 4, emp: 2, chase: .1, fuel: 1, name: 'T-400 Maintenance Endo' },   // rusty droid carrying fuel cells that go up when it does
+  centurion:{ plate: .4, hp: 1200, armor: .25, spd: 12, hw: .4, scrap: 450, emp: 0, chase: .06, weave: .25, hold: 230, shoot: 1.15, dmg: 2, block: 1, mg: 1, volley: 4, mortar: 1, name: 'HK-Centurion' },   // quad-legged boss: twin gatlings, side mortar pods
   ogre:     { tracked: 1, plate: .35, hp: 560, spd: 13, hw: .36, scrap: 320, emp: 0,  chase: .08, weave: .3, hold: 200, shoot: 2.0, dmg: 3, block: 1, volley: 3, name: 'The Ogre' },   // final boss: a three-storey tracked fortress
 };
 const CLASS = {   // special squad classes: pick up to 3 before a sector (unlock with scrap); gates then grow only your picks
@@ -107,8 +113,8 @@ function sanitizeSave() { // a hand-edited, corrupted or older save can never br
 }
 sanitizeSave();
 const clsTotal = () => CLS.reduce((a, k) => a + (G.cls[k] || 0), 0);
-const MUZ = { gunner: { ox: 30, h: 40, fwd: 1 }, aerostat: { ox: 0, h: 66 }, gunship: { ox: 0, h: 112 }, heavy: { ox: 78, h: 74, alt: 1 }, tank: { ox: 66, h: 50, fwd: 1 }, behemoth: { ox: 50, h: 58, alt: 1 }, harvester: { ox: -50, h: 150, fwd: 1 }, overlord: { ox: 72, h: 76, alt: 1 } };   // muzzle offset (px) and height at scale 1; fwd = flips with facing
-const HITH = { grunt: 40, gunner: 40, runner: 12, aerostat: 36, heavy: 80, tank: 60, gunship: 190, behemoth: 40, harvester: 105, ogre: 150 };
+const MUZ = { t700: { ox: 32, h: 42, alt: 1 }, centurion: { ox: 90, h: 86, alt: 1 }, gunner: { ox: 30, h: 40, fwd: 1 }, aerostat: { ox: 0, h: 66 }, gunship: { ox: 0, h: 112 }, heavy: { ox: 78, h: 74, alt: 1 }, tank: { ox: 66, h: 50, fwd: 1 }, behemoth: { ox: 50, h: 58, alt: 1 }, harvester: { ox: -50, h: 150, fwd: 1 }, overlord: { ox: 72, h: 76, alt: 1 } };   // muzzle offset (px) and height at scale 1; fwd = flips with facing
+const HITH = { t700: 42, t1000: 44, drone: 26, minelayer: 60, t400: 38, centurion: 130, grunt: 40, gunner: 40, runner: 12, aerostat: 36, heavy: 80, tank: 60, gunship: 190, behemoth: 40, harvester: 105, ogre: 150 };
 const GZ = 38;   // the reprogrammed unit walks point this far ahead of the squad
 const SECT = ['Rubble Fields', 'Scrapyard', 'Dead City', 'Reactor Ring', 'Foundry', 'Black Bridge', 'Salt Flats', 'Server Vault', 'Drowned Metro', 'Core Gate'];
 const PAL = [
@@ -317,22 +323,28 @@ function makeGate(z, lv) {
   if (Math.random() < .5) { const t = A; A = B; B = t; }
   return { wz: z, L: A, R: B, used: false };
 }
+const INDUSTRIAL = new Set([1, 3, 4, 7]);   // Scrapyard, Reactor Ring, Foundry, Server Vault: maintenance droids
 function spawnWave(en, z, lv, p, wv, hpm) {
   let n = Math.round(5 + lv * 1.1 + p * 5);
   const swarm = wv % 3 === 0;
   if (swarm) n = Math.round(n * 1.6);
   const pat = swarm ? 'scatter' : ['scatter', 'line', 'wedge', 'columns', 'pincer'][(wv + lv) % 5];   // waves arrive in different formations
   for (let i = 0; i < n; i++) {
-    const t = !swarm && lv >= 2 && Math.random() < .18 ? 'gunner' : 'grunt', f = n > 1 ? i / (n - 1) : .5;
+    const t = !swarm && lv >= 2 && Math.random() < .18 ? 'gunner' : INDUSTRIAL.has((lv - 1) % 10) && Math.random() < .3 ? 't400' : 'grunt', f = n > 1 ? i / (n - 1) : .5;
     let x = rnd(-.82, .82), dz = rnd(0, 120);
     if (pat === 'line') { x = -.8 + 1.6 * f; dz = rnd(0, 18); }                                            // a wall of machines: gaps are tight
     else if (pat === 'wedge') { x = (f - .5) * 1.6; dz = Math.abs(f - .5) * 150 + rnd(0, 14); }             // a V pointing at you
     else if (pat === 'columns') { const c = i % 3; x = -.55 + c * .55 + rnd(-.05, .05); dz = Math.floor(i / 3) * 26 + rnd(0, 8); }   // three lanes of marching files
     else if (pat === 'pincer') { x = (i % 2 ? 1 : -1) * rnd(.5, .85); dz = rnd(0, 90); }                    // squeezes from both flanks, leaving the middle open
-    if (t === 'gunner') dz += 60;                                                                           // gunners hang back behind the line
+    if (t === 'gunner') dz += 60;
+    if (t === 't400') dz += rnd(0, 40);                                                                           // gunners hang back behind the line
     en.push(mk(t, z + dz, clamp(x, -.85, .85), hpm));
   }
   if (lv >= 2 && wv % 3 === 1) { const c = lv >= 6 ? 2 : 1; for (let i = 0; i < c; i++) en.push(mk('aerostat', z + 220 + i * 40, rnd(-.6, .6), hpm)); }
+  if (lv >= 3 && wv % 4 === 1) { const cx0 = rnd(-.55, .55); for (let i = 0; i < 5; i++) en.push(mk('drone', z + 170 + rnd(0, 70), clamp(cx0 + (i - 2) * .12, -.85, .85), hpm, { sc: .55 })); }   // a drone swarm
+  if (lv >= 4 && wv % 3 === 2 && !swarm) en.push(mk('t700', z + 100 + rnd(0, 60), rnd(-.6, .6), hpm));
+  if (lv >= 4 && wv % 5 === 3) en.push(mk('minelayer', z + 215, rnd(-.4, .4), hpm, { sc: .9 }));
+  if (lv >= 6 && wv % 7 === 3) { const c = lv >= 10 ? 2 : 1; for (let i = 0; i < c; i++) en.push(mk('t1000', z + 130 + i * 60, rnd(-.5, .5), hpm)); }
   if (wv % 4 === 0) en.push(mk('heavy', z + 150, rnd(-.4, .4), hpm));
   if (lv >= 5 && wv % 5 === 2) en.push(mk('gunship', z + 260, rnd(-.4, .4), hpm));
   if (lv >= 3 && wv % 4 === 2) { const c = lv >= 8 ? 2 : 1; for (let i = 0; i < c; i++) en.push(mk('behemoth', z + 200 + i * 45, rnd(-.5, .5), hpm)); }   // the T-1
@@ -368,6 +380,7 @@ function addObstacles(obs, gates, en, L, lv) {
     }
   }
 }
+const BOSS_KINDS = ['heavy', 'harvester', 'tank', 'gunship', 'ogre', 'centurion'];
 function genLevel(lv) {
   const L = 2800 + lv * 260, hpm = 1 + .2 * (lv - 1);
   const gates = [], en = [];
@@ -381,10 +394,10 @@ function genLevel(lv) {
   for (const g of gates) for (const e of en) {
     if (e.wz > g.wz - GCLEAR_BEFORE && e.wz < g.wz + GCLEAR_AFTER) e.wz = e.wz < g.wz ? g.wz - GCLEAR_BEFORE - (g.wz - e.wz) * .1 : g.wz + GCLEAR_AFTER + (e.wz - g.wz) * .12;
   }
-  const kind = ['heavy', 'harvester', 'tank', 'gunship', 'ogre'][(lv - 1) % 5];
-  const mul = { heavy: 1, harvester: 2.0, tank: 1.7, gunship: 1.3, behemoth: 1.5, ogre: 1.6 }[kind];
+  const kind = BOSS_KINDS[(lv - 1) % BOSS_KINDS.length];
+  const mul = { centurion: 1.7, heavy: 1, harvester: 2.0, tank: 1.7, gunship: 1.3, behemoth: 1.5, ogre: 1.6 }[kind];
   const hp = (2500 + lv * 800) * mul;
-  en.push(mk(kind, L, 0, 1, { boss: true, armor: .25, hp, max: hp, sc: kind === 'ogre' ? 2.1 : kind === 'tank' ? 2.3 : kind === 'harvester' ? 2.8 : kind === 'behemoth' ? 1.7 : 1.5, name: ET[kind].name }));
+  en.push(mk(kind, L, 0, 1, { boss: true, armor: .25, hp, max: hp, sc: kind === 'centurion' ? 2.5 : kind === 'ogre' ? 2.1 : kind === 'tank' ? 2.3 : kind === 'harvester' ? 2.8 : kind === 'behemoth' ? 1.7 : 1.5, name: ET[kind].name }));
   const haz = [];
   for (const g of gates) if (Math.random() < Math.min(.85, .3 + .08 * lv)) addHazards(haz, g.wz + 170, lv);
   const pups = [];   // reprogrammed-unit power-up crates: one early, a second on later sectors
@@ -481,7 +494,7 @@ const demoK = () => (G && G.cls.demo > 0 ? 1.35 : 1);   // demolitions: splash d
 const BUFF = { rapid: { name: 'OVERDRIVE', col: '#ffb03a', desc: 'fire rate x1.8 for 7 s' }, shield: { name: 'ARMOUR PLATING', col: '#8fd0ff', desc: 'blocks the next 4 hits' } };
 // ---- radio chatter: short spoken barks from the squad (browser speech synthesis), rate-limited, switchable in Settings
 const BK = {};
-const BARKS = { tank: 'HK tank! Take cover!', gunship: 'Hunter killer overhead!', behemoth: 'T-1 on the road!', harvester: 'Harvester! Scatter!', heavy: 'Heavy walker, dead ahead!', aerostat: 'Aerostat, watch the sky!', ogre: 'It is huge! Everything we have!' };
+const BARKS = { t700: 'Heavy endo, armoured!', t1000: 'Liquid metal! Plasma only!', drone: 'Drones! Swarm inbound!', minelayer: 'Minelayer! Watch your step!', centurion: 'Centurion! Quad walker!', tank: 'HK tank! Take cover!', gunship: 'Hunter killer overhead!', behemoth: 'T-1 on the road!', harvester: 'Harvester! Scatter!', heavy: 'Heavy walker, dead ahead!', aerostat: 'Aerostat, watch the sky!', ogre: 'It is huge! Everything we have!' };
 function bark(key, txt, gap) {
   if (save.chat === false || save.mute || typeof speechSynthesis === 'undefined' || typeof SpeechSynthesisUtterance === 'undefined') return;
   const n = (typeof performance !== 'undefined' ? performance.now() : Date.now());
@@ -583,13 +596,14 @@ function hurt(amt, bx, quiet) {
   if (G.n <= 0) { G.n = 0; G.over = true; G.endT = 1.2; sfx.lose(); }
 }
 
-const bigFoe = e => { const d = ET[e.t]; return !!(d.block || d.fly || d.tracked); };
+const bigFoe = e => { const d = ET[e.t]; return !!(d.block || d.fly || d.tracked) && !d.swarm; };
 const bossShielded = e => !!e.boss && G.en.some(o => !o.dead && !o.boss && o.wz < e.wz && bigFoe(o));   // the boss cannot be hurt while a large machine still stands in front of it
 const armorOf = e => (e.armor !== undefined ? e.armor : (ET[e.t].armor || 0));
 // ---- boss subsystems: shoot the left or right of the hull for the turret / launcher, use explosives for the tracks
 const BPARTS = {
   tank: [{ k: 'L', name: 'LEFT TURRET' }, { k: 'R', name: 'SHOULDER LAUNCHER' }, { k: 'T', name: 'TRACK PODS' }],
   ogre: [{ k: 'L', name: 'LEFT TURRET' }, { k: 'R', name: 'SHOULDER LAUNCHER' }, { k: 'T', name: 'TRACK PODS' }],
+  centurion: [{ k: 'L', name: 'LEFT GATLING' }, { k: 'R', name: 'MORTAR POD' }, { k: 'T', name: 'LEG ACTUATORS' }],
   harvester: [{ k: 'L', name: 'GRAPPLE ARM' }, { k: 'R', name: 'SHOULDER CANNON' }, { k: 'T', name: 'LEG ACTUATORS' }],
 };
 function partFor(e, o) {
@@ -620,6 +634,8 @@ let SURE_BLAST = false;   // grenade splash: endoskeletons killed by it always c
 function hurtEnemy(e, dmg, o) { // front plating soaks fire first; flanking (squad well off to one side) bypasses it
   o = o || {};
   if (bossShielded(e)) return 'plate';   // shots glance off until the pre-boss is destroyed
+  const chrome = e.t === 't1000' && e.form === 'chrome', ballistic = chrome && !o.plasma && !o.explosive;
+  if (chrome) dmg *= o.plasma ? 1.5 : o.explosive ? .6 : .05;   // chrome form soaks bullets; plasma and blasts get through
   if (e.cp) { const cp = partFor(e, o); if (cp) { cp.fr -= dmg / (e.max * .12); cp.hit = .15; if (cp.fr <= 0) breakPart(e, cp); dmg *= .5; } }   // a subsystem soaks the hit first; half of it still reaches the hull
   const raw = dmg * (o.ignoreArmor ? 1 : 1 - armorOf(e)); if (bigFoe(e) || e.boss) e.dmgAcc = (e.dmgAcc || 0) + raw; const flank = Math.abs(G.px - e.x) > .32;
   e.plateHit = 0; if (o.explosive) { e.blast = true; if (SURE_BLAST) e.sure = true; }
@@ -631,7 +647,7 @@ function hurtEnemy(e, dmg, o) { // front plating soaks fire first; flanking (squ
     }
     return 'plate';
   }
-  e.hp -= raw; dismember(e); return 'hp';
+  e.hp -= raw; dismember(e); return ballistic ? 'plate' : 'hp';
 }
 
 function spawnScrap(x, wz, sc) {
@@ -649,8 +665,12 @@ function kill(e) {
     return;
   }
   e.dead = true; G.kills++; if (!e.boss && bigFoe(e) && !e.crashed) dropCrate(e);
-  if (!e.boss && G.deaths.length < 28) { const dd = ET[e.t], veh = (dd.block || dd.fly || dd.tracked) && e.t !== 'heavy' && !e.crashed; G.deaths.push({ e, t: 0, k: 0, big: false, bursts: [], kind: veh ? 'veh' : 'walk' }); }   // vehicles and flyers blow up; walkers go out in a small burst
+  if (!e.boss && G.deaths.length < 28) { const dd = ET[e.t], veh = (dd.block || dd.fly || dd.tracked) && !dd.swarm && e.t !== 'heavy' && !e.crashed; G.deaths.push({ e, t: 0, k: 0, big: false, bursts: [], kind: veh ? 'veh' : 'walk' }); }   // vehicles and flyers blow up; walkers go out in a small burst
   const d = ET[e.t], rel = e.wz - G.dist, q = P(e.x, rel);
+  if (d.fuel && !G.over) { // the fuel cells go up: it takes neighbours with it, and the squad if it is close
+    const fd = 55 + 8 * G.lv; explodeAt(e.x, e.wz, fd, null);
+    if (rel < 70 && rel > -20 && Math.abs(e.x - G.px) < .25 + squadHalf() * .5) { hurt(1, (e.x - G.px) * LANE); addText(squadPos().x, squadPos().y - 100, 'FUEL BLAST', '#ff9a4a'); }
+  }
   const big = d.block ? 1 : 0;
   const sc = Math.round(d.scrap * (1 + .1 * (G.lv - 1)) * 1.2);
   if (e.boss) G.scrap += sc; else spawnScrap(e.x, e.wz, sc);
@@ -667,7 +687,7 @@ function kill(e) {
 }
 
 const EMP_SPEED = 780, PULSE_RANGE = 560, NUKE_SPEED = 1500, NUKE_RANGE = 1500;   // shockwaves travel outward at these world px per second
-const BIPED = new Set(['grunt', 'gunner', 'runner']);   // the endoskeletons: pulse grenades hold these for longer
+const BIPED = new Set(['grunt', 'gunner', 'runner', 't700', 't400']);   // the endoskeletons: pulse grenades hold these for longer
 const waveSpeed = w => (w.kind === 'nuke' ? NUKE_SPEED : EMP_SPEED);
 function launchWave(kind, range) { G.waves.push({ t: 0, x: G.px, z: G.dist, hit: new Set(), kind, range }); }
 function useItem() { // fire whatever the tactical slot holds; returns whether it did anything
@@ -756,7 +776,7 @@ const USE = {
     const dm = (500 + 60 * G.lv) * ipow();
     for (const e of G.en.slice().sort((a, b) => a.wz - b.wz)) {   // nearest first, so a machine in front is gone before the boss behind it is hit
       if (e.dead || e.wz - G.dist < 0 || Math.abs(e.x - G.px) > ET[e.t].hw * e.sc * .6 + .16) continue;
-      if (e.boss) hurtEnemy(e, dm + e.max * .12, { ignoreArmor: true, plateMul: 1.5 }); else e.hp = 0;   // nothing but a boss survives the beam
+      if (e.boss) hurtEnemy(e, dm + e.max * .12, { ignoreArmor: true, plateMul: 1.5, plasma: true }); else e.hp = 0;   // nothing but a boss survives the beam
       e.flash = .3;
       const q = P(e.x, e.wz - G.dist); addSparks(q.x, q.y - (HITH[e.t] || 40) * q.s * e.sc, 16, q.y, true); addParts(q.x, q.y - 30 * q.s, 10, '#d9a0ff', 260, .5);
       if (e.hp <= 0) kill(e);
@@ -960,7 +980,7 @@ function explodeAt(x, wz, dmg, main) {
     hurtEnemy(o, o === main ? dmg : dmg * .6, { ignoreArmor: true, plateMul: 1.5, explosive: true });
     if (o.hp <= 0) kill(o);
   }
-  for (const h of G.haz) if (!h.dead && h.k === 'uxo' && Math.abs(h.x - x) < .3 && Math.abs(h.wz - wz) < 60) detonateHaz(h, false);
+  for (const h of G.haz) if (!h.dead && (h.k === 'uxo' || h.k === 'mine') && Math.abs(h.x - x) < .3 && Math.abs(h.wz - wz) < 60) detonateHaz(h, false);
   obsBlast(x, wz, dmg);
 }
 function detonateHaz(h, hitsSquad) {
@@ -1043,6 +1063,10 @@ function enemyShoot(e, sideSign) { // bolts leave the weapon's muzzle (not the m
   e.muz = .12; if (d.mg) sfx.mg(); else sfx.zap(!!(d.volley || d.block));
 }
 
+function mortarRound(e) { // the Centurion's side pods: shells land around the squad, one lane always left open
+  const open = Math.floor(Math.random() * 3);
+  for (let i = 0; i < 3; i++) { if (i === open) continue; G.strikes.push({ x: clamp(G.px + (i - 1) * .36 + rnd(-.06, .06), -.88, .88), rz: rnd(6, 60), t: 1.8, max: 1.8, dmg: 2 + Math.floor(G.lv / 4), r: .16, fire: 0, storm: 1 }); }
+}
 function strikeRound(e) { // sky hunter paints the ground: weave through the gap while it is still shooting
   const gx = clamp(G.px + rnd(-.5, .5), -.6, .6);
   for (let x = -.84; x <= .86; x += .28) {
@@ -1134,7 +1158,7 @@ function update(dt) {
     }
     if (b.dead) continue;
     for (const h of G.haz) { // shoot unexploded ordnance from range
-      if (h.dead || h.k !== 'uxo' || h.wz < b.pz - 10 || h.wz > b.wz + 10 || Math.abs(h.x - b.x) > h.hw + .03) continue;
+      if (h.dead || (h.k !== 'uxo' && h.k !== 'mine') || h.wz < b.pz - 10 || h.wz > b.wz + 10 || Math.abs(h.x - b.x) > h.hw + .03) continue;
       b.dead = true; detonateHaz(h, false); break;
     }
     if (b.dead) continue;
@@ -1143,7 +1167,7 @@ function update(dt) {
       if (e.wz + 10 < b.pz || e.wz - 10 > b.wz) continue;
       if (Math.abs(e.x - b.x) > ET[e.t].hw * e.sc + .025) continue;
       b.hit.push(e);
-      const crit = b.crit && (e.boss || bigFoe(e)) ? b.crit : 1, res = hurtEnemy(e, b.dmg * crit, { ignoreArmor: !!b.pen, bx: b.x }), rel = e.wz - G.dist, q = P(b.x, rel), hy = q.y - (HITH[e.t] || 40) * q.s * e.sc;
+      const crit = b.crit && (e.boss || bigFoe(e)) ? b.crit : 1, res = hurtEnemy(e, b.dmg * crit, { ignoreArmor: !!b.pen, bx: b.x, plasma: !!b.w.plasma }), rel = e.wz - G.dist, q = P(b.x, rel), hy = q.y - (HITH[e.t] || 40) * q.s * e.sc;
       addSparks(q.x, hy, res === 'plate' ? 7 : 4, q.y - 2, res === 'plate'); sfx.impact(res, G.tier, b.w.name);
       if (crit > 1 && res !== 'plate') { addText(q.x, hy - 30, 'CRITICAL', '#ff9ad0'); addSparks(q.x, hy, 10, q.y - 2, true); }
       if (G.lt.length < 20) addLight(q.x, hy, 24, 'rgba(255,170,60,', .07);
@@ -1189,7 +1213,7 @@ function update(dt) {
     if (e.dmgAcc > 0 && (e.dmgT = (e.dmgT === undefined ? .3 : e.dmgT) - dw) <= 0) { e.dmgT = .35; const qd = P(e.x, rel), v = e.dmgAcc; e.dmgAcc = 0; addText(qd.x + rnd(-14, 14), qd.y - (e.sh0 || 90) * qd.s * e.sc - 10, '-' + (v >= 1000 ? (v / 1000).toFixed(1) + 'k' : Math.round(v)), e.plate > 0 ? '#6ff3ff' : '#ffe6a0', 13); }   // aggregated damage readout on big machines
     { const fd = e.x - G.px; if (Math.abs(fd) > .07) e.face = fd > 0 ? -1 : 1; else if (!e.face) e.face = 1; }
     if (e.plateMax) { e.plateHit = (e.plateHit || 0) + dw; if (e.plate > 0 && e.plate < e.plateMax && e.plateHit > 1.5) e.plate = Math.min(e.plateMax, e.plate + e.plateMax * .06 * dw); }
-    if (!e.scaled && rel < 450 && (d.block || d.fly || e.boss)) { // big enemies size themselves to current firepower
+    if (!e.scaled && rel < 450 && (d.block || d.fly || e.boss) && !d.swarm) { // big enemies size themselves to current firepower
       e.scaled = true;
       if (e.boss) { // boss health is sized from your actual damage output: the fight lasts ~25s + 3s per sector whatever your power level
         const base = e.hp, T = 16 + 2.5 * G.lv; e.base0 = base;   // total (health + plating) takes roughly T seconds of accurate fire
@@ -1212,7 +1236,7 @@ function update(dt) {
     if (e.boss) { const f = e.hp / e.max; e.gl = f < .25 ? 2 : f < .5 ? 1 : 0; if (e.gl && e.bx !== undefined && Math.random() < dw * (e.gl === 2 ? 2.4 : 1)) e.bx = clamp(e.bx + rnd(-.07, .07), -.8, .8); }   // a badly damaged boss glitches: twitching steering, slower, fewer shots
     const gate = gateBefore(e);   // the nearest unused gate between the squad and this enemy
     if (gate && G.dist < gate.wz - 380) continue;   // machines stay put until the squad is nearly at the gate in front of them
-    if (!e.active) { if (rel < 900) { e.active = true; toughen(e); if (e.t === 'grunt' || e.t === 'gunner') bark('t800', 'T-800 incoming!', 40000); if (!e.boss && bigFoe(e) && G.t - (G.lastAlert || -9) > 3.5) { G.lastAlert = G.t; G.alert = { t: 2.4, txt: (ET[e.t].name || '').toUpperCase() + ' INCOMING', fly: !!ET[e.t].fly }; if (BARKS[e.t]) bark('b_' + e.t, BARKS[e.t], 20000); } } else continue; }
+    if (!e.active) { if (rel < 900) { e.active = true; toughen(e); if (e.t === 'grunt' || e.t === 'gunner') bark('t800', 'T-800 incoming!', 40000); else if (BARKS[e.t] && !bigFoe(e)) bark('b_' + e.t, BARKS[e.t], 25000); if (!e.boss && bigFoe(e) && G.t - (G.lastAlert || -9) > 3.5) { G.lastAlert = G.t; G.alert = { t: 2.4, txt: (ET[e.t].name || '').toUpperCase() + ' INCOMING', fly: !!ET[e.t].fly }; if (BARKS[e.t]) bark('b_' + e.t, BARKS[e.t], 20000); } } else continue; }
     if (e.t === 'gunner' && e.hp < e.max * .6 && Math.random() < dw * 5) { const q1 = P(e.x, rel); pushPart({ x: q1.x + rnd(-3, 3), y: q1.y - 48 * q1.s, vx: rnd(-8, 8), vy: -28, life: .8, max: .8, col: '#2a2f38', r: 3, g: -18 }); }
     if (e.crash !== undefined || e.rise !== undefined) { // an EMP'd flyer drops out of the sky and blows up on impact
       if (e.crash !== undefined) {
@@ -1233,11 +1257,15 @@ function update(dt) {
       if (e.stunRel !== undefined) e.wz = G.dist + e.stunRel;   // units that hold station against the squad stay put relative to it while the world scrolls
       continue;
     }
+    if (e.t === 't1000') { // the shape-shifter alternates between a fast blade stance and slow bullet-proof chrome
+      e.ft = (e.ft === undefined ? 2.5 : e.ft) - dw; if (!e.form) e.form = 'blade';
+      if (e.ft <= 0) { e.form = e.form === 'blade' ? 'chrome' : 'blade'; e.ft = e.form === 'chrome' ? 5 : 4; const qm = P(e.x, rel); addSparks(qm.x, qm.y - 40 * qm.s, 16, qm.y, true); addLight(qm.x, qm.y - 40 * qm.s, 70 * qm.s + 20, 'rgba(220,235,255,', .35); addText(qm.x, qm.y - 90 * qm.s, e.form === 'chrome' ? 'CHROME: BULLETS WON\'T WORK' : 'BLADE', '#dbe8ff'); sfx.ping(); }
+    }
     // movement: Endos never run - they advance at a slow, deliberate pace
     let rolling = false;   // tracked vehicles may only change lane while they are actually driving forward
     if (d.hold && rel <= d.hold) {
       if (!d.block) e.wz = G.dist + d.hold;
-    } else { e.wz -= d.spd * dw * (e.noT ? .5 : 1) * (e.gl === 2 ? .55 : e.gl === 1 ? .8 : 1) * (e.armOff && !d.shoot ? .8 : 1); rolling = true; }
+    } else { e.wz -= d.spd * dw * (e.t === 't1000' && e.form === 'chrome' ? .45 : 1) * (e.noT ? .5 : 1) * (e.gl === 2 ? .55 : e.gl === 1 ? .8 : 1) * (e.armOff && !d.shoot ? .8 : 1); rolling = true; }
     if (d.fly && rel <= d.hold + 50) { e.fph = (e.fph || 0) + dw; e.wz += (G.dist + d.hold + 45 * Math.sin(e.fph * .8 + e.id) - e.wz) * Math.min(1, dw * 4); }   // flyers ease into their hover bob instead of snapping to it   // own clock: it freezes with the machine and resumes exactly where it stopped
     if (gate && e.wz < gate.wz + 40) { e.wz = gate.wz + 40; rolling = false; }   // and never come through a gate before the squad has
     if (d.weave) {   // predictable slow weave
@@ -1251,10 +1279,17 @@ function update(dt) {
     if (!d.hold && !G.over && G.guard && !G.guard.dead && rel <= GZ + 6 && rel > GZ - 12 && Math.abs(e.x - G.gx) < d.hw + .13) { // melee machines slam into the unit first
       hurtGuard(1 + Math.floor(G.lv / 5)); e.dead = true; const gq = P(e.x, rel); addParts(gq.x, gq.y - 30 * gq.s, 8, '#9aa4ae', 160, .5); continue;
     }
+    if (d.stab && rel <= 8 && !G.over && Math.abs(e.x - G.px) < d.hw + squadHalf() * .9) { // blades: it cuts into the squad and is thrown back by the rush, then comes again
+      hurt(2 + Math.floor(G.lv / 6), (e.x - G.px) * LANE); e.wz = G.dist + 130; e.stun = Math.max(e.stun || 0, .7); e.stunT = G.t; e.stunRel = undefined; const qs = P(e.x, 0); addSparks(qs.x, qs.y - 40, 14, qs.y, true); continue;
+    }
     if (!d.hold && rel <= 6 && !G.over) {
       if (Math.abs(e.x - G.px) < d.hw + squadHalf() * .9) { hurt(1 + Math.floor(G.lv / 5), (e.x - G.px) * LANE); e.dead = true; addParts(P(e.x, 0).x, P(e.x, 0).y - 30, 8, '#9aa4ae', 160, .5); continue; }
     }
     if (rel < -60) { e.dead = true; continue; }
+    if (d.mines && !G.over && rel < 700 && rel > 120) { // minelayer: active proximity mines creep toward the squad
+      e.mnc = (e.mnc === undefined ? 1.2 : e.mnc) - dw;
+      if (e.mnc <= 0 && G.haz.filter(h => h.k === 'mine' && !h.dead).length < 6) { e.mnc = d.mines * rnd(.8, 1.3); G.haz.push({ k: 'mine', x: clamp(e.x + rnd(-.1, .1), -.85, .85), hw: .1, wz: e.wz - 30, len: 24, arm: .9, tick: 0, dead: false }); sfx.ping(); }
+    }
     // harvester grab: aim (tracks you) -> lock (marker freezes) -> slam -> recover
     if (d.grab && !e.noL && rel <= d.hold + 80 && !G.over) {
       let want = 0;
@@ -1285,6 +1320,7 @@ function update(dt) {
           const cnt = (e.t === 'ogre' ? 3 : 2) + Math.floor(G.n / 80);
           for (let i = 0; i < cnt; i++) { const m = mk('grunt', e.wz - 20 - i * 10, clamp(e.x + rnd(-.5, .5), -.8, .8), (1 + .2 * (G.lv - 1)) * G.assist); m.active = true; toughen(m); G.en.push(m); }
         }
+        if (d.mortar && !e.noR) { e.mrt = (e.mrt === undefined ? 4 : e.mrt) - dw; if (e.mrt <= 0) { e.mrt = e.enr ? 4.5 : 7; mortarRound(e); addText(W / 2, 150, 'MORTARS!', '#ff9a3a'); sfx.siren(); } }
         if ((e.t === 'ogre' || e.t === 'harvester') && e.enr && !e.noR) { // enraged ground bosses call down a barrage: weave through the gap while the markers burn
           if (e.sk2 === undefined) e.sk2 = 3; e.sk2 -= dw;
           if (e.sk2 <= 0) { strikeRound(e); e.sk2 = e.hp < e.max * .25 ? 5.5 : 8; addText(W / 2, 150, 'BARRAGE!', '#ff5a5a'); G.shake = Math.max(G.shake, 4); sfx.siren(); }
@@ -1308,6 +1344,11 @@ function update(dt) {
     const rel = h.wz - G.dist;
     if (h.dead || rel < -h.len || G.over) continue;
     const over = Math.abs(G.px - h.x) < h.hw + squadHalf() * .55;
+    if (h.k === 'mine') { // creeps toward the squad, arms, then goes off on proximity (shoot it, or step aside)
+      h.wz -= 26 * dt; h.x += clamp(G.px - h.x, -1, 1) * dt * .22; h.arm -= dt;
+      if (h.arm <= 0 && Math.abs(h.wz - G.dist) < 16 && Math.abs(G.px - h.x) < h.hw + squadHalf() * .5) detonateHaz(h, true);
+      continue;
+    }
     if (h.k === 'uxo') { if (Math.abs(rel) < 14 && over) detonateHaz(h, true); continue; }
   }
   G.haz = G.haz.filter(h => !h.dead && h.wz - G.dist > -120);
@@ -1490,7 +1531,7 @@ function showMenu() {
   ov(`<div class="panel"><h1>CYBER<br>NET ATTACK</h1>
     <p class="tag">Hold the line. Slay the machines.</p>
     <div class="sel"><button id="pv" ${lv <= 1 ? 'disabled' : ''}>◀</button>
-      <div>SECTOR ${lv}<br><small>${SECT[(lv - 1) % SECT.length]}</small><br><small style="color:#ffd24a">${'\u2605'.repeat(save.stars[lv] || 0)}${'\u2606'.repeat(3 - (save.stars[lv] || 0))}</small><br><small style="color:#ff9a7a">Boss: ${ET[['heavy', 'harvester', 'tank', 'gunship', 'ogre'][(lv - 1) % 5]].name}</small></div>
+      <div>SECTOR ${lv}<br><small>${SECT[(lv - 1) % SECT.length]}</small><br><small style="color:#ffd24a">${'\u2605'.repeat(save.stars[lv] || 0)}${'\u2606'.repeat(3 - (save.stars[lv] || 0))}</small><br><small style="color:#ff9a7a">Boss: ${ET[BOSS_KINDS[(lv - 1) % BOSS_KINDS.length]].name}</small></div>
       <button id="nxl" ${lv >= save.best ? 'disabled' : ''}>▶</button></div>
     <button class="big" id="play">DEPLOY</button>
     <button id="sq">Squad · ${save.loadout.length ? save.loadout.map(k => CLASS[k].name).join(', ') : 'riflemen only'}</button>
@@ -1815,6 +1856,7 @@ function drawSpr(name, x, y, s, o) { // o: head[hx,hz] | dir, flip(legacy side-a
     cx.save(); cx.beginPath(); if (f > 0) cx.rect(-w * .5, -h, w * .3, h); else cx.rect(w * .2, -h, w * .3, h); cx.clip();
     cx.globalAlpha = .26; cx.drawImage(tinted(fr, 'purple', 'rgb(170,110,255)'), -w * .5, -h, w, h); cx.restore();
   }
+  if (o.tint) { cx.globalAlpha = o.tint[2]; cx.drawImage(tinted(fr, o.tint[0], o.tint[1]), -w * .5, -h, w, h); cx.globalAlpha = 1; }   // placeholder look for units that share another unit's art until they have their own sheet
   if (o.flash) { cx.globalAlpha = Math.min(.9, o.flash); cx.drawImage(tinted(fr, 'white', '#ffffff'), -w * .5, -h, w, h); }
   cx.restore();
   return { key: pv.key, flip: f, frames: nf, muz: pv.rec.muz, lights: pv.rec.lights, vents: pv.rec.vents };
@@ -1848,8 +1890,9 @@ function bossSize(e, d, base) { // boss health: sized to the squad's firepower, 
   return Math.min(Math.max(base * .25, byDps), Math.max(cap, byDps)) * G.assist;
 }
 function toughen(e) { // Endos are built to take a beating: when one comes within reach its armour is sized to the squad's firepower, so a pack always takes a few seconds to cut down
-  if (e.tough || (e.t !== 'grunt' && e.t !== 'gunner')) return; e.tough = true;
-  const f = e.t === 'gunner' ? .6 : .3, hp = Math.max(e.max, squadDps() * f) * G.assist;
+  const TF = { grunt: .3, gunner: .6, t700: .9, t400: .12, t1000: 1.4 };
+  if (e.tough || !TF[e.t]) return; e.tough = true;
+  const f = TF[e.t], hp = Math.max(e.max, squadDps() * f) * G.assist;
   e.hp = e.max = hp;
 }
 function bodyPoint(e, q, ss, k) { // a spot on the boss's solid body (screen coords)
@@ -2012,6 +2055,8 @@ const EDRAW = {   // sprite, walk-cycle speed / sway, spotlight beams [spread, l
   grunt: { spr: 't800', walk: 1, amp: 1 }, gunner: { spr: 't800_minigun', walk: 1, amp: .7 }, runner: { spr: 't800_crawler', walk: .5, amp: .8 },
   harvester: { spr: 'harvester', walk: .5, amp: .35 }, behemoth: { spr: 't1', walk: 2, amp: .18, beam: [.14, 130, 16, .22] },
   gunship: { spr: 'hk_aerial', fly: 1, laser: '90,235,255' }, aerostat: { spr: 'aerostat', fly: 1 }, heavy: { spr: 't47', walk: 1, amp: .55 },
+  t700: { spr: 't800_minigun', walk: 1, amp: .6, tint: ['t7', '#5a6270', .4] }, t1000: { spr: 't800_infiltrator', walk: 1.3, amp: .8 }, drone: { spr: 'aerostat', fly: 1, tint: ['dr', '#c8ffd0', .25] },
+  minelayer: { spr: 'hk_tank', walk: 2.5, amp: .2, tint: ['ml', '#6a7a3a', .3] }, t400: { spr: 't800', walk: .8, amp: 1, tint: ['rs', '#9a5a22', .5] }, centurion: { spr: 't47', walk: .6, amp: .25, tint: ['ce', '#8a2a2a', .3], beam: [.16, 140, 22, .24] },
   tank: { spr: 'hk_tank', walk: 2.5, amp: .2, beam: [.12, 120, 24, .24], laser: '255,70,50' }, ogre: { spr: 'ogre', walk: .9, amp: .12, beam: [.16, 140, 22, .24] },
 };
 function drawLaser(e, q, ss, rgb, rel) { // a target designator: the line sharpens as the volley comes
@@ -2036,11 +2081,14 @@ function drawEnemy(e) {
   if (!nm) return;
   let lift = 0;
   if (e.t === 'gunship') lift = (120 + Math.sin(a * .35) * 3) * lk;   // a big gunship (about the length of a heavy pickup truck) hovering well overhead
-  else if (e.t === 'aerostat') lift = (22 + Math.sin(G.t * 3.5 + e.id) * 3) * lk;   // a drone about the size of a person's torso, hovering at chest height
+  else if (e.t === 'aerostat') lift = (22 + Math.sin(G.t * 3.5 + e.id) * 3) * lk;
+  else if (e.t === 'drone') lift = (14 + Math.sin(G.t * 7 + e.id) * 2) * lk;   // a drone about the size of a person's torso, hovering at chest height
   const o = { flip: face, flash: F };
   if (V.walk) { o.walk = a * V.walk; o.amp = V.amp; }
+  if (V.tint) o.tint = V.tint;
+  if (e.t === 't1000') { const ch = e.form === 'chrome'; nm = ch ? 't800_infiltrator' : 't800'; o.tint = ['t1k', ch ? '#e4f0ff' : '#aebccc', ch ? .6 + .15 * Math.sin(G.t * 6) : .4]; o.walk = a * (ch ? .8 : 2.2); o.amp = ch ? .5 : 1.1; o.rim = false; }   // placeholder: liquid-metal silver over the endoskeleton / T-800 art
   if (V.fly) { o.lift = lift; o.lean = tilt; }
-  if (e.t === 'aerostat') o.shadow = false;
+  if (e.t === 'aerostat' || e.t === 'drone') o.shadow = false;
   if (D(nm, o)) {
     sh = SPR[nm].h + (e.t === 'gunship' ? 120 : e.t === 'aerostat' ? 22 : 0);
     if (e.t === 'aerostat') { cx.fillStyle = 'rgba(0,0,0,.22)'; cx.beginPath(); cx.ellipse(q.x, q.y, 9 * ss, 2.8 * ss, 0, 0, 7); cx.fill(); }
@@ -2052,13 +2100,13 @@ function drawEnemy(e) {
   if (G.snTg === e && !e.dead) { const ry = q.y - (HITH[e.t] || 40) * ss * 1.1, rr = 13 * ss + 5, pl = .6 + .4 * Math.sin(G.t * 9); cx.strokeStyle = `rgba(255,140,200,${.5 + .4 * pl})`; cx.lineWidth = Math.max(1.2, 1.6 * s); cx.beginPath(); cx.arc(q.x, ry, rr, 0, 7); cx.moveTo(q.x - rr * 1.4, ry); cx.lineTo(q.x - rr * .5, ry); cx.moveTo(q.x + rr * .5, ry); cx.lineTo(q.x + rr * 1.4, ry); cx.moveTo(q.x, ry - rr * 1.4); cx.lineTo(q.x, ry - rr * .5); cx.moveTo(q.x, ry + rr * .5); cx.lineTo(q.x, ry + rr * 1.4); cx.stroke(); }
   if (e.stun > 0 || (e.boss && e.gl && Math.sin(G.t * 3.1 + e.id * 7) + Math.sin(G.t * 7.7 + e.id) > (e.gl === 2 ? -.6 : 1.1))) drawStun(e, q, ss, sh);   // a failing boss throws blue electrical arcs
   e.sh0 = sh || { heavy: 150, tank: 100, gunship: 160, harvester: 200, ogre: 165 }[e.t] || 120;
-  if (e.boss || ET[e.t].block || ET[e.t].fly || ET[e.t].tracked) drawDamageFX(e, q, ss, sh);   // every big machine, flyers included, smoulders then burns as it is shot up
+  if ((e.boss || ET[e.t].block || ET[e.t].fly || ET[e.t].tracked) && !ET[e.t].swarm) drawDamageFX(e, q, ss, sh);   // every big machine, flyers included, smoulders then burns as it is shot up
   if (e.plateMax && e.plate > 0) { // front plating: a curved shield on the face the squad is shooting at
     const m = sh ? [sh * .58, sprW({ heavy: 't47', harvester: 'harvester', ogre: 'ogre' }[e.t] || 't47', 1) * .3, sh * .34] : ({ heavy: [85, 42, 46], harvester: [100, 36, 72] }[e.t] || [60, 30, 40]), fr = e.plate / e.plateMax, hit = (e.plateHit || 9) < .15;
     cx.strokeStyle = `rgba(120,225,255,${.12 + .12 * fr + (hit ? .55 : 0)})`; cx.lineWidth = Math.max(1.2, (hit ? 3 : 1.6) * s); cx.fillStyle = `rgba(110,210,255,${hit ? .12 : 0})`;
     cx.beginPath(); cx.ellipse(q.x, q.y - m[0] * ss, m[1] * ss, m[2] * ss, 0, 0, 7); cx.fill(); cx.stroke();
   }
-  if ((ET[e.t].block || ET[e.t].fly) && !e.boss && (e.hp < e.max || (e.plateMax && e.plate < e.plateMax))) {
+  if ((ET[e.t].block || ET[e.t].fly || ET[e.t].show) && !ET[e.t].swarm && !e.boss && (e.hp < e.max || (e.plateMax && e.plate < e.plateMax))) {
     const hgt = (sh || { heavy: 150, tank: 100, aerostat: 100, gunship: 160, behemoth: 108, harvester: 200 }[e.t]) * ss + 8, w = 60 * ss, bh = 5 * Math.max(.6, s);
     cx.fillStyle = '#300'; cx.fillRect(q.x - w / 2, q.y - hgt, w, bh);
     cx.fillStyle = '#ff3b3b'; cx.fillRect(q.x - w / 2, q.y - hgt, w * Math.max(0, e.hp / e.max), bh);
@@ -2235,6 +2283,12 @@ function drawDecor(d) {
 
 function drawHaz(h) {
   const rel = h.wz - G.dist, q = P(h.x, rel), s = q.s;
+  if (h.k === 'mine') { // a plasma mine: a flat disc with a pulsing blue core, brighter once armed
+    const on = h.arm <= 0, pl = .5 + .5 * Math.sin(G.t * (on ? 12 : 5) + h.x * 7);
+    cx.save(); cx.translate(q.x, q.y); cx.fillStyle = 'rgba(0,0,0,.35)'; cx.beginPath(); cx.ellipse(0, 0, 13 * s * 1.3, 4 * s * 1.3, 0, 0, 7); cx.fill();
+    cx.fillStyle = '#2b323b'; cx.beginPath(); cx.ellipse(0, -3 * s * 1.3, 11 * s * 1.3, 4.2 * s * 1.3, 0, 0, 7); cx.fill(); cx.fillStyle = '#4d5866'; cx.beginPath(); cx.ellipse(0, -5 * s * 1.3, 9 * s * 1.3, 3 * s * 1.3, 0, 0, 7); cx.fill();
+    cx.globalCompositeOperation = 'lighter'; glow(0, -5 * s * 1.3, (on ? 2.6 : 1.6) * s * 1.3 * (.7 + .5 * pl), on ? '#7ad0ff' : '#3a6a9a'); cx.restore(); return;
+  }
   if (h.k === 'uxo') {
     cx.save(); cx.translate(q.x, q.y); cx.scale(s * 1.3, s * 1.3);
     shadow(14); cx.rotate(-.3);

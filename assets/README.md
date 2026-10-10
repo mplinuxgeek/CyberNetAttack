@@ -24,8 +24,9 @@ hk_tank, t1, hk_aerial, aerostat, t47, harvester, ogre.
 ## Placeholder sprites (art still needed)
 New classes reuse existing soldiers until they get their own sheets: GRENADIER uses `resistance_heavy`, TECH-COM HACKER `resistance_tech`,
 SCOUT SNIPER `resistance_goggles`, DEMOLITIONS `resistance_captain`; FIELD MEDIC wants `resistance_medic`. To give one its own look,
-drop the unit folder in and change `spr` in `CLASS` (game.js). Phase 3 enemies (T-1000, T-700, HK-Centurion, HK-Drone Scout,
-Hunter-Killer Minelayer, T-400) are not in the game yet: they need sprite sheets first (see ROADMAP.md).
+drop the unit folder in and change `spr` in `CLASS` (game.js). Phase 3 enemies use placeholders until their sheets exist (unit folder name to add, then change `EDRAW` in game.js): T-700 (`t800_minigun`, tinted),
+T-1000 (`t800` blade / `t800_infiltrator` chrome, silver tint), HK Scout Drone (`aerostat`, small), HK Minelayer (`hk_tank`, tinted),
+T-400 (`t800`, rust tint), HK-Centurion (`t47`, red tint, boss scale 2.5). Suggested folders: t700, t1000 (blade + chrome sets), hk_drone, hk_minelayer, t400, hk_centurion.
 
 ## Adding art
 1. Generate a sheet (prompts: `docs/prompt_builder.html`), flat fuchsia background.
