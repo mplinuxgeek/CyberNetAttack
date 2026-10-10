@@ -30,7 +30,7 @@ if (args.includes('--help') || args.includes('-h')) {
   --up L           begin with every upgrade at level L (to test a late sector)
   --attempts N     tries per sector before buying upgrades (default 3)
   --time S         optional wall-clock budget in seconds (default: none, runs until the cap; Ctrl+C to stop)
-  --level-time S   give up on one attempt after S simulated seconds (default 480; raise it for very high sectors)
+  --level-time S   give up on one attempt after S simulated seconds (default 900; raise it for very high sectors)
   --seed N         random seed (default 11)
   --form F         free | v | col | wall (default v)
   --assist         keep the game's "machines get weaker after a loss" help (off by default)
@@ -42,7 +42,7 @@ for (const a of args) if (a.startsWith('--')) { const k = ALIAS[a.slice(2)] || a
 if (args.includes('--watch')) { Object.assign(global, REAL); require('../tools/watch.js')(args); return; }   // the same bot, drawn in a Chrome window
 const opt = (k, d) => { let i = args.indexOf('--' + k); if (i < 0) for (const a in ALIAS) if (ALIAS[a] === k && args.indexOf('--' + a) >= 0) i = args.indexOf('--' + a); return i < 0 ? d : (typeof d === 'boolean' ? true : +args[i + 1]); };
 const WHY = opt('why', false), MAXLV = opt('max-sector', 100), ATT = opt('attempts', 3), BUDGET = opt('time', 0) > 0 ? opt('time', 0) * 1000 : Infinity, ASSIST = opt('assist', false);
-const LEVELT = opt('level-time', 480);
+const LEVELT = opt('level-time', 900);
 const FORM = (args.indexOf('--form') >= 0 ? args[args.indexOf('--form') + 1] : 'v');
 let seed = opt('seed', 11); Math.random = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;
 
@@ -58,7 +58,7 @@ const pilot = bot.pilot, useItems = bot.useItems; let DBG = ''; const dbgNow = (
 
 // ------------------------------------------------------------------ one attempt at a sector
 const ORDER = Object.keys(t.UPS);   // every upgrade path, in the Armory's order
-const ABBR = { squad: 'Sq', dmg: 'Dm', rate: 'Fr', weapon: 'Wp', guard: 'Gu', emp: 'Or', plate: 'Pl', rein: 'Rn', gate: 'Gi', crit: 'Mk', cache: 'Qm' };
+const ABBR = { squad: 'Sq', dmg: 'Dm', rate: 'Fr', weapon: 'Wp', guard: 'Gu', emp: 'Or', plate: 'Pl', rein: 'Rn', gate: 'Gi', crit: 'Mk', cache: 'Qm', breaker: 'Bb', orbital: 'Ou', overdrive: 'Od' };
 let STOP = false;   // Ctrl+C: finish up, print the summary (a second Ctrl+C quits at once)
 process.on('SIGINT', () => { if (STOP) process.exit(130); STOP = true; console.log('\n^C: stopping, summary follows (press Ctrl+C again to quit immediately)...'); });
 const tick = () => new Promise(r => setImmediate(r));   // the simulation is synchronous: yielding now and then is what lets Ctrl+C be heard

@@ -37,17 +37,21 @@ function applyCRT() { const w = document.getElementById('wrap'); if (w && w.clas
 function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} }
 
 // ---------------------------------------------------------------- data
+const DMG_K = .12, RATE_K = .08, CRIT_K = .06, GATE_K = .08, SQUAD_K = 3, SIZE_DISCOUNT = .6;   // per-level strength of the Armory upgrades
 const UPS = {
-  squad:  { name: 'Squad Size',      desc: '+2 starting fighters',          max: 25, cost: l => Math.round(50 * Math.pow(1.3, l)) },
-  dmg:    { name: 'Damage',          desc: '+10% weapon damage',            max: 30, cost: l => Math.round(70 * Math.pow(1.3, l)) },
-  rate:   { name: 'Fire Rate',       desc: '+6% fire rate',                 max: 30, cost: l => Math.round(70 * Math.pow(1.3, l)) },
+  squad:  { name: 'Squad Size',      desc: '+3 starting fighters',          max: 25, cost: l => Math.round(50 * Math.pow(1.3, l)) },
+  dmg:    { name: 'Damage',          desc: '+12% weapon damage',            max: 40, cost: l => Math.round(70 * Math.pow(1.3, l)) },
+  rate:   { name: 'Fire Rate',       desc: '+8% fire rate',                 max: 40, cost: l => Math.round(70 * Math.pow(1.3, l)) },
   weapon: { name: 'Starting Weapon', desc: 'Begin each run with a better gun. Max tier: Pulse-Plasma Rifle (40kW Output)', max: 4, cost: l => [200, 500, 1100, 2200][l] },
   guard:  { name: 'Reprogrammed Unit', desc: '+25% alloy plating on the infiltrator unit leading your squad', max: 15, cost: l => Math.round(80 * Math.pow(1.3, l)) },
-  emp:    { name: 'Tactical Ordnance', desc: '+20% special-item power, supply crates drop more often', max: 15, cost: l => Math.round(90 * Math.pow(1.3, l)) },
-  plate:  { name: 'Reactive Plating', desc: 'Start every sector with plates that each block one hit', max: 12, cost: l => Math.round(120 * Math.pow(1.35, l)) },
+  emp:    { name: 'Tactical Ordnance', desc: '+30% special-item power, supply crates drop more often', max: 15, cost: l => Math.round(90 * Math.pow(1.3, l)) },
+  plate:  { name: 'Reactive Plating', desc: 'Start every sector with 2 hit-blocking plates per level', max: 12, cost: l => Math.round(120 * Math.pow(1.35, l)) },
   rein:   { name: 'Field Reinforcements', desc: 'Fallen soldiers are replaced by reserves, faster with each level', max: 10, cost: l => Math.round(100 * Math.pow(1.4, l)) },
-  gate:   { name: 'Gate Intel', desc: 'Good gates give 5% more, bad gates take 5% less', max: 10, cost: l => Math.round(90 * Math.pow(1.4, l)) },
-  crit:   { name: 'Marksmanship', desc: '+4% chance per level that a round lands for 2.5x damage', max: 10, cost: l => Math.round(110 * Math.pow(1.4, l)) },
+  gate:   { name: 'Gate Intel', desc: 'Good gates give 8% more, bad gates take 8% less', max: 10, cost: l => Math.round(90 * Math.pow(1.4, l)) },
+  crit:   { name: 'Marksmanship', desc: '+6% chance per level that a round lands for 2.5x damage', max: 10, cost: l => Math.round(110 * Math.pow(1.4, l)) },
+  breaker:{ name: 'Boss Breaker', desc: '+6% damage per level against bosses and big machines (machines do not scale up to match it)', max: 25, cost: l => Math.round(150 * Math.pow(1.3, l)) },
+  orbital:{ name: 'Orbital Uplink', desc: 'Automatic orbital strikes on the machines ahead: a share of their health, more targets and faster with each level', max: 20, cost: l => Math.round(200 * Math.pow(1.33, l)) },
+  overdrive:{ name: 'Overdrive Cells', desc: 'OVERDRIVE (fire rate x1.8) switches itself on regularly, for longer and more often with each level', max: 15, cost: l => Math.round(180 * Math.pow(1.35, l)) },
   cache:  { name: 'Quartermaster', desc: 'Start every sector with a better special item', max: 8, cost: l => Math.round(150 * Math.pow(1.5, l)) },
 };
 const U = k => save.up[k] | 0;   // upgrade level, tolerant of older saves and test harness saves
@@ -102,7 +106,7 @@ const formK = () => FORMS[(G && G.form) || 'free'] || FORMS.free;
 const CLS = Object.keys(CLASS);        // display / sprite order
 const MAXPICK = 3;
 const SQUAD_CONE = .22;   // how far off its own line (in lane widths) a squad round will curve toward a machine
-const classStart = () => Math.max(2, Math.round((6 + 2 * save.up.squad) * .15));   // soldiers each picked class starts with: 2, growing with Squad Size upgrades
+const classStart = () => Math.max(2, Math.round((6 + SQUAD_K * save.up.squad) * .15));   // soldiers each picked class starts with: 2, growing with Squad Size upgrades
 function sanitizeSave() { // a hand-edited, corrupted or older save can never break the game: every field is clamped to what is legal
   const n = (v, lo, hi, d) => Number.isFinite(+v) ? Math.min(hi, Math.max(lo, Math.floor(+v))) : d;
   if (!save.up || typeof save.up !== 'object') save.up = {}; if (!save.paid || typeof save.paid !== 'object') save.paid = {}; if (!save.fails || typeof save.fails !== 'object') save.fails = {}; if (!save.stars || typeof save.stars !== 'object') save.stars = {};
@@ -459,11 +463,11 @@ function startLevel(lv, opt) {
   G = {
     lv, L: lvl.L, gates: lvl.gates, en: lvl.en, assist,
     dist: 0, spd: 0, px: 0, tx: 0,
-    n: 6 + 2 * save.up.squad, tier: save.up.weapon, rateG: 1, dmgG: 1,
+    n: 6 + SQUAD_K * save.up.squad, tier: save.up.weapon, rateG: 1, dmgG: 1,
     fcd: .3, bullets: [], bolts: [], parts: [], texts: [],
-    form: save.form, scrap: 0, kills: 0, item: { k: QM[U('cache')][0], n: QM[U('cache')][1] }, shield: U('plate'), reinT: 0, c4: [], flares: [], fallout: [], nukes: [], beam: null, shake: 0, flash: 0, hurtFlash: 0,
+    form: save.form, scrap: 0, kills: 0, item: { k: QM[U('cache')][0], n: QM[U('cache')][1] }, shield: 2 * U('plate'), reinT: 0, c4: [], flares: [], fallout: [], nukes: [], uplinks: [], beam: null, shake: 0, flash: 0, hurtFlash: 0,
     guard: null, gx: 0, pups: [], pupPlan: lvl.pups.map(p => ({ k: p.k, x: p.x, wz: p.wz, done: false })),
-    cls: Object.fromEntries(CLS.map(k => [k, 0])), sig: 7, scr: [], haz: lvl.haz, obs: lvl.obs, slow: 1, env: ENVS[SECT[(lv - 1) % SECT.length]] || null, dk: 0, rn: 0, storm: 0, rockets: [], strikes: [], lt: [], warn: null, mz: 0, rcd: 2, peak: 6 + 2 * save.up.squad,
+    cls: Object.fromEntries(CLS.map(k => [k, 0])), sig: 7, scr: [], haz: lvl.haz, obs: lvl.obs, slow: 1, env: ENVS[SECT[(lv - 1) % SECT.length]] || null, dk: 0, rn: 0, storm: 0, rockets: [], strikes: [], lt: [], warn: null, mz: 0, rcd: 2, peak: 6 + SQUAD_K * save.up.squad,
     ts: 1, t: 0, later: [], deaths: [], waves: [], alert: null, over: false, won: false, endT: 0, paused: false,
   };
   for (const k of save.loadout) { if (!CLASS[k] || !save.unlocked[k]) continue; const c0 = classStart(); G.cls[k] = c0; G.n += c0; G.peak += c0; }
@@ -549,7 +553,7 @@ const ITEMS = {
   cannon: { name: 'M-25 PLASMA CANNON', g: 'M25', col: '#c86bff', n: 1, w: 2, desc: 'piercing beam down the lane' },
   nuke:   { name: 'M-38 MINI-NUKE',     g: 'M38', col: '#ffe24a', n: 1, w: 1, desc: 'fired at the thickest group ahead; wipes out everything near the impact' },
 };
-const ipow = () => 1 + .2 * save.up.emp;
+const ipow = () => 1 + .3 * save.up.emp;
 function rollItem(lv) {
   const ks = Object.keys(ITEMS).filter(k => k !== 'nuke' || lv >= 4); let r = Math.random() * ks.reduce((a, k) => a + ITEMS[k].w, 0);
   for (const k of ks) { r -= ITEMS[k].w; if (r <= 0) return k; }
@@ -654,6 +658,7 @@ let SURE_BLAST = false;   // grenade splash: endoskeletons killed by it always c
 function hurtEnemy(e, dmg, o) { // front plating soaks fire first; flanking (squad well off to one side) bypasses it
   o = o || {};
   if (bossShielded(e)) return 'plate';   // shots glance off until the pre-boss is destroyed
+  if (U('breaker') && (bigFoe(e) || e.boss)) dmg *= 1 + .06 * U('breaker');   // not part of the firepower that bosses are sized to
   const chrome = e.t === 't1000' && e.form === 'chrome', ballistic = chrome && !o.plasma && !o.explosive;
   if (chrome) dmg *= o.plasma ? 1.5 : o.explosive ? .6 : .05;   // chrome form soaks bullets; plasma and blasts get through
   if (e.cp) { const cp = partFor(e, o); if (cp) { cp.fr -= dmg / (e.max * .12); cp.hit = .15; if (cp.fr <= 0) breakPart(e, cp); dmg *= .5; } }   // a subsystem soaks the hit first; half of it still reaches the hull
@@ -770,6 +775,8 @@ function empStep(dt) {
   if (G.beam) { G.beam.t -= dt; if (G.beam.t <= 0) G.beam = null; }
   for (const n of G.nukes) { n.wz += 900 * dt; n.x += (n.tx - n.x) * Math.min(1, dt * 2.5); if (n.wz >= n.tz) { n.dead = true; nukeBlast(n.tx, n.tz); } else if (G.parts.length < 400 && Math.random() < .8) { const q = P(n.x, n.wz - G.dist); pushPart({ x: q.x + rnd(-2, 2), y: q.y - 36 * q.s, vx: rnd(-8, 8), vy: rnd(-6, 6), life: .6, max: .6, col: Math.random() < .5 ? '#d0d6dc' : '#ffb02e', r: 3, g: -10 }); } }
   if (G.nukes.length) G.nukes = G.nukes.filter(n => !n.dead);
+  for (const u of G.uplinks) u.t -= dt;
+  if (G.uplinks.length) G.uplinks = G.uplinks.filter(u => u.t > 0);
   for (const f of G.flares) f.life -= dt;
   if (G.flares.length) G.flares = G.flares.filter(f => f.life > 0);
 }
@@ -920,10 +927,10 @@ function applyGateOpt(o, bonus) {
   const q = squadPos(), yy = q.y - 90 - (bonus ? 22 : 0);
   if (o.k === 'add') {
     const v = Math.floor(o.v);
-    if (v >= 0) { const gv = Math.round(v * (1 + .05 * U('gate'))); G.n = Math.min(999, G.n + gv); G.peak = Math.max(G.peak, G.n); sfx.gate(); addText(q.x, yy, '+' + gv, '#6fb5ff'); }
-    else { const pen = Math.round(v * (1 - .05 * U('gate'))) - Math.floor(G.n * .1 * (1 - .05 * U('gate'))); G.n += pen; trimClasses(); buzz([100, 40, 100]); sfx.bad(); addText(q.x, yy, String(pen), '#ff5a5a'); G.shake = 5; checkLost(); }
+    if (v >= 0) { const gv = Math.round(v * (1 + GATE_K * U('gate'))); G.n = Math.min(999, G.n + gv); G.peak = Math.max(G.peak, G.n); sfx.gate(); addText(q.x, yy, '+' + gv, '#6fb5ff'); }
+    else { const pen = Math.round(v * (1 - GATE_K * U('gate'))) - Math.floor(G.n * .1 * (1 - GATE_K * U('gate'))); G.n += pen; trimClasses(); buzz([100, 40, 100]); sfx.bad(); addText(q.x, yy, String(pen), '#ff5a5a'); G.shake = 5; checkLost(); }
   } else if (o.k === 'mul') {
-    G.n = Math.min(999, Math.round(G.n * o.v * (1 + .03 * U('gate')))); G.peak = Math.max(G.peak, G.n); sfx.gate(); addText(q.x, yy, '×' + o.v, '#4dffa0');
+    G.n = Math.min(999, Math.round(G.n * o.v * (1 + GATE_K * .6 * U('gate')))); G.peak = Math.max(G.peak, G.n); sfx.gate(); addText(q.x, yy, '×' + o.v, '#4dffa0');
   } else if (o.k === 'wpn') {
     if (G.tier < 5) { G.tier++; addText(q.x, yy, WEAPONS[G.tier].name.toUpperCase(), '#ffd24a'); }
     else { G.n = Math.min(999, G.n + 8); G.peak = Math.max(G.peak, G.n); addText(q.x, yy, '+8', '#6fb5ff'); }
@@ -940,14 +947,16 @@ function applyGate(g) {
   if (G.cls.tech > 0 && Math.abs(g.px) < .05 * G.cls.tech && gateGood(g[other])) applyGateOpt(g[other], true); // tech operatives widen gate collection
 }
 
+const upMul = () => (1 + DMG_K * U('dmg')) * (1 + RATE_K * U('rate')) * (1 + CRIT_K * 1.5 * U('crit'));
+const sizeDps = () => squadDps() / Math.pow(upMul(), SIZE_DISCOUNT);   // machines are sized to the squad's firepower, but only 40% of what the Damage / Fire Rate / Marksmanship upgrades add: those upgrades really shorten fights
 function squadDps() {
   const w = WEAPONS[G.tier];
-  const base = w.dmg * (1 + .1 * save.up.dmg) * G.dmgG, total = base * (1 + Math.min(G.n, 60) * .35 + Math.max(0, G.n - 60) * .1);
+  const base = w.dmg * (1 + DMG_K * save.up.dmg) * G.dmgG, total = base * (1 + Math.min(G.n, 60) * .35 + Math.max(0, G.n - 60) * .1);
   const extra = Math.min(4, G.cls.mark) * 2.6 * base + Math.min(18, 3 * G.cls.shot) * .55 * base * Math.max(1, Math.min(2.5, 1 + G.n / 40)) * .6;   // marksman rounds + shotgun pellets (bosses hold at pellet range, so ~60%)
-  const rate = (1 + .06 * save.up.rate) * G.rateG * (1 + Math.min(.3, .05 * G.cls.officer));
-  const strike = G.cls.signal > 0 ? 90 * (1 + .1 * save.up.dmg) * G.dmgG * (1 + .25 * Math.min(4, G.cls.signal)) / Math.max(7, 16 - 2 * G.cls.signal) : 0;   // air strike dps on one target
-  const gr = G.cls.gren > 0 ? Math.min(4, G.cls.gren) * 55 * (1 + .1 * save.up.dmg) * G.dmgG * rate / 1.7 : 0, sn = G.cls.sniper > 0 ? Math.min(4, G.cls.sniper) * base * 3.2 * rate / 1.5 : 0;
-  return ((total + extra) / (w.int / rate) + strike + gr + sn) * (1 + .06 * U('crit'));
+  const rate = (1 + RATE_K * save.up.rate) * G.rateG * (1 + Math.min(.3, .05 * G.cls.officer));
+  const strike = G.cls.signal > 0 ? 90 * (1 + DMG_K * save.up.dmg) * G.dmgG * (1 + .25 * Math.min(4, G.cls.signal)) / Math.max(7, 16 - 2 * G.cls.signal) : 0;   // air strike dps on one target
+  const gr = G.cls.gren > 0 ? Math.min(4, G.cls.gren) * 55 * (1 + DMG_K * save.up.dmg) * G.dmgG * rate / 1.7 : 0, sn = G.cls.sniper > 0 ? Math.min(4, G.cls.sniper) * base * 3.2 * rate / 1.5 : 0;
+  return ((total + extra) / (w.int / rate) + strike + gr + sn) * (1 + CRIT_K * 1.5 * U('crit'));
 }
 
 function aimTarget(x0, zo, cone, pick) { // a machine ahead of a shooter, inside a diagonal cone (default wide; the squad uses a narrow one so steering still matters)
@@ -970,15 +979,15 @@ function pushShot(b, src, zo) { // every fighter fires on his own clock: each ro
 }
 function volley() {
   const w = WEAPONS[G.tier], B = clamp(1 + Math.floor(G.n / 7), 1, 8);
-  const total = w.dmg * (1 + .1 * save.up.dmg) * G.dmgG * (1 + Math.min(G.n, 60) * .35 + Math.max(0, G.n - 60) * .1);
+  const total = w.dmg * (1 + DMG_K * save.up.dmg) * G.dmgG * (1 + Math.min(G.n, 60) * .35 + Math.max(0, G.n - 60) * .1);
   const each = total / B;
   const shown = Math.min(G.n, 40);
   for (let i = 0; i < B; i++) {
     const k = Math.floor(Math.random() * shown), sl = slotOf(k, shown), ox = sl.ox, zo = sl.oz + 7;   // a random fighter of the formation takes this shot, from his own spot (rounds leave from where he stands, not from the squad's centre)
     const x = clamp(G.px + ox + rnd(-w.spread, w.spread), -.95, .95);
-    pushShot({ x, dmg: each * (Math.random() < .04 * U('crit') ? 2.5 : 1), w, hit: [], vx: 0, tg: aimTarget(x, zo, SQUAD_CONE * formK().cone, true) }, 'px', zo);   // soldiers lean their shots toward a machine just off their line, but still have to be steered at the rest
+    pushShot({ x, dmg: each * (Math.random() < CRIT_K * U('crit') ? 2.5 : 1), w, hit: [], vx: 0, tg: aimTarget(x, zo, SQUAD_CONE * formK().cone, true) }, 'px', zo);   // soldiers lean their shots toward a machine just off their line, but still have to be steered at the rest
   }
-  const base = w.dmg * (1 + .1 * save.up.dmg) * G.dmgG;
+  const base = w.dmg * (1 + DMG_K * save.up.dmg) * G.dmgG;
   const fz = frontZ();   // specialists fire from the front rank
   if (G.cls.shot > 0) { // shotgunners: a spread of short-range pellets, brutal up close
     const np = Math.min(18, 3 * G.cls.shot), pw = { name: 'pellet', pierce: false, splash: 0, col: '#ffd27a', spread: 0 };
@@ -1020,10 +1029,19 @@ function detonateHaz(h, hitsSquad) {
   explodeAt(h.x, h.wz, 90, null);
   if (hitsSquad && !G.over) hurt(2 + LS(4, 6), 0);
 }
+function uplink() { // orbital uplink: strikes the nearest machines for a share of their health (so it keeps up with sector tiers)
+  const lv = U('orbital'), n = 2 + Math.floor(lv / 5), pct = .01 + .0015 * lv;
+  const t = G.en.filter(e => !e.dead && e.wz - G.dist > 80 && e.wz - G.dist < 750 && !bossShielded(e)).sort((a, b) => a.wz - b.wz).slice(0, n);
+  if (!t.length) return false;
+  t.forEach((e, i) => G.later.push({ t: i * .14, f: () => { if (e.dead) return; hurtEnemy(e, e.max * pct * (e.boss ? .5 : 1) + 60 * lv, { ignoreArmor: true, plateMul: 1, explosive: true }); G.uplinks.push({ x: e.x, wz: e.wz, t: .4 }); const q = P(e.x, e.wz - G.dist); addSparks(q.x, q.y - 40 * q.s, 12, q.y, true); addParts(q.x, q.y - 30 * q.s, 10, '#bff', 220, .5); sfx.boom(); if (e.hp <= 0) kill(e); } }));
+  addText(W / 2, 330, 'ORBITAL UPLINK', '#9ff'); G.shake = Math.max(G.shake, 3); sfx.siren();
+  return true;
+}
+function drawUplink(u) { const q = P(u.x, u.wz - G.dist), a = clamp(u.t / .4, 0, 1), w = 22 * q.s + 4; cx.save(); cx.globalCompositeOperation = 'lighter'; cx.fillStyle = `rgba(120,230,255,${.5 * a})`; cx.fillRect(q.x - w, 0, w * 2, q.y); cx.fillStyle = `rgba(235,252,255,${.95 * a})`; cx.fillRect(q.x - w * .35, 0, w * .7, q.y); cx.restore(); }
 function airStrike() { // signaller: bombs the nearest machines ahead
   const t = G.en.filter(e => !e.dead && e.wz - G.dist > 80 && e.wz - G.dist < 750).sort((a, b) => a.wz - b.wz).slice(0, 2 + Math.min(4, G.cls.signal));
   if (!t.length) return false;
-  const dmg = 90 * (1 + .1 * save.up.dmg) * G.dmgG * (1 + .25 * Math.min(4, G.cls.signal));
+  const dmg = 90 * (1 + DMG_K * save.up.dmg) * G.dmgG * (1 + .25 * Math.min(4, G.cls.signal));
   t.forEach((e, i) => G.later.push({ t: i * .16, f: () => { if (!e.dead) explodeAt(e.x, e.wz, dmg, e); } }));   // game-time timers: they pause with the game and die with the run
   addText(W / 2, 330, 'AIR STRIKE', CLASS.signal.col); G.shake = Math.max(G.shake, 4); sfx.siren();
   return true;
@@ -1040,7 +1058,7 @@ function fireRockets() {
     if (rel < best) { best = rel; tgt = e; }
   }
   if (!tgt) return false;
-  const dmg = 80 * (1 + .1 * save.up.dmg) * G.dmgG;
+  const dmg = 80 * (1 + DMG_K * save.up.dmg) * G.dmgG;
   for (let i = 0; i < hn; i++) G.rockets.push({ x: G.px + (i - (hn - 1) / 2) * .08, wz: G.dist + 12, pz: G.dist + 12, dmg, tgt, delay: i * .12 });
   sfx.rocket();
   return true;
@@ -1050,7 +1068,7 @@ function fireGrenades() { // grenadiers lob 40mm rounds at the nearest endoskele
   const gn = Math.min(4, G.cls.gren); let n = 0;
   const c = G.en.filter(e => !e.dead && e.wz - G.dist > 50 && e.wz - G.dist < 700 && !ET[e.t].fly).sort((a, b) => ((BIPED.has(a.t) ? 0 : 400) + a.wz) - ((BIPED.has(b.t) ? 0 : 400) + b.wz));
   if (!c.length) return false;
-  const dmg = 55 * (1 + .1 * save.up.dmg) * G.dmgG;
+  const dmg = 55 * (1 + DMG_K * save.up.dmg) * G.dmgG;
   for (let i = 0; i < gn; i++) { const tgt = c[Math.min(c.length - 1, i % Math.min(3, c.length))]; G.rockets.push({ x: G.px + (i - (gn - 1) / 2) * .06, wz: G.dist + 12, pz: G.dist + 12, dmg, tgt, delay: i * .14, gren: true }); n++; }
   sfx.thump(); return n > 0;
 }
@@ -1058,7 +1076,7 @@ function fireSnipers() { // scout snipers: a thermal-scoped round at the weak po
   const sn = Math.min(4, G.cls.sniper); let tg = null, bs = -1;
   for (const e of G.en) { if (e.dead || bossShielded(e)) continue; const rel = e.wz - G.dist; if (rel < 60 || rel > 900 || Math.abs(e.x - G.px) > .9) continue; const sc = (e.boss ? 3 : bigFoe(e) ? 2 : ET[e.t].armor ? 1 : 0) * 1000 - rel; if (sc > bs) { bs = sc; tg = e; } }
   G.snTg = tg; if (!tg) return false;
-  const base = WEAPONS[G.tier].dmg * (1 + .1 * save.up.dmg) * G.dmgG, w = { name: 'sniper', pierce: false, splash: 0, col: '#ff9ad0', spread: 0 };
+  const base = WEAPONS[G.tier].dmg * (1 + DMG_K * save.up.dmg) * G.dmgG, w = { name: 'sniper', pierce: false, splash: 0, col: '#ff9ad0', spread: 0 };
   for (let i = 0; i < sn; i++) pushShot({ x: G.px + (i - (sn - 1) / 2) * .04, dmg: base * 3.2, w, pen: true, crit: 2.5, hit: [], tg, vx: 0 }, 'px', frontZ());
   sfx.sniper(); return true;
 }
@@ -1157,15 +1175,17 @@ function update(dt) {
   if (!G.over) {
     G.fcd -= dt;
     const last = G.n > 0 && G.peak >= 12 && G.n <= G.peak * .25 ? 1.2 : 1;   // last stand: a battered squad fights harder
-    const iv = G.fiv = WEAPONS[G.tier].int / ((1 + .06 * save.up.rate) * G.rateG * (1 + Math.min(.3, .05 * G.cls.officer)) * (G.od > 0 ? 1.8 : 1) * (G.rn > .5 ? .9 : 1) * last);
+    const iv = G.fiv = WEAPONS[G.tier].int / ((1 + RATE_K * save.up.rate) * G.rateG * (1 + Math.min(.3, .05 * G.cls.officer)) * (G.od > 0 ? 1.8 : 1) * (G.rn > .5 ? .9 : 1) * last);
     G.od = Math.max(0, (G.od || 0) - dt);
     let guard = 0;
     while (G.fcd <= 0 && guard++ < 5) { volley(); G.fcd += iv; }
+    if (U('overdrive') > 0) { G.odT = (G.odT === undefined ? 12 : G.odT) - dt; if (G.odT <= 0 && !(G.od > 0)) { G.od = 3 + .4 * U('overdrive'); G.odT = Math.max(10, 45 - 2 * U('overdrive')); const q = squadPos(); addText(q.x, q.y - 110, 'OVERDRIVE CELLS', '#ffb03a'); sfx.gate(); } }
+    if (U('orbital') > 0) { G.orbT = (G.orbT === undefined ? 6 : G.orbT) - dt; if (G.orbT <= 0) G.orbT = uplink() ? Math.max(4, 14 - .5 * U('orbital')) : 1.5; }
     if (G.cls.signal > 0) { G.sig -= dt; if (G.sig <= 0) G.sig = airStrike() ? Math.max(7, 16 - 2 * G.cls.signal) : 1.5; }
     G.rcd -= dt;
-    if (G.cls.gren > 0) { G.gcd = (G.gcd || 0) - dt; if (G.gcd <= 0) G.gcd = fireGrenades() ? 1.7 / ((1 + .06 * save.up.rate) * G.rateG) : .4; }
-    if (G.cls.sniper > 0) { G.scd = (G.scd || 0) - dt; if (G.scd <= 0) G.scd = fireSnipers() ? 1.5 / ((1 + .06 * save.up.rate) * G.rateG) : .4; } else G.snTg = null;
-    if (G.rcd <= 0 && G.cls.heavy > 0) G.rcd = fireRockets() ? 2.4 / ((1 + .06 * save.up.rate) * G.rateG) : .4;
+    if (G.cls.gren > 0) { G.gcd = (G.gcd || 0) - dt; if (G.gcd <= 0) G.gcd = fireGrenades() ? 1.7 / ((1 + RATE_K * save.up.rate) * G.rateG) : .4; }
+    if (G.cls.sniper > 0) { G.scd = (G.scd || 0) - dt; if (G.scd <= 0) G.scd = fireSnipers() ? 1.5 / ((1 + RATE_K * save.up.rate) * G.rateG) : .4; } else G.snTg = null;
+    if (G.rcd <= 0 && G.cls.heavy > 0) G.rcd = fireRockets() ? 2.4 / ((1 + RATE_K * save.up.rate) * G.rateG) : .4;
   }
   G.gflash = Math.max(0, (G.gflash || 0) - dt);
   G.muzzle = Math.max(0, (G.muzzle || 0) - dt);
@@ -1249,7 +1269,7 @@ function update(dt) {
       if (e.boss) { // boss health is sized from your actual damage output: the fight lasts ~25s + 3s per sector whatever your power level
         const base = e.hp; e.base0 = base;   // total (health + plating) takes roughly T seconds of accurate fire
         const fr = e.max > 0 ? clamp(e.hp / e.max, 0, 1) : 1; e.hp = e.max = bossSize(e, d, base); e.hp *= fr;   // keep whatever damage it already has
-      } else { const k = clamp(Math.pow(squadDps() / 150, .7), .4, 6) * (d.soft || 1) * tierMul(G.lv); e.hp *= k; e.max *= k; }
+      } else { const k = clamp(Math.pow(sizeDps() / 150, .7), .4, 6) * (d.soft || 1) * tierMul(G.lv); e.hp *= k; e.max *= k; }
       if (e.boss) e.str = clamp(1 + G.n / 160, 1, 1.8);   // and hit harder / fire faster / call more reinforcements against a big squad
       if (d.plate) { const pf = e.plateMax ? e.plate / e.plateMax : 1; e.plateMax = e.max * d.plate; e.plate = e.plateMax * pf; }
       if (e.boss) { bark('boss', 'Boss contact! Hit it with everything!', 60000); G.warn = { t: 2.6, name: e.name || d.name || 'BOSS' }; G.shake = Math.max(G.shake, 14); G.flash = Math.max(G.flash, .35); sfx.siren(); }
@@ -1352,7 +1372,7 @@ function update(dt) {
         if (e.sum <= 0) {
           e.sum = (e.enr ? 6 : 9) / (e.str ? 1 + (e.str - 1) * .4 : 1);
           const cnt = Math.min(8, (e.t === 'ogre' ? 3 : 2) + Math.floor(G.n / 80));
-          for (let i = 0; i < cnt; i++) { const m = mk('grunt', e.wz - 20 - i * 10, clamp(e.x + rnd(-.5, .5), -.8, .8), hpScale(G.lv) * G.assist); m.active = true; m.tough = true; m.hp = m.max = Math.max(m.max, squadDps() * .05 * G.assist * tierMul(G.lv)); G.en.push(m); }   // a boss's reinforcements are fodder, not a wall that soaks the squad's whole output
+          for (let i = 0; i < cnt; i++) { const m = mk('grunt', e.wz - 20 - i * 10, clamp(e.x + rnd(-.5, .5), -.8, .8), hpScale(G.lv) * G.assist); m.active = true; m.tough = true; m.hp = m.max = Math.max(m.max, sizeDps() * .05 * G.assist * tierMul(G.lv)); G.en.push(m); }   // a boss's reinforcements are fodder, not a wall that soaks the squad's whole output
         }
         if (d.mortar && !e.noR) { e.mrt = (e.mrt === undefined ? 4 : e.mrt) - dw; if (e.mrt <= 0) { e.mrt = e.enr ? 4.5 : 7; mortarRound(e); addText(W / 2, 150, 'MORTARS!', '#ff9a3a'); sfx.siren(); } }
         if ((e.t === 'ogre' || e.t === 'harvester') && e.enr && !e.noR) { // enraged ground bosses call down a barrage: weave through the gap while the markers burn
@@ -1388,7 +1408,7 @@ function update(dt) {
   G.haz = G.haz.filter(h => !h.dead && h.wz - G.dist > -120);
 
   if (G.n > 0 && G.n < G.peak && U('rein') > 0 && !G.over) { // field reinforcements: reserves rejoin on a timer
-    G.reinT += dt; const per = 26 - 2.2 * U('rein');
+    G.reinT += dt; const per = 22 - 1.8 * U('rein');
     if (G.reinT >= per) { G.reinT = 0; const k = 1 + Math.floor(G.peak * .01 * U('rein') / 4); G.n = Math.min(G.peak, G.n + k); const q = squadPos(); addText(q.x + rnd(-30, 30), q.y - 100, '+' + k + ' REINFORCED', '#9ad0ff'); }
   }
   // field medic: when the squad is nearly gone a nanite repair kit drops ahead of it
@@ -1671,7 +1691,7 @@ function showSquad() { // choose up to MAXPICK classes for the next sectors; unl
   ov(`<div class="panel"><h2>SQUAD</h2>
     <div class="res">Pick up to ${MAXPICK} classes (${save.loadout.length}/${MAXPICK})<br>Scrap: ${save.scrap}</div>
     <p class="tag" style="margin:0">Loadout presets (classes + formation)</p>${pre}
-    <p class="tag" style="margin:0 0 .5em">Each picked class adds ${classStart()} soldiers to your squad of ${6 + 2 * save.up.squad}. Class gates add only your picks.</p>${rows}
+    <p class="tag" style="margin:0 0 .5em">Each picked class adds ${classStart()} soldiers to your squad of ${6 + SQUAD_K * save.up.squad}. Class gates add only your picks.</p>${rows}
     <button class="big" id="go">DEPLOY</button><button id="bk">Back</button></div>`);
   document.querySelectorAll('.row').forEach(b => b.onclick = () => {
     const k = b.dataset.k, c = CLASS[k];
@@ -1925,13 +1945,13 @@ function lightBeams(e, q, rel, ss, spread, len, wid, alpha) { // spotlights leav
 const hsh = k => { const v = Math.sin(k * 127.1 + 311.7) * 43758.5453; return v - Math.floor(v); };   // cheap deterministic noise 0..1
 const bossT = lv => 14 + 2 * Math.min(lv, 25);   // boss fight length (nominal seconds of the squad's full output): grows to sector 25, then stays
 function bossSize(e, d, base) { // boss health: sized to the squad's firepower, with a floor from the sector's base value, but never more than a bounded time-to-kill whatever the sector number
-  const dps = squadDps(), ak = Math.max(.4, 1 - armorOf(e)), pk = 1 + (d.plate || 0), byDps = dps * bossT(G.lv) * .75 / ak / pk, cap = dps * Math.min(150, 45 + 3 * G.lv) * ak / pk;   // (cap: the real time-to-kill, armour and plating included)
+  const dps = sizeDps(), ak = Math.max(.4, 1 - armorOf(e)), pk = 1 + (d.plate || 0), byDps = dps * bossT(G.lv) * .75 / ak / pk, cap = dps * Math.min(150, 45 + 3 * G.lv) * ak / pk;   // (cap: the real time-to-kill, armour and plating included)
   return Math.min(Math.max(base * .25, byDps), Math.max(cap, byDps)) * G.assist * tierMul(G.lv);
 }
 function toughen(e) { // Endos are built to take a beating: when one comes within reach its armour is sized to the squad's firepower, so a pack always takes a few seconds to cut down
   const TF = { grunt: .3, gunner: .6, t700: .9, t400: .12, t1000: 1.4 };
   if (e.tough || !TF[e.t]) return; e.tough = true;
-  const tm = tierMul(G.lv), f = TF[e.t], hp = Math.max(e.max, squadDps() * f) * G.assist * tm;
+  const tm = tierMul(G.lv), f = TF[e.t], hp = Math.max(e.max, sizeDps() * f) * G.assist * tm;
   e.hp = e.max = hp;
 }
 function bodyPoint(e, q, ss, k) { // a spot on the boss's solid body (screen coords)
@@ -2806,6 +2826,7 @@ function render() {
   for (const o of G.obs) { const z = o.wz - G.dist; if (z < 1500 && z > -90) items.push({ z: o.k === 'overpass' ? z + 40 : z, f: () => drawObs(o) }); }   // (behind the squad the projection flips sign: never draw there) }
   for (const w of G.waves) items.push({ z: 1e6, f: () => drawEmpWave(w) });
   for (const n of G.nukes) items.push({ z: n.wz - G.dist, f: () => drawNuke(n) });
+  for (const u of G.uplinks) items.push({ z: u.wz - G.dist, f: () => drawUplink(u) });
   if (G.beam) items.push({ z: 1e6, f: () => drawBeam(G.beam) });
   for (const f of G.fallout) { const z = f.wz - G.dist; if (z < 1500 && z > -100) items.push({ z: z + 1, f: () => drawFallout(f) }); }
   for (const f of G.flares) { const z = f.wz - G.dist; if (z < 1500 && z > -100) items.push({ z, f: () => drawFlare(f) }); }

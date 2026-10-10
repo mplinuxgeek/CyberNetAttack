@@ -4,9 +4,9 @@
 (function () {
   const q = new URLSearchParams(location.search);
   const num = (k, d) => (q.has(k) && Number.isFinite(+q.get(k)) ? +q.get(k) : d);
-  const OPT = { max: num('max', 100), start: num('start', 1), up: num('up', 0), attempts: num('attempts', 3), speed: Math.max(1, Math.min(16, num('speed', 1))), form: q.get('form') || 'v', levelTime: num('leveltime', 480), assist: q.has('assist'), mute: q.has('mute') };
+  const OPT = { max: num('max', 100), start: num('start', 1), up: num('up', 0), attempts: num('attempts', 3), speed: Math.max(1, Math.min(16, num('speed', 1))), form: q.get('form') || 'v', levelTime: num('leveltime', 900), assist: q.has('assist'), mute: q.has('mute') };
   const bot = makeBot({ squadHalf, ET, bigFoe, bossShielded, useItem });
-  const ORDER = Object.keys(UPS), ABBR = { squad: 'Sq', dmg: 'Dm', rate: 'Fr', weapon: 'Wp', guard: 'Gu', emp: 'Or', plate: 'Pl', rein: 'Rn', gate: 'Gi', crit: 'Mk', cache: 'Qm' };
+  const ORDER = Object.keys(UPS), ABBR = { squad: 'Sq', dmg: 'Dm', rate: 'Fr', weapon: 'Wp', guard: 'Gu', emp: 'Or', plate: 'Pl', rein: 'Rn', gate: 'Gi', crit: 'Mk', cache: 'Qm', breaker: 'Bb', orbital: 'Ou', overdrive: 'Od' };
   let lv = OPT.start, playLv = OPT.start, tries = 0, best = 0, runs = 0, rounds = 0, wins = 0, losses = 0, started = false, handled = true, done = '', speed = OPT.speed, frame = 0, farming = false, last = '';
   if (OPT.mute) save.mute = true;
 
