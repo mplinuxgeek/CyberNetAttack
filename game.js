@@ -352,7 +352,7 @@ function spawnWave(en, z, lv, p, wv, hpm) {
   if (lv >= 3 && wv % 4 === 1) { const cx0 = rnd(-.55, .55); for (let i = 0; i < 5; i++) en.push(mk('drone', z + 170 + rnd(0, 70), clamp(cx0 + (i - 2) * .12, -.85, .85), hpm, { sc: .55 })); }   // a drone swarm
   if (lv >= 4 && wv % 3 === 2 && !swarm) en.push(mk('t700', z + 100 + rnd(0, 60), rnd(-.6, .6), hpm));
   if (lv >= 4 && wv % 5 === 3) en.push(mk('minelayer', z + 215, rnd(-.4, .4), hpm, { sc: .9 }));
-  if (lv >= 6 && wv % 7 === 3) { const c = lv >= 10 ? 2 : 1; for (let i = 0; i < c; i++) en.push(mk('t1000', z + 130 + i * 60, rnd(-.5, .5), hpm)); }
+  if (lv >= 6 && wv % 7 === 3) en.push(mk('t1000', z + 130, rnd(-.5, .5), hpm));   // never more than one T-1000 at a time
   if (wv % 4 === 0) en.push(mk('heavy', z + 150, rnd(-.4, .4), hpm));
   if (lv >= 5 && wv % 5 === 2) en.push(mk('gunship', z + 260, rnd(-.4, .4), hpm));
   if (lv >= 3 && wv % 4 === 2) { const c = lv >= 8 ? 2 : 1; for (let i = 0; i < c; i++) en.push(mk('behemoth', z + 200 + i * 45, rnd(-.5, .5), hpm)); }   // the T-1

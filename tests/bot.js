@@ -1,7 +1,7 @@
 // A ruthless bot that plays Cyber Net Attack through the real simulation (no rendering) to measure how far a given power level gets.
 //
 //   node tests/bot.js                      # fresh save, no upgrades; upgrades only when a sector cannot be beaten
-//   node tests/bot.js --max-sector 40 --seed 3 --attempts 3 --time 900 --assist
+//   node tests/bot.js --max-sector 150 --seed 3 --attempts 3 --time 900 --assist
 //
 // Progression rules:
 //   1. play sector 1, 2, 3 ... with no upgrades;
@@ -20,8 +20,23 @@ global.performance = { now: () => Date.now() };
 global.requestAnimationFrame = noop;
 global.setTimeout = () => {}; global.setInterval = () => 0; global.clearInterval = noop;
 
-const args = process.argv.slice(2), opt = (k, d) => { const i = args.indexOf('--' + k); return i < 0 ? d : (typeof d === 'boolean' ? true : +args[i + 1]); };
-const WHY = opt('why', false), MAXLV = opt('max-sector', 40), ATT = opt('attempts', 3), BUDGET = opt('time', 900) * 1000, ASSIST = opt('assist', false);
+const args = process.argv.slice(2);
+const KNOWN = ['max-sector', 'attempts', 'time', 'assist', 'seed', 'why', 'form', 'start', 'up', 'help'], ALIAS = { max: 'max-sector', levels: 'max-sector', sectors: 'max-sector' };
+if (args.includes('--help') || args.includes('-h')) {
+  console.log(`usage: node tests/bot.js [options]
+  --max-sector N   stop after clearing sector N (default 100; aliases --max, --levels)
+  --start N        begin at sector N (default 1)
+  --up L           begin with every upgrade at level L (to test a late sector)
+  --attempts N     tries per sector before buying upgrades (default 3)
+  --time S         wall-clock budget in seconds (default 900)
+  --seed N         random seed (default 11)
+  --form F         free | v | col | wall (default v)
+  --assist         keep the game's "machines get weaker after a loss" help (off by default)
+  --why            print what killed the squad or what a timed-out run was stuck on`); process.exit(0);
+}
+for (const a of args) if (a.startsWith('--')) { const k = ALIAS[a.slice(2)] || a.slice(2); if (!KNOWN.includes(k)) { console.error('unknown option ' + a + ' (try --help)'); process.exit(2); } }
+const opt = (k, d) => { let i = args.indexOf('--' + k); if (i < 0) for (const a in ALIAS) if (ALIAS[a] === k && args.indexOf('--' + a) >= 0) i = args.indexOf('--' + a); return i < 0 ? d : (typeof d === 'boolean' ? true : +args[i + 1]); };
+const WHY = opt('why', false), MAXLV = opt('max-sector', 100), ATT = opt('attempts', 3), BUDGET = opt('time', 900) * 1000, ASSIST = opt('assist', false);
 const FORM = (args.indexOf('--form') >= 0 ? args[args.indexOf('--form') + 1] : 'v');
 let seed = opt('seed', 11); Math.random = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;
 

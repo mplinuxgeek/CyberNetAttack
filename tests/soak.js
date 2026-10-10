@@ -11,13 +11,15 @@ global.setTimeout=()=>{};
 let src=fs.readFileSync((process.argv[2]||require('path').join(__dirname,'..','game.js')),'utf8')+`
 ;globalThis.__t={render,showMenu,update,startLevel,useItem,fireEMP,CLS,get save(){return save},get G(){return G},get state(){return state},ET,activateGuard,applyGate};`;
 eval(src); const t=globalThis.__t;
-let seed=+process.argv[3]||777; const R=()=>{ seed=(seed*1664525+1013904223)>>>0; return seed/4294967296; };
+const nargs=(k,d)=>{ const i=process.argv.indexOf('--'+k); return i<0?d:+process.argv[i+1]; };
+const MAXSOAK=nargs('max-sector',12);   // sectors are drawn at random from 1..N (node tests/soak.js '' <seed> <runs> --max-sector 120)
+let seed=nargs('seed',+process.argv[3]||777); const R=()=>{ seed=(seed*1664525+1013904223)>>>0; return seed/4294967296; };
 Math.random=R;
 const bad=[]; const report=(m)=>{ if(bad.length<25) bad.push(m); };
 const stats={runs:0,won:0,lost:0,timeout:0,maxBul:0,maxEn:0,maxParts:0};
 const fin=x=>Number.isFinite(x); let stuck=0; const ET0={};
-for(let run=0;run<+(process.argv[4]||40);run++){
-  const lv=1+Math.floor(R()*12); t.save.unlocked={heavy:1,tech:1,medic:1,shot:1,mark:1,officer:1,signal:1};
+for(let run=0;run<nargs('runs',+process.argv[4]||40);run++){
+  const lv=1+Math.floor(R()*MAXSOAK); t.save.unlocked={heavy:1,tech:1,medic:1,shot:1,mark:1,officer:1,signal:1};
   t.save.loadout=t.CLS.filter(()=>R()<.45).slice(0,3); t.save.up={squad:Math.floor(R()*16),dmg:Math.floor(R()*21),rate:Math.floor(R()*21),weapon:Math.floor(R()*5),emp:Math.floor(R()*11),guard:Math.floor(R()*11)};
   t.save.vib=true;
   try{

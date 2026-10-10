@@ -380,4 +380,5 @@ const arena=(lv,...en)=>{ const G=fresh(lv,[]); G.n=40; G.gates=[]; G.en=[]; G.o
 { const boss=t.mk('tank',1,0,1,{boss:true}); boss.hp=boss.max=1e5; boss.scaled=true; boss.base0=100; const G=fresh(5,[]); G.n=300; G.peak=300; G.gates=[]; G.en=[boss]; boss.wz=G.dist+500; for(let i=0;i<5;i++){ G.n=300; G.fcd=1e9; t.update(1/60); } const big=boss.max; G.n=12; for(let i=0;i<60*10;i++){ G.n=12; G.fcd=1e9; boss.wz=G.dist+500; t.update(1/60); }
   check('a boss eases down when the squad shrinks', boss.max<big*.8, big+' -> '+boss.max); }
 { for(const k of ['plate','rein','gate','crit','cache']) check('upgrade '+k+' exists', t.UPS[k] && t.UPS[k].max>0); check('late sectors cap per-hit damage', true); }
+{ let bad=0; for(let lv=6;lv<=40;lv++) for(let r=0;r<3;r++){ const z=t.genLevel(lv).en.filter(e=>e.t==='t1000').map(e=>e.wz).sort((a,b)=>a-b); for(let i=1;i<z.length;i++) if(z[i]-z[i-1]<600) bad++; } check('T-1000s never come two at a time', bad===0, bad); }
 console.log(pass+' passed, '+fail+' failed');
