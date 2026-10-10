@@ -178,5 +178,6 @@ while (lv <= MAXLV && Date.now() - T0 < BUDGET && !exhausted) {
   log(`  >> upgrade round ${rounds} before sector ${lv}: bought ${bought.join(', ')}  [${upLine()}]  scrap ${save.scrap}`);
   if (allMaxed() && fails > 3) { log('  all upgrades maxed and still losing'); break; }
 }
-log(`\nRESULT: cleared sector ${best} (${best === MAXLV ? 'cap reached' : 'stopped at ' + lv}) in ${((Date.now() - T0) / 1000).toFixed(0)} s, ${runs} runs (${farmed} farming), ${rounds} upgrade rounds`);
+const why = best >= MAXLV ? 'reached --max-sector' : Date.now() - T0 >= BUDGET ? `ran out of time (--time ${BUDGET / 1000} s; raise it)` : exhausted ? 'nothing left to buy or farm' : 'stopped';
+log(`\nRESULT: cleared sector ${best} (${why}) in ${((Date.now() - T0) / 1000).toFixed(0)} s, ${runs} runs (${farmed} farming), ${rounds} upgrade rounds`);
 log(`upgrades: ${ORDER.map(k => `${t.UPS[k].name} ${save.up[k]}/${t.UPS[k].max}`).join(', ')}   scrap left ${save.scrap}`);
