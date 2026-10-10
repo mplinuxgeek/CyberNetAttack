@@ -35,7 +35,7 @@ module.exports = function watch(args) {
     flags.push(url);
     const ch = cp.spawn(bin, flags, { stdio: ['ignore', 'ignore', has('verbose') ? 'inherit' : 'ignore'] });
     if (headless && !shot) setTimeout(() => { console.log(status || '(no status received)'); stop(); }, Math.round(+val('shot-after', 30) * 1000));
-    const stop = () => { try { ch.kill(); } catch (e) {} try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) {} srv.close(); process.exit(0); };
+    const stop = () => { if (status && !(headless && !shot)) console.log('\nlast bot panel:\n' + status); try { ch.kill(); } catch (e) {} try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) {} srv.close(); process.exit(0); };
     ch.on('exit', () => setTimeout(stop, 200)); process.on('SIGINT', stop);
     console.log('close the window (or Ctrl+C) to stop. Keys in the window: ] faster, [ slower, H hides the panel.');
   });
