@@ -43,7 +43,9 @@
       // what to head for: the better side of the next gate, otherwise the target, crates and scrap
       let want = null, ww = 0;
       const gate = G.gates.filter(g => !g.used && g.wz - G.dist > -5).sort((a, b) => a.wz - b.wz)[0];
-      if (gate && gate.wz - G.dist < 900) {
+      // a machine that is holding the squad stops it short of everything beyond it, gates included: shoot it instead of waiting at the gate's side
+    const blocking = G.en.some(e => !e.dead && (t.ET[e.t].block || e.boss) && e.wz - G.dist < t.ET[e.t].hold + 60 && !G.gates.some(g => !g.used && g.wz > G.dist - 5 && g.wz < e.wz));
+    if (gate && gate.wz - G.dist < 900 && !(blocking && gate.wz > G.dist + 200)) {
         const lv = gateValue(gate.L, G.n), rv = gateValue(gate.R, G.n);
         want = (lv >= rv ? -1 : 1) * (.42 + Math.min(.2, half)); ww = 1.6;
         if (gate.wz - G.dist < 120) ww = 3;   // commit
@@ -59,7 +61,7 @@
         if (want !== null) c += ww * 3 * Math.abs(xs[i] - want);
         if (c < bc) { bc = c; best = i; }
       }
-      G.tx = xs[best]; DBG = `want ${want === null ? '-' : want.toFixed(2)} w${ww} tgt ${tgt ? tgt.t + (tgt.boss ? '*' : '') : '-'} cost ${bc.toFixed(1)} tx ${G.tx}`;
+      WHYINFO = { xs, cost, want, ww, tgt, best }; WHYINFO = { xs, cost, want, ww, tgt, best }; G.tx = xs[best]; DBG = `want ${want === null ? '-' : want.toFixed(2)} w${ww} tgt ${tgt ? tgt.t + (tgt.boss ? '*' : '') : '-'} cost ${bc.toFixed(1)} tx ${G.tx}`;
     }
 
     let lastItem = -9;
@@ -81,8 +83,8 @@
     }
 
 
-    let DBG = '';
-    return { pilot, useItems, gateValue, dbg: () => DBG, reset: () => { lastItem = -9; } };
+    let DBG = '', WHYINFO = null;
+    return { pilot, useItems, gateValue, dbg: () => DBG, why: () => WHYINFO, why: () => WHYINFO, reset: () => { lastItem = -9; } };
   }
   if (typeof module !== 'undefined' && module.exports) module.exports = makeBot; else root.makeBot = makeBot;
 })(typeof window !== 'undefined' ? window : globalThis);

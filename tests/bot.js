@@ -60,11 +60,12 @@ const ABBR = { squad: 'Sq', dmg: 'Dm', rate: 'Fr', weapon: 'Wp', guard: 'Gu', em
 function attempt(lv) {
   if (!ASSIST) save.fails[lv] = 0;
   t.startLevel(lv); let G = t.G; G.form = FORM;
-  const t0 = Date.now(); let f = 0, pn = G.n; const drops = [];
+  let stuckN = 0; const t0 = Date.now(); let f = 0, pn = G.n; const drops = [];
   for (; f < 60 * 480 && t.state === 'play'; f++) {
     G = t.G;
     if (WHY && G.n < pn - 2) { const g = G.gates.find(g => !g.used); drops.push(`f${f} -${pn - G.n} dist ${G.dist.toFixed(0)} gate ${g ? Math.round(g.wz - G.dist) : '-'} near ${G.en.filter(e => !e.dead).sort((a, b) => a.wz - b.wz).slice(0, 2).map(e => e.t + '@' + Math.round(e.wz - G.dist)).join(',')}`); } pn = G.n;
     if (f % 4 === 0 && !G.sweep && !G.over) { pilot(G); useItems(G); }
+    if (WHY && f % 4 === 0 && G.spd < 3 && !G.over) { const w = bot.why(); if (w && w.tgt && Math.abs(G.px - w.tgt.x) > .5) { stuckN++; if (stuckN === 75) { const i0 = w.xs.findIndex(x => x >= w.tgt.x), ip = w.xs.findIndex(x => x >= G.px); console.log(`    OFF-TARGET 5 s: px ${G.px.toFixed(2)} target ${w.tgt.t}${w.tgt.boss ? '*' : ''} x ${w.tgt.x.toFixed(2)} want ${w.want === null ? '-' : w.want.toFixed(2)} w${w.ww}; cost at px ${w.cost[ip].toFixed(1)}, at target ${w.cost[i0].toFixed(1)}; bolts ${G.bolts.length} strikes ${G.strikes.length} haz ${G.haz.filter(h => !h.dead).length} pups ${G.pups.map(p => p.k + '@' + Math.round(p.wz - G.dist)).join(',')} en ${G.en.filter(e => !e.dead).slice(0, 6).map(e => e.t + '@' + Math.round(e.wz - G.dist) + 'x' + e.x.toFixed(2)).join(' ')}`); } } else stuckN = 0; }
     t.update(1 / 60);
     if (WHY && f % 1200 === 0) { const b = G.en.find(e => e.boss && !e.dead && e.wz - G.dist < 800); if (b) console.log(`    boss t=${(f / 60) | 0}s hp ${(b.hp / b.max * 100).toFixed(0)}% plate ${b.plateMax ? (b.plate / b.plateMax * 100).toFixed(0) : '-'}% x ${b.x.toFixed(2)} px ${G.px.toFixed(2)} n ${G.n} dbg[${dbgNow()}] bolts ${G.bolts.length} strikes ${G.strikes.length} en ${G.en.length}`); }
   }
