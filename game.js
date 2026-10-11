@@ -1150,7 +1150,7 @@ function strikeRound(e) { // sky hunter paints the ground: weave through the gap
 }
 
 function update(dt) {
-  G.t += dt;
+  G.t += dt; if (G.bench) benchPilot();
   if (G.pn === undefined) G.pn = G.n; if (G.n < G.pn) G.lostN = (G.lostN || 0) + (G.pn - G.n); G.pn = G.n;   // soldiers lost this run (drives the star rating)
   for (const L of G.later) { L.t -= dt; if (L.t <= 0) { L.done = true; if (!G.over) L.f(); } }
   if (G.later.length) G.later = G.later.filter(L => !L.done);
@@ -1604,12 +1604,70 @@ function showBoard() {
   $('bk').onclick = showMenu;
 }
 
+// ---------------------------------------------------------------- benchmark: ten sectors with different looks, drawn as fast as the browser allows
+const BENCH_SECTORS = [1, 2, 3, 4, 8, 13, 20, 34, 60, 100], BENCH_SECS = 15;   // moonlit city, rain, thunderstorm, dust, fog, ash, winter, desert, and two late sectors with big waves
+let BENCH = null;
+function mulberry(a) { return () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+function startBench() {
+  if (BENCH) return;
+  BENCH = { idx: -1, res: [], frames: [], work: [], rend: [], last: 0, skip: 30, bad: '', rng0: Math.random, mute0: save.mute, vol0: save.vol, t0: performance.now(), dev: { dpr: (typeof window !== 'undefined' && window.devicePixelRatio) || 1, canvas: cv.width + 'x' + cv.height, ua: (typeof navigator !== 'undefined' && navigator.userAgent) || '', cores: (typeof navigator !== 'undefined' && navigator.hardwareConcurrency) || 0, crt: !!save.crt, fx: save.fx || 'full', zoom: zoomLevel() } };
+  Math.random = mulberry(20260101); save.mute = true; musicStop(); ambStop();   // the same run every time, and silent
+  benchNext();
+}
+function benchNext() {
+  if (BENCH.idx >= 0) benchClose();
+  BENCH.idx++;
+  if (BENCH.idx >= BENCH_SECTORS.length) { benchFinish(); return; }
+  const lv = BENCH_SECTORS[BENCH.idx]; BENCH.frames = []; BENCH.work = []; BENCH.rend = []; BENCH.last = 0; BENCH.skip = 30;
+  startLevel(lv); G.bench = true; G.n = G.peak = 150; G.gates.forEach(g => { g.L = { k: 'add', v: 20 }; g.R = { k: 'add', v: 20 }; }); ovHide();
+}
+function benchPilot() { // weaves through the first gates and the waves, fires its item once: enough to put every kind of effect on screen
+  const G0 = G, gate = G0.gates.find(g => !g.used && g.wz - G0.dist > -5);
+  G0.tx = gate && gate.wz - G0.dist < 600 ? (gate.wz % 2 ? -.5 : .5) : Math.sin(G0.t * .9) * .6;
+  if (G0.n < 100) G0.n = G0.peak = 150;
+  if (!G0.bUsed && G0.t > 5) { G0.bUsed = true; useItem(); }
+}
+function benchClose() {
+  const L = BENCH.look = BENCH.look || [], fr = BENCH.frames.slice().sort((a, b) => a - b), n = fr.length, sum = a => a.reduce((x, y) => x + y, 0), look = G && G.look;
+  if (n < 20) { BENCH.res.push({ lv: BENCH_SECTORS[BENCH.idx], look: look ? look.tod + ' · ' + look.wA + (look.wB !== look.wA ? '>' + look.wB : '') + ' · ' + look.biome : '', fps: 0, low: 0, ms: 0, work: 0, rend: 0, head: 0, frames: n }); return; }
+  const mean = sum(fr) / n, p99 = fr[Math.min(n - 1, Math.floor(n * .99))], work = sum(BENCH.work) / BENCH.work.length, rend = sum(BENCH.rend) / BENCH.rend.length;
+  BENCH.res.push({ lv: BENCH_SECTORS[BENCH.idx], look: look ? look.tod + ' · ' + look.wA + (look.wB !== look.wA ? '>' + look.wB : '') + ' · ' + look.biome : '', fps: 1000 / mean, low: 1000 / p99, ms: mean, work, rend, head: 1000 / Math.max(.05, work), frames: n, enemies: G ? G.en.length : 0, parts: G ? G.parts.length : 0 });
+}
+function benchFinish() {
+  Math.random = BENCH.rng0; save.mute = BENCH.mute0; const B = BENCH; BENCH = null; G = null; state = 'menu';
+  const r = B.res, avg = k => r.reduce((a, x) => a + x[k], 0) / Math.max(1, r.length), tot = { fps: avg('fps'), low: Math.min(...r.map(x => x.low)), work: avg('work'), rend: avg('rend'), head: avg('head') };
+  const out = { when: new Date().toISOString(), seconds: Math.round((performance.now() - B.t0) / 1000), device: B.dev, bad: B.bad, levels: r, avg: tot };
+  save.bench = { when: out.when, fps: Math.round(tot.fps), low: Math.round(tot.low), head: Math.round(tot.head) }; persist();
+  try { window.__bench = out; } catch (e) {}
+  try { if (/[?&]benchpost\b/.test(location.search || '')) fetch('__bench', { method: 'POST', body: JSON.stringify(out) }).catch(() => {}); } catch (e) {}   // `node tests/bench_run.js` collects the result this way
+  showBench(out);
+}
+function benchText(o) {
+  const f = (v, d) => (v || 0).toFixed(d === undefined ? 1 : d), L = ['CYBER NET ATTACK BENCHMARK ' + o.when, 'screen: ' + o.device.canvas + ' px canvas, device pixel ratio ' + o.device.dpr + ', ' + o.device.cores + ' cores, CRT ' + (o.device.crt ? 'on' : 'off') + ', effects ' + o.device.fx, o.device.ua, ''];
+  L.push('sector  look                                  fps   1%low  frame ms  work ms  render ms  headroom fps');
+  for (const x of o.levels) L.push(String(x.lv).padEnd(7) + ' ' + x.look.padEnd(36) + f(x.fps).padStart(6) + f(x.low).padStart(8) + f(x.ms).padStart(10) + f(x.work).padStart(9) + f(x.rend).padStart(11) + f(x.head, 0).padStart(14));
+  L.push('', 'AVERAGE fps ' + f(o.avg.fps) + ' · worst 1% low ' + f(o.avg.low) + ' · work per frame ' + f(o.avg.work) + ' ms · headroom ' + f(o.avg.head, 0) + ' fps' + (o.bad ? ' · NOTE: ' + o.bad : ''));
+  return L.join('\n');
+}
+function showBench(o) {
+  const f = (v, d) => (v || 0).toFixed(d === undefined ? 1 : d), rows = o.levels.map(x => `<tr><td>${x.lv}</td><td style="text-align:left">${x.look}</td><td>${f(x.fps, 0)}</td><td>${f(x.low, 0)}</td><td>${f(x.work)}</td><td>${f(x.head, 0)}</td></tr>`).join('');
+  ov(`<div class="panel"><h2>BENCHMARK</h2>
+    <div class="res" style="font-size:1.5em;color:#ffd24a">${f(o.avg.fps, 0)} fps average</div>
+    <small>worst 1% low ${f(o.avg.low, 0)} fps · the browser limits drawing to the screen's refresh rate (${f(1000 / Math.max(1, o.levels[0] ? o.levels[0].ms : 16), 0)} fps here): <b>headroom ${f(o.avg.head, 0)} fps</b> is what the CPU work alone allows, a better guide to heat and battery use${o.bad ? '<br>NOTE: ' + o.bad : ''}</small>
+    <table style="width:100%;font-size:.78em;margin:.6em 0;border-collapse:collapse"><tr style="color:#9fb3c8"><td>Sec</td><td style="text-align:left">Look</td><td>fps</td><td>1% low</td><td>work ms</td><td>headroom</td></tr>${rows}</table>
+    <button id="bcp">Copy results</button><button class="big" id="bagain">RUN AGAIN</button><button id="bbk">Back</button></div>`);
+  $('bcp').onclick = () => { const t = benchText(o); try { navigator.clipboard.writeText(t).then(() => { $('bcp').textContent = 'Copied'; }, () => { $('bcp').textContent = 'Copy failed'; }); } catch (e) { $('bcp').textContent = 'Copy failed'; } };
+  $('bagain').onclick = startBench; $('bbk').onclick = () => showSettings('menu');
+}
+function abortBench(why) { if (!BENCH) return; Math.random = BENCH.rng0; save.mute = BENCH.mute0; BENCH = null; G = null; state = 'menu'; showSettings('menu'); }
+
 // ---------------------------------------------------------------- UI overlays
 function ov(html) { const u = $('ui'); u.innerHTML = html; u.style.display = 'flex'; }
 function ovHide() { $('ui').style.display = 'none'; }
 
 function showMenu() {
-  state = 'menu'; G = null; buildScenery(lookFor(save.sel || 1)); ambStop(); musicStart();
+  state = 'menu'; G = null; buildScenery(lookFor(save.sel || 1));
+  if (!window.__benchAuto && typeof location !== 'undefined' && /[?&]bench\b/.test(location.search || '')) { window.__benchAuto = true; setTimeout(startBench, 400); }   // ?bench in the address starts it straight away ambStop(); musicStart();
   const lv = save.sel;
   ov(`<div class="panel"><h1>CYBER<br>NET ATTACK</h1>
     <p class="tag">Hold the line. Slay the machines.</p>
@@ -1641,6 +1699,7 @@ function showSettings(from) {
     <label class="sl">Effects volume <input id="vol" type="range" min="0" max="100" value="${Math.round((save.vol === undefined ? 1 : save.vol) * 100)}"></label>
     <label class="sl">Music volume <input id="mvol" type="range" min="0" max="100" value="${Math.round((save.mvol === undefined ? 1 : save.mvol) * 100)}"></label>
     <button id="zm">Camera: ${ZNAMES[clamp(zoomLevel(), 0, 2)]}</button>
+    <button id="bnch">Run benchmark (10 sectors, uncapped)</button>
     <button id="fps">Frame rate: ${save.fps === 30 ? '30 (battery saver)' : save.fps === 0 ? 'UNCAPPED' : '60'}</button>
     <button id="fxq">Effects: ${save.fx === 'low' ? 'REDUCED (faster)' : 'FULL'}</button>
     <button id="vib">Vibration: ${save.vib === false ? 'OFF' : 'ON'}</button>
@@ -1655,6 +1714,7 @@ function showSettings(from) {
   $('vol').onchange = () => { unlockAudio(); sfx.shot(2); };
   $('mvol').oninput = e => { save.mvol = e.target.value / 100; if (MUS && AC) MUS.gain.setTargetAtTime(.5 * save.mvol, AC.currentTime, .05); persist(); };
   $('zm').onclick = () => { save.zoom = (clamp(zoomLevel(), 0, 2) + 1) % 3; persist(); showSettings(); };
+  $('bnch').onclick = startBench;
   $('fps').onclick = () => { save.fps = FPS_OPTS[(FPS_OPTS.indexOf(save.fps) + 1) % FPS_OPTS.length]; persist(); setRS(); showSettings(); };
   $('fxq').onclick = () => { save.fx = save.fx === 'low' ? 'full' : 'low'; persist(); showSettings(); };
   $('vib').onclick = () => { save.vib = save.vib === false; persist(); if (save.vib) buzz(60); showSettings(); };
@@ -1734,6 +1794,7 @@ function showSquad() { // choose up to MAXPICK classes for the next sectors; unl
 }
 
 function setPause(p) {
+  if (BENCH) { if (p) abortBench(); return; }   // pausing or leaving ends a benchmark
   if (!G || state !== 'play' || (G.over && !G.sweep)) return;
   G.paused = p;
   if (p) {
@@ -3323,6 +3384,7 @@ function render() {
 }
 
 function drawHUD() {
+  if (BENCH && G) { cx.fillStyle = 'rgba(0,0,0,.6)'; cx.fillRect(0, H - 30, W, 30); cx.fillStyle = '#ffd24a'; cx.font = `13px ${FONT}`; cx.textAlign = 'center'; cx.textBaseline = 'middle'; const fr = BENCH.frames, n = fr.length; cx.fillText(`BENCHMARK ${BENCH.idx + 1}/${BENCH_SECTORS.length} · sector ${G.lv} · ${n > 10 ? Math.round(1000 / (fr.slice(-30).reduce((a, b) => a + b, 0) / Math.min(30, n))) : '...'} fps · P to stop`, W / 2, H - 15); }
   cx.fillStyle = 'rgba(0,0,0,.5)'; cx.fillRect(0, 0, W, 52);
   cx.textBaseline = 'middle'; cx.textAlign = 'left'; cx.font = `15px ${FONT}`; cx.fillStyle = '#ff9a4a';
   cx.fillText('SECTOR ' + G.lv + (G.endless ? ' · SURVIVAL' : ''), 14, 18);
@@ -3400,17 +3462,22 @@ let acc = 0;
 let lastDraw = 0;
 function fpsCap() { const f = save.fps === undefined ? 60 : save.fps; return state === 'menu' ? Math.min(f || 60, 30) : f; }   // the menu is nearly still: 30 is plenty there
 function frame(ts) {
-  const cap = fpsCap();
+  const cap = BENCH ? 0 : fpsCap();   // (the benchmark draws as fast as the browser allows)
   if (cap && ts - lastDraw < 1000 / cap - 2) { requestAnimationFrame(frame); return; }   // a 120 Hz screen would otherwise draw twice as often as needed, and run the CPU, GPU and battery hot
+  if (BENCH) { if (BENCH.last && BENCH.skip-- <= 0 && state === 'play') BENCH.frames.push(ts - BENCH.last); BENCH.last = ts; if (document.hidden) BENCH.bad = 'the tab was hidden during the run: the numbers are unreliable'; }
   lastDraw = ts;
   try { frame0(ts); } catch (err) { console.error(err); try { cv.width = cv.width; } catch (e2) {} last = ts; acc = 0; requestAnimationFrame(frame); }   // (re-assigning the width resets the canvas state: a draw that threw half way must not leave a clip, blend mode or save() behind for every later frame)   // one bad frame must never freeze the game
 }
 function frame0(ts) {
   const dt = Math.min(.1, (ts - last) / 1000 || 0); last = ts; T += dt;
+  const tw0 = BENCH ? performance.now() : 0;
   if (state === 'play' && G && !G.paused) { // fixed 60 Hz simulation: game speed no longer depends on the display's frame rate (a 30 fps phone plays at the same pace, just choppier)
     acc += dt; let n = 0; while (acc >= 1 / 60 && n < 6) { update(1 / 60); acc -= 1 / 60; n++; } if (n === 6) acc = 0;
   } else { acc = 0; if (state === 'menu') bgDist += 60 * dt; }
+  const tw1 = BENCH ? performance.now() : 0;
   render();
+  if (BENCH && state === 'play' && BENCH.skip <= 0) { const tw2 = performance.now(); BENCH.work.push(tw2 - tw0); BENCH.rend.push(tw2 - tw1); }
+  if (BENCH && G && G.bench && G.t >= BENCH_SECS) benchNext();
   requestAnimationFrame(frame);
 }
 applyCRT();

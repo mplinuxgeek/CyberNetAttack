@@ -10,6 +10,8 @@ Controls: drag / move the mouse (or A/D, arrows) to steer; tap the item slot, do
 
 Every sector has its own look: time of day (dawn, noon, dusk, moonlit night, pitch-dark night, overcast), weather that can change part way through (clear, fog, rain, thunderstorms with lightning, wind, dust, ash), a landscape (wasteland, ash, desert, scorched, winter, flooded, industrial) and a skyline (city, sparse ruins, mountains). It is derived from the sector number, so a sector always looks the same.
 
+Benchmark: Settings has "Run benchmark" (or add `?bench` to the address): it plays ten sectors with different looks as fast as the browser allows, then shows average fps, the worst 1%, the CPU work per frame and the "headroom fps" it could reach, with a Copy button. `node tests/bench_run.js` does the same from a terminal.
+
 Threat tiers: from sector 10, enemy health (including the firepower-based sizing of endos, big machines and bosses) rises 10% every ten sectors, with no limit.
 
 Endless Survival (main menu) chains sectors until the squad is lost. Scores are kept on the device and, when the game is served by `tools/serve.py`, on a shared leaderboard (`/api/scores`, stored in `scores.json` next to the server).
