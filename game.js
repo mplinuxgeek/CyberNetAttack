@@ -303,6 +303,7 @@ const sfx = {   // gritty, low and heavy: filtered noise and saturated low tones
   emp() { tn(0, 70, 1400, .35, 'sawtooth', .16); nz(.28, .7, { f0: 2200, f1: 120, q: .6, g: .6 }); tn(.28, 70, 22, .7, 'sawtooth', .5); tn(.28, 48, 20, .8, 'sine', .8); },   // charge up then a deep concussive burst
   cannon() { tn(0, 1400, 70, .5, 'sawtooth', .3); nz(0, .6, { f0: 3500, f1: 250, q: .7, g: .55 }); tn(.05, 60, 30, .8, 'sine', .8); tn(0, 200, 900, .25, 'square', .1); },   // a heavy plasma discharge
   thump() { tn(0, 190, 60, .14, 'square', .3); nz(0, .07, { type: 'lowpass', f0: 900, f1: 200, g: .35 }); },   // a 40mm launcher
+  thunder() { nz(0, .07, { f0: 3200, q: 1, g: .3 }); nz(.05, 2.2, { type: 'lowpass', f0: 420, f1: 50, q: .4, g: .7 }); tn(.05, 62, 24, 1.8, 'sine', .55); nz(.9, 1.6, { type: 'lowpass', f0: 240, f1: 40, q: .4, g: .35 }); },   // a crack, then the rolling rumble
   squelch() { nz(0, .014, { f0: 3500, q: 3, g: .4 }); nz(.02, .11, { f0: 2400, f1: 1300, q: .6, g: .3 }); },   // radio key-up: a click and a burst of hiss
   squelchEnd() { nz(0, .016, { f0: 2800, q: 3, g: .38 }); nz(.03, .05, { f0: 1800, q: .7, g: .2 }); },   // key-down click
   geiger() { if (ok('gg', 70)) nz(0, .012, { f0: 3200, q: 3, g: .16 }); },
@@ -453,13 +454,25 @@ function makeCity(minW, maxW, minH, maxH, winP) { // ruined skyline layer: colum
       hs.push(Math.max(10, h - d));
     }
     const lit = [];
-    for (let r = 14; r < h - 8; r += 9) for (let q = 3; q < w - 3; q += 7) if (Math.random() < winP) lit.push([q, r, Math.random() < .25 ? 1 : 0]);
+    for (let r = 14; r < h - 8; r += 9) for (let q = 3; q < w - 3; q += 7) if (Math.random() < winP * 1.5) lit.push([q, r, Math.random() < .25 ? 1 : 0, Math.random()]);
     out.push({ x, w, h, cols, hs, lit, spire: Math.random() < .25 ? rnd(8, 24) : 0 });
     x += w + rnd(-5, 9);
   }
   return { b: out, w: x };
 }
-const CITY = [makeCity(26, 70, 80, 160, .01), makeCity(22, 60, 60, 125, .035), makeCity(18, 52, 40, 95, .07)];
+let CITY = [makeCity(26, 70, 80, 160, .01), makeCity(22, 60, 60, 125, .035), makeCity(18, 52, 40, 95, .07)];
+function makeRidge(minH, maxH, step) { // distant mountains or hills: a jagged skyline of ridges
+  const pts = []; let y = rnd(minH, maxH), x = 0;
+  while (x < W * 2.4) { y = clamp(y + rnd(-1, 1) * (maxH - minH) * .38, minH, maxH); pts.push([x, y]); x += rnd(step * .5, step * 1.5); }
+  return { p: pts, w: x };
+}
+let RIDGE = makeRidge(30, 120, 22);
+function buildScenery(look) { // every sector gets its own skyline: dense city, sparse ruins, mountains, or both
+  const m = look.cityMode, dens = look.dens;
+  CITY = [makeCity(26, 70, 80 * dens, 160 * dens, .01), makeCity(22, 60, 60 * dens, 125 * dens, .035), makeCity(18, 52, 40 * dens, 95 * dens, .07)];
+  if (m === 'sparse') for (const L of CITY) L.b = L.b.filter((b, i) => i % 3 === 0);
+  RIDGE = makeRidge(look.tod === 'dark' ? 40 : 30, 60 + 90 * look.sx, 18 + 20 * look.sx);
+}
 let decor = [], decorNext = 0, wallNext = 0;
 
 function startLevel(lv, opt) {
@@ -474,7 +487,7 @@ function startLevel(lv, opt) {
     dist: 0, spd: 0, px: 0, tx: 0,
     n: 6 + SQUAD_K * save.up.squad, tier: save.up.weapon, rateG: 1, dmgG: 1,
     fcd: .3, bullets: [], bolts: [], parts: [], texts: [],
-    form: save.form, scrap: 0, kills: 0, item: { k: QM[U('cache')][0], n: QM[U('cache')][1] }, shield: 2 * U('plate'), reinT: 0, c4: [], flares: [], fallout: [], nukes: [], uplinks: [], beam: null, shake: 0, flash: 0, hurtFlash: 0,
+    look: lookFor(lv), form: save.form, scrap: 0, kills: 0, item: { k: QM[U('cache')][0], n: QM[U('cache')][1] }, shield: 2 * U('plate'), reinT: 0, c4: [], flares: [], fallout: [], nukes: [], uplinks: [], beam: null, shake: 0, flash: 0, hurtFlash: 0,
     guard: null, gx: 0, pups: [], pupPlan: lvl.pups.map(p => ({ k: p.k, x: p.x, wz: p.wz, done: false })),
     cls: Object.fromEntries(CLS.map(k => [k, 0])), sig: 7, scr: [], haz: lvl.haz, obs: lvl.obs, slow: 1, env: ENVS[SECT[(lv - 1) % SECT.length]] || null, dk: 0, rn: 0, storm: 0, rockets: [], strikes: [], lt: [], warn: null, mz: 0, rcd: 2, peak: 6 + SQUAD_K * save.up.squad,
     ts: 1, t: 0, later: [], deaths: [], waves: [], alert: null, over: false, won: false, endT: 0, paused: false,
@@ -484,6 +497,7 @@ function startLevel(lv, opt) {
     G.endless = { sectors: opt.sectors || 0, kills: opt.kills || 0, scrap: opt.scrap || 0, lost: opt.lost || 0 };
     if (opt.carry) { const c = opt.carry; G.peak = Math.max(G.peak, c.peak); G.cls = Object.assign(G.cls, c.cls); G.n = Math.min(G.peak, c.n + 2 + Math.ceil(c.peak * .12)); G.item = c.item; G.form = c.form || G.form; trimClasses(); }
   }   // each picked class starts with a few soldiers, on top of the squad
+  buildScenery(G.look); G.tp = todPal(G.look, 0); G.wx = wxAt(G.look, 0);
   decor = []; decorNext = 0; wallNext = 0;
   state = 'play'; ovHide(); musicStop(); ambStart();
   sfx.win();
@@ -1398,7 +1412,7 @@ function update(dt) {
   }
   G.en = G.en.filter(e => !e.dead);
   for (const Dh of G.deaths) deathStep(Dh, dt);
-  empStep(dt); obsStep(dt); envStep(dt);
+  empStep(dt); obsStep(dt); envStep(dt); weatherStep(dt);
   if (G.item && G.item.k === 'c4' && !G.over && G.en.some(e => !e.dead && bigFoe(e) && !ET[e.t].fly && e.wz - G.dist > 100 && e.wz - G.dist < 600)) bark('c4', 'Drop the C4!', 25000);
   if (G.deaths.length) G.deaths = G.deaths.filter(Dh => Dh.t < (Dh.tb || 0) + 3.2 * (Dh.ts || 1) + .1);
 
@@ -1593,7 +1607,7 @@ function ov(html) { const u = $('ui'); u.innerHTML = html; u.style.display = 'fl
 function ovHide() { $('ui').style.display = 'none'; }
 
 function showMenu() {
-  state = 'menu'; G = null; ambStop(); musicStart();
+  state = 'menu'; G = null; buildScenery(lookFor(save.sel || 1)); ambStop(); musicStart();
   const lv = save.sel;
   ov(`<div class="panel"><h1>CYBER<br>NET ATTACK</h1>
     <p class="tag">Hold the line. Slay the machines.</p>
@@ -2733,9 +2747,9 @@ function drawCity(layer, off, col, edge, win) {
     cx.fillStyle = 'rgba(0,0,0,.38)'; for (let r = 14; r < b.h; r += 14) cx.fillRect(x0, HOR - r, b.w, 1.6);
     
     // Windows with warm fire flickering & cyan Skynet scanner lights
-    if (win) for (const l of b.lit) {
+    if (win > 0) for (const l of b.lit) {
       const ci = Math.min(b.cols - 1, Math.floor(l[0] / 5));
-      if (l[1] < b.hs[ci] - 4) {
+      if (l[1] < b.hs[ci] - 4 && l[3] < win) {
         const flick = Math.sin(T * 8 + l[0] * 3) > -0.2;
         cx.fillStyle = l[2] ? (flick ? '#6ff3ff' : '#2b90a8') : (flick ? '#ff9a4a' : '#b8581e');
         cx.fillRect(x0 + l[0], HOR - l[1], 3.2, 3.2);
@@ -2744,13 +2758,139 @@ function drawCity(layer, off, col, edge, win) {
   }
 }
 
-function heap(xc, z, hw, hh, seed) { // rubble berm along the edge of the cleared path
+function heap(xc, z, hw, hh, seed, col) { // rubble berm along the edge of the cleared path
   const q = P(xc, z), w = hw * LANE * q.s, h = hh * q.s;
-  cx.fillStyle = '#0f1620'; cx.beginPath(); cx.moveTo(q.x - w, q.y); cx.lineTo(q.x - w * .6, q.y - h * .55); cx.lineTo(q.x - w * .2, q.y - h * (.75 + hash(seed) * .25));
+  cx.fillStyle = col || '#0f1620'; cx.beginPath(); cx.moveTo(q.x - w, q.y); cx.lineTo(q.x - w * .6, q.y - h * .55); cx.lineTo(q.x - w * .2, q.y - h * (.75 + hash(seed) * .25));
   cx.lineTo(q.x + w * .3, q.y - h * .6); cx.lineTo(q.x + w * .7, q.y - h * .42); cx.lineTo(q.x + w, q.y); cx.closePath(); cx.fill();
   cx.fillStyle = '#3f5270'; cx.fillRect(q.x - w * .45, q.y - h * .6, w * .5, Math.max(1.4, 2.6 * q.s));
   cx.fillStyle = '#1b2431'; cx.fillRect(q.x + w * .1, q.y - h * .45, w * .4, h * .2);
   cx.strokeStyle = '#5e4332'; cx.lineWidth = Math.max(1, 1.5 * q.s); line(q.x + w * .2, q.y - h * .6, q.x + w * .3, q.y - h * 1.15);
+}
+
+// ---------------------------------------------------------------- level looks: time of day, weather, biome and skyline differ from sector to sector
+const mixC = (a, b, t) => { const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16), f = sh => Math.round(((pa >> sh) & 255) * (1 - t) + ((pb >> sh) & 255) * t); return '#' + ((1 << 24) | (f(16) << 16) | (f(8) << 8) | f(0)).toString(16).slice(1); };
+const lerp = (a, b, t) => a + (b - a) * t;
+const TODS = {
+  dawn:     { sky: ['#1b1634', '#8a4560', '#ffb070'], gnd: ['#5a4650', '#1c1519'], city: [['#3a3050', '#a06a78'], ['#2a2238', '#7a4e66'], ['#14101e', '#4a3048']], haze: [255, 170, 130], tint: [255, 150, 100, .10], stars: .05, win: .2, vig: .5, fires: .7, search: 0, glow: .3 },
+  day:      { sky: ['#2d73b8', '#6aa9dc', '#d6e9f6'], gnd: ['#6d6454', '#2b2721'], city: [['#7d92a8', '#b8c9d8'], ['#5d7189', '#97aabd'], ['#3d4e63', '#6f8399']], haze: [215, 232, 246], tint: [255, 244, 214, .05], stars: 0, win: 0, vig: .25, fires: .3, search: 0, glow: 0 },
+  dusk:     { sky: ['#150a26', '#7e2c50', '#ff8238'], gnd: ['#4d3a3a', '#190f12'], city: [['#2b1a30', '#8a4a58'], ['#1d1124', '#6a3448'], ['#0f0914', '#3c1e2e']], haze: [255, 130, 80], tint: [255, 110, 60, .10], stars: .15, win: .35, vig: .5, fires: .9, search: .5, glow: .5 },
+  moon:     { sky: ['#030718', '#102650', '#3a6aa8'], gnd: ['#2a3a52', '#101a26'], city: [['#1b2e45', '#4a6f96'], ['#0f1c2d', '#2b4a68'], ['#070e19', '#1a2e44']], haze: [110, 160, 230], tint: [70, 120, 220, .09], stars: 1, win: .6, vig: .42, fires: 1, search: 1, glow: 1 },
+  dark:     { sky: ['#010203', '#03060c', '#0b1220'], gnd: ['#161e2a', '#06090e'], city: [['#0b121b', '#1c2a3a'], ['#070b11', '#121c28'], ['#04070b', '#0b121a']], haze: [40, 70, 110], tint: [0, 10, 30, .20], stars: .3, win: .9, vig: .8, fires: 1.25, search: .6, glow: .3 },
+  overcast: { sky: ['#262a30', '#454b54', '#7d858f'], gnd: ['#4a4d50', '#1a1c1e'], city: [['#3a4048', '#6a727c'], ['#2a3036', '#505860'], ['#161a1e', '#343a40']], haze: [150, 160, 170], tint: [150, 160, 170, .06], stars: 0, win: .12, vig: .4, fires: .6, search: 0, glow: 0 },
+};
+const BIOMES = {
+  wasteland:  { gnd: null, chip: ['#79899f', '#0b1118', '#34445a', '#4a3a30'], scar: ['rgba(5,8,13,.55)', 'rgba(96,120,158,.3)'], heap: '#0f1620', puddle: .3, road: 'rgba(30,36,46,.45)' },
+  ash:        { gnd: ['#4c4c50', '#18181b'], chip: ['#9a9aa2', '#26262a', '#5c5c64', '#44444a'], scar: ['rgba(10,10,12,.5)', 'rgba(150,150,160,.28)'], heap: '#1c1c20', puddle: .15, road: 'rgba(24,24,28,.5)' },
+  desert:     { gnd: ['#9a7a4c', '#3e2c1a'], chip: ['#c8a870', '#5a4028', '#a08050', '#3a2a1c'], scar: ['rgba(40,24,10,.4)', 'rgba(220,190,130,.3)'], heap: '#4a3622', puddle: 0, road: 'rgba(70,52,34,.4)' },
+  scorched:   { gnd: ['#5a2e24', '#190d0a'], chip: ['#8a4a38', '#1a0c0a', '#6a3a2c', '#30201a'], scar: ['rgba(12,4,3,.6)', 'rgba(150,80,60,.28)'], heap: '#2a1410', puddle: .1, road: 'rgba(36,18,14,.5)' },
+  winter:     { gnd: ['#a8b4c2', '#505c6c'], chip: ['#f0f4fa', '#8a96a8', '#c8d2de', '#6a7686'], scar: ['rgba(60,70,90,.35)', 'rgba(240,246,255,.5)'], heap: '#6a7686', puddle: .2, road: 'rgba(80,90,106,.4)' },
+  flooded:    { gnd: ['#264650', '#0c1a20'], chip: ['#5a8896', '#0a1418', '#34606c', '#1c3038'], scar: ['rgba(3,10,14,.55)', 'rgba(90,150,170,.3)'], heap: '#0c1a20', puddle: .85, road: 'rgba(14,30,38,.5)' },
+  industrial: { gnd: ['#3c3632', '#141110'], chip: ['#8a7a6a', '#0e0c0a', '#4a4036', '#6a3a26'], scar: ['rgba(8,6,4,.6)', 'rgba(130,110,90,.3)'], heap: '#201a16', puddle: .25, road: 'rgba(28,24,22,.5)' },
+};
+const WXT = { clear: {}, fog: { fog: .85 }, rain: { rain: .75, fog: .2, wind: .3 }, storm: { rain: 1, storm: 1, wind: .7, fog: .1 }, wind: { wind: 1 }, dust: { dust: 1, wind: .85, fog: .3 }, ash: { ash: 1, fog: .25, wind: .2 } };
+const WXK = ['fog', 'rain', 'storm', 'wind', 'dust', 'ash'];
+const LOOKS = {};
+function makeLook(lv) { // deterministic per sector: the same sector always looks the same, neighbouring sectors do not
+  const h = k => hash(lv * 1000003 + k * 40503 + 99991), pick = (a, k) => a[Math.floor(h(k) * a.length) % a.length];
+  let tod = lv === 1 ? 'moon' : pick(['dawn', 'day', 'dusk', 'moon', 'dark', 'overcast', 'day', 'moon', 'dusk', 'dark', 'overcast', 'dawn'], 1);
+  const wxs = { dawn: ['clear', 'fog', 'wind', 'clear', 'rain', 'fog'], day: ['clear', 'clear', 'wind', 'dust', 'rain', 'storm', 'fog', 'dust', 'storm'], dusk: ['clear', 'wind', 'fog', 'storm', 'rain', 'storm', 'dust'], moon: ['clear', 'clear', 'fog', 'wind', 'rain', 'ash', 'storm'], dark: ['clear', 'rain', 'storm', 'fog', 'ash', 'storm'], overcast: ['rain', 'storm', 'storm', 'fog', 'ash', 'wind'] };
+  let wA = lv === 1 ? 'clear' : pick(wxs[tod], 2), wB = h(3) < .55 ? pick(wxs[tod], 4) : wA;
+  const env = ENVS[SECT[(lv - 1) % SECT.length]];
+  if (env === 'dark') { tod = 'dark'; wA = 'clear'; wB = h(3) < .5 ? 'fog' : 'clear'; }
+  else if (env === 'rain') { wA = 'wind'; wB = 'wind'; }   // (the radioactive rain of the Salt Flats is its own effect)
+  else if (env === 'storm') { if (tod !== 'dusk' && tod !== 'dark') tod = 'dusk'; wA = 'wind'; wB = 'clear'; }
+  return { lv, tod, from: tod === 'dawn' ? 'moon' : tod === 'dusk' ? 'day' : tod, wA, wB, sw: .3 + h(8) * .4, biome: lv === 1 ? 'wasteland' : pick(['wasteland', 'wasteland', 'ash', 'desert', 'scorched', 'winter', 'flooded', 'industrial'], 6), cityMode: lv === 1 ? 'city' : pick(['city', 'city', 'city', 'sparse', 'ridge', 'ridge'], 7), dens: .55 + h(12) * .9, sx: h(9), moonX: .12 + h(10) * .76, phase: h(11), env };
+}
+function lookFor(lv) { return LOOKS[lv] || (LOOKS[lv] = makeLook(lv)); }
+function curLook() { return G && G.look ? G.look : lookFor(save.sel || 1); }
+function todPal(look, frac) { // the palette right now: dawn brightens from moonlight, dusk darkens from daylight, the rest hold
+  const A = TODS[look.from], B = TODS[look.tod], f = look.from === look.tod ? 1 : clamp(frac * 1.6, 0, 1);
+  const m = (a, b) => mixC(a, b, f), n = (a, b) => lerp(a, b, f);
+  return { sky: [m(A.sky[0], B.sky[0]), m(A.sky[1], B.sky[1]), m(A.sky[2], B.sky[2])], gnd: [m(A.gnd[0], B.gnd[0]), m(A.gnd[1], B.gnd[1])], city: [0, 1, 2].map(i => [m(A.city[i][0], B.city[i][0]), m(A.city[i][1], B.city[i][1])]),
+    haze: A.haze.map((v, i) => Math.round(n(v, B.haze[i]))).join(','), tint: B.tint.map((v, i) => n(A.tint[i], v)), stars: n(A.stars, B.stars), win: n(A.win, B.win), vig: n(A.vig, B.vig), fires: n(A.fires, B.fires), search: n(A.search, B.search), glow: n(A.glow, B.glow), f };
+}
+function wxAt(look, frac) { // weather intensity 0..1 per kind, crossing from the first weather to the second part-way through the sector
+  const a = WXT[look.wA], b = WXT[look.wB], t = clamp((frac - look.sw) / .12 + .5, 0, 1), out = {};
+  for (const k of WXK) out[k] = lerp(a[k] || 0, b[k] || 0, t * t * (3 - 2 * t));
+  return out;
+}
+function makeBolt() {
+  const pts = [[rnd(40, W - 40), 0]]; let y = 0;
+  while (y < HOR - 8) { y += rnd(8, 18); const p = pts[pts.length - 1]; pts.push([p[0] + rnd(-16, 16), Math.min(HOR - 6, y)]); }
+  const br = []; for (let i = 0; i < 2; i++) { const k = rint(2, Math.max(2, pts.length - 3)), bp = [pts[k]]; let by = pts[k][1]; for (let j = 0; j < 4; j++) { by += rnd(6, 14); const p = bp[bp.length - 1]; bp.push([p[0] + rnd(-20, 20), Math.min(HOR - 4, by)]); } br.push(bp); }
+  G.bolt = { t: .5, max: .5, pts, br }; G.thunder = rnd(.25, 1.7);
+}
+function weatherStep(dt) {
+  const L = G.look; if (!L) return; const frac = clamp(G.dist / Math.max(1, G.L), 0, 1);
+  G.tp = todPal(L, frac); G.wx = wxAt(L, frac);
+  if (G.wx.storm > .35 && !G.over) { G.ltCd = (G.ltCd === undefined ? rnd(2, 6) : G.ltCd) - dt; if (G.ltCd <= 0) { G.ltCd = rnd(3.5, 12) / Math.max(.5, G.wx.storm); makeBolt(); } }
+  if (G.bolt) { G.bolt.t -= dt; if (G.bolt.t <= 0) G.bolt = null; }
+  if (G.thunder > 0) { G.thunder -= dt; if (G.thunder <= 0) { sfx.thunder(); G.shake = Math.max(G.shake, 3); } }
+  const wv = G.wx.wind * 9 * dt; if (wv > 0) for (const p of G.parts) if (!p.st && !p.fl) p.x += wv;   // smoke and dust lean downwind
+}
+function drawBolt(b) {
+  const a = clamp(b.t / b.max, 0, 1), ft = 1 - a, fl = ft < .12 ? 1 : ft < .2 ? .2 : ft < .3 ? .85 : ft < .6 ? .35 * (1 - (ft - .3) / .3) : 0;
+  if (fl <= 0) return;
+  cx.save(); cx.lineCap = 'round'; cx.lineJoin = 'round';
+  for (const [pts, w] of [[b.pts, 1], ...b.br.map(p => [p, .55])]) for (const [lw, col] of [[7 * w, `rgba(150,170,255,${.35 * fl})`], [2.4 * w, `rgba(245,248,255,${fl})`]]) { cx.strokeStyle = col; cx.lineWidth = lw; cx.beginPath(); pts.forEach((p, i) => i ? cx.lineTo(p[0], p[1]) : cx.moveTo(p[0], p[1])); cx.stroke(); }
+  cx.restore();
+}
+function drawSun(look, tp, frac) { // sun disc and glow (behind the skyline, so a low sun is cut by the roofs)
+  if (look.tod === 'moon' || look.tod === 'dark') return;
+  const hgt = look.tod === 'dawn' ? -.04 + .24 * tp.f : look.tod === 'dusk' ? .5 - .46 * tp.f : look.tod === 'overcast' ? .38 : .62;
+  const x = W * (.18 + .64 * look.sx) - frac * 30, y = HOR - 4 - hgt * (HOR - 38), r = look.tod === 'dusk' ? 30 + 12 * tp.f : look.tod === 'dawn' ? 28 : 24, ov = look.tod === 'overcast' ? .35 : 1;
+  const g = cx.createRadialGradient(x, y, r * .4, x, y, r * 6); g.addColorStop(0, `rgba(${look.tod === 'day' ? '255,246,215' : look.tod === 'overcast' ? '230,230,225' : '255,170,100'},${.5 * ov})`); g.addColorStop(1, 'rgba(255,200,140,0)');
+  cx.fillStyle = g; cx.fillRect(0, 0, W, HOR + 40);
+  cx.fillStyle = look.tod === 'day' ? 'rgba(255,252,235,.97)' : look.tod === 'overcast' ? 'rgba(240,240,235,.5)' : 'rgba(255,196,120,.97)'; cx.beginPath(); cx.arc(x, y, r, 0, 7); cx.fill();
+}
+function drawMoon(look, tp, frac) {
+  const show = look.tod === 'moon' ? 1 : look.tod === 'dawn' ? 1 - tp.f : 0; if (show <= .02) return;
+  const x = W * look.moonX - frac * 14, y = 52 + 30 * (1 - look.sx), r = 24;
+  const g = cx.createRadialGradient(x, y, r * .5, x, y, r * 7); g.addColorStop(0, `rgba(190,215,255,${.38 * show})`); g.addColorStop(1, 'rgba(120,160,230,0)'); cx.fillStyle = g; cx.fillRect(0, 0, W, HOR + 40);
+  cx.save(); cx.globalAlpha = show; cx.fillStyle = '#e9eff8'; cx.beginPath(); cx.arc(x, y, r, 0, 7); cx.fill();
+  cx.fillStyle = 'rgba(150,165,190,.45)'; for (const [dx, dy, rr] of [[-7, -5, 5], [6, 4, 7], [-3, 9, 3.4], [9, -9, 3]]) { cx.beginPath(); cx.arc(x + dx, y + dy, rr, 0, 7); cx.fill(); }
+  const sh = look.phase;   // a bite out of the disc for a waning moon
+  if (sh > .35) { cx.fillStyle = TODS.moon.sky[1]; cx.beginPath(); cx.arc(x + r * (.4 + (sh - .35) * 1.2), y, r * .94, 0, 7); cx.fill(); }
+  cx.restore();
+}
+function drawStars(look, tp, wx) {
+  const k = tp.stars * (1 - clamp((wx.storm || 0) + (wx.fog || 0) * .9 + (wx.rain || 0) * .5 + (wx.ash || 0) + (wx.dust || 0), 0, 1)); if (k < .04) return;
+  for (let i = 0; i < 90; i++) { const sx = hash(look.lv * 31 + i) * W, sy = hash(look.lv * 53 + i * 3) * (HOR - 30), tw = .55 + .45 * Math.sin(T * (1 + hash(i) * 2) + i); cx.fillStyle = `rgba(235,242,255,${k * tw * (.4 + hash(i * 7) * .6)})`; const sz = hash(i * 11) < .12 ? 2 : 1; cx.fillRect(sx, sy, sz, sz); }
+}
+function drawClouds(look, tp, wx) {
+  const grey = clamp((wx.storm || 0) * .9 + (wx.rain || 0) * .4 + (wx.ash || 0) * .5, 0, 1), n = Math.round(5 + 9 * grey + (look.tod === 'overcast' ? 5 : 0)), sp = 1.8 + (wx.wind || 0) * 9;
+  for (let i = 0; i < n; i++) {
+    const xx = ((i * 185 + T * (sp + i * .5)) % (W + 360)) - 180, yy = 16 + (i * 47) % 130, big = 145 + (i % 3) * 45 + grey * 40;
+    cx.fillStyle = i % 2 ? `rgba(${tp.haze},${.10 + .22 * (1 - tp.stars) * (1 - grey)})` : `rgba(8,14,24,${.18 + .25 * grey + .1 * tp.stars})`;
+    cx.beginPath(); cx.ellipse(xx, yy, big, 15 + (i % 2) * 10 + grey * 8, 0, 0, 7); cx.fill();
+  }
+}
+function drawRidge(col, edge, off) {
+  const R = RIDGE; cx.fillStyle = col; cx.beginPath(); cx.moveTo(-10, HOR + 4);
+  for (let rep = 0; rep < 2; rep++) for (const p of R.p) { const x = p[0] - off + rep * R.w; if (x > -40 && x < W + 40) cx.lineTo(x, HOR - p[1]); }
+  cx.lineTo(W + 10, HOR + 4); cx.closePath(); cx.fill(); cx.strokeStyle = edge; cx.lineWidth = 1.2; cx.stroke();
+}
+function drawWeather() { // in front of the world: fog, rain, ash, dust, wind-blown debris, and the flash of lightning
+  const L = curLook(), wx = (G && G.wx) || wxAt(L, .3), tp = (G && G.tp) || todPal(L, .3), gust = .75 + .25 * Math.sin(T * .35);
+  if ((wx.fog || 0) > .02) { // low, drifting fog: thickest at the horizon, thinning toward the camera
+    const f = wx.fog, g = cx.createLinearGradient(0, HOR - 70, 0, H); g.addColorStop(0, `rgba(${tp.haze},${.78 * f})`); g.addColorStop(.3, `rgba(${tp.haze},${.55 * f})`); g.addColorStop(1, `rgba(${tp.haze},${.1 * f})`); cx.fillStyle = g; cx.fillRect(0, HOR - 70, W, H - HOR + 70);
+    for (let i = 0; i < 4; i++) { const fx = ((T * (6 + i * 4) + i * 130) % (W + 300)) - 150; cx.fillStyle = `rgba(${tp.haze},${.12 * f})`; cx.beginPath(); cx.ellipse(fx, HOR + 40 + i * 70, 190, 30 + i * 8, 0, 0, 7); cx.fill(); }
+  }
+  if ((wx.dust || 0) > .02) { cx.fillStyle = `rgba(190,150,90,${.2 * wx.dust})`; cx.fillRect(0, 0, W, H); }
+  const slant = .12 + (wx.wind || 0) * gust * .55;
+  if ((wx.rain || 0) > .02) {
+    const n = Math.round(130 * wx.rain), ln = 16 + 10 * wx.rain; cx.strokeStyle = `rgba(190,215,240,${.28 + .22 * wx.rain})`; cx.lineWidth = 1; cx.beginPath();
+    for (let i = 0; i < n; i++) { const sp = 520 + hash(i * 5) * 380, x = ((hash(i) * (W + 120) + T * 40 * slant * 10) % (W + 120)) - 40 + 0, y = (hash(i + 3) * H + T * sp) % H; cx.moveTo(x, y); cx.lineTo(x - slant * ln, y + ln); }
+    cx.stroke();
+  }
+  if ((wx.ash || 0) > .02) { for (let i = 0; i < 70 * wx.ash; i++) { const x = ((hash(i) * W + Math.sin(T * .5 + i) * 18 + T * 24 * slant * 4) % W + W) % W, y = (hash(i + 9) * H + T * (22 + hash(i * 3) * 24)) % H; cx.fillStyle = `rgba(${i % 3 ? '170,170,176' : '70,70,76'},${.5 * wx.ash})`; cx.fillRect(x, y, 1.6 + hash(i * 7) * 1.8, 1.6 + hash(i * 7) * 1.8); } }
+  if ((wx.wind || 0) > .25) { // wind: long dust streaks and tumbling debris, all going the same way
+    const k = (wx.wind - .25) / .75 * gust; cx.strokeStyle = `rgba(${tp.haze},${.16 * k})`; cx.lineWidth = 1; cx.beginPath();
+    for (let i = 0; i < 26 * k + 4; i++) { const y = hash(i * 13) * H, x = ((hash(i) * (W + 240) + T * (240 + hash(i * 3) * 200) * k) % (W + 240)) - 120, ln = 40 + hash(i * 5) * 70; cx.moveTo(x, y); cx.lineTo(x + ln, y + Math.sin(T + i) * 3); }
+    cx.stroke();
+    for (let i = 0; i < 9 * k; i++) { const x = ((hash(i * 17) * (W + 100) + T * (180 + hash(i) * 120) * k) % (W + 100)) - 50, y = HOR + 40 + hash(i * 19) * (H - HOR - 60) + Math.sin(T * 3 + i) * 6; cx.fillStyle = 'rgba(60,56,50,.55)'; cx.save(); cx.translate(x, y); cx.rotate(T * 4 + i); cx.fillRect(-2, -1, 5, 2); cx.restore(); }
+  }
+  if (G && G.bolt) { const b = G.bolt, ft = 1 - b.t / b.max, fl = ft < .12 ? 1 : ft < .2 ? .2 : ft < .3 ? .85 : ft < .6 ? .35 * (1 - (ft - .3) / .3) : 0; if (fl > 0) { cx.fillStyle = `rgba(215,228,255,${.32 * fl})`; cx.fillRect(0, 0, W, H); } }
 }
 
 function drawBG(dist, pal) {
@@ -2758,46 +2898,47 @@ function drawBG(dist, pal) {
     const a = P(xa, z0), b = P(xb, z0), c = P(xb, z1), d = P(xa, z1);
     cx.fillStyle = col; cx.beginPath(); cx.moveTo(a.x, a.y); cx.lineTo(b.x, b.y); cx.lineTo(c.x, c.y); cx.lineTo(d.x, d.y); cx.closePath(); cx.fill();
   };
-  // Sky: smooth atmospheric gradient bands
+  const L = curLook(), frac = G ? clamp(dist / Math.max(1, G.L), 0, 1) : .3, tp = (G && G.tp) || todPal(L, frac), wx = (G && G.wx) || wxAt(L, frac), B = BIOMES[L.biome] || BIOMES.wasteland;
+  const grey = clamp((wx.storm || 0) * .75 + (wx.rain || 0) * .3 + (wx.ash || 0) * .45 + (wx.fog || 0) * .3, 0, .8), dustK = (wx.dust || 0) * .6;
+  const sk = tp.sky.map(c => { let r = mixC(c, '#3a4048', grey); if (dustK > 0) r = mixC(r, '#a88a5a', dustK); return r; });
   const SK = HOR + 40, STEPS = 20, sh = SK / STEPS;
   for (let i = 0; i < STEPS; i++) {
-    const t = i / (STEPS - 1), seg = t < .6 ? [pal.sky[0], pal.sky[1], t / .6] : [pal.sky[1], pal.sky[2], (t - .6) / .4];
+    const t = i / (STEPS - 1), seg = t < .6 ? [sk[0], sk[1], t / .6] : [sk[1], sk[2], (t - .6) / .4];
     cx.fillStyle = mixHex(seg[0], seg[1], seg[2]); cx.fillRect(0, i * sh, W, sh + 1);
   }
-  // Heavy rolling storm clouds
-  for (let i = 0; i < 10; i++) {
-    const xx = ((i * 185 + T * (1.8 + i * .5)) % (W + 360)) - 180, yy = 18 + (i * 47) % 130;
-    cx.fillStyle = i % 2 ? 'rgba(50,85,130,.14)' : 'rgba(8,16,28,.28)';
-    cx.beginPath(); cx.ellipse(xx, yy, 145 + (i % 3) * 45, 15 + (i % 2) * 10, 0, 0, 7); cx.fill();
+  drawStars(L, tp, wx); drawSun(L, tp, frac); drawMoon(L, tp, frac); drawClouds(L, tp, wx);
+  if (tp.glow > .05) { // the glare of the burning cities on the horizon
+    const mg = cx.createRadialGradient(W * .64, HOR - 30, 4, W * .64, HOR - 30, 140);
+    mg.addColorStop(0, `rgba(210,240,255,${.6 * tp.glow})`); mg.addColorStop(.25, `rgba(110,180,245,${.25 * tp.glow})`); mg.addColorStop(1, 'rgba(40,90,160,0)');
+    cx.fillStyle = mg; cx.fillRect(0, 0, W, HOR + 40);
   }
-  // Skynet horizon searchlight sweeping beams
-  const mg = cx.createRadialGradient(W * .64, HOR - 30, 4, W * .64, HOR - 30, 140);
-  mg.addColorStop(0, 'rgba(210,240,255,.6)'); mg.addColorStop(.25, 'rgba(110,180,245,.25)'); mg.addColorStop(1, 'rgba(40,90,160,0)');
-  cx.fillStyle = mg; cx.fillRect(0, 0, W, HOR + 40);
-  for (const bm of [{ x: 75, p: 0 }, { x: 260, p: 1.4 }, { x: 410, p: 2.8 }]) {
+  if (tp.search > .05) for (const bm of [{ x: 75, p: 0 }, { x: 260, p: 1.4 }, { x: 410, p: 2.8 }]) {
     const sx = bm.x + Math.sin(T * .4 + bm.p) * 85;
-    cx.fillStyle = 'rgba(160,215,255,.08)'; cx.beginPath(); cx.moveTo(bm.x - 3, HOR); cx.lineTo(bm.x + 3, HOR); cx.lineTo(sx + 32, 0); cx.lineTo(sx - 32, 0); cx.fill();
+    cx.fillStyle = `rgba(160,215,255,${.08 * tp.search})`; cx.beginPath(); cx.moveTo(bm.x - 3, HOR); cx.lineTo(bm.x + 3, HOR); cx.lineTo(sx + 32, 0); cx.lineTo(sx - 32, 0); cx.fill();
   }
-  drawDistantGunship();
-  // Ruined city: 3 parallax layers with volumetric haze
-  drawCity(CITY[0], (dist * .02) % CITY[0].w, '#1b2e45', '#37597a', false);
-  const hz0 = cx.createLinearGradient(0, HOR - 120, 0, HOR); hz0.addColorStop(0, 'rgba(80,140,200,0)'); hz0.addColorStop(1, 'rgba(90,150,210,.32)');
+  if (G && G.bolt) drawBolt(G.bolt);
+  if (tp.stars > .25 || L.tod === 'dusk') drawDistantGunship();
+  // horizon: mountains, a dense ruined city, or both
+  if (L.cityMode === 'ridge') { drawRidge(tp.city[0][0], tp.city[0][1], (dist * .015) % RIDGE.w); drawRidge(tp.city[1][0], tp.city[1][1], (dist * .03) % RIDGE.w); }
+  else drawCity(CITY[0], (dist * .02) % CITY[0].w, tp.city[0][0], tp.city[0][1], 0);
+  const hz0 = cx.createLinearGradient(0, HOR - 120, 0, HOR); hz0.addColorStop(0, `rgba(${tp.haze},0)`); hz0.addColorStop(1, `rgba(${tp.haze},${.18 + .14 * Math.max(tp.glow, .3)})`);
   cx.fillStyle = hz0; cx.fillRect(0, HOR - 120, W, 120);
-  drawCity(CITY[1], (dist * .04) % CITY[1].w, '#0f1c2d', '#25415c', true);
-  // Burning skyline fires & smoke vents
+  drawCity(CITY[1], (dist * .04) % CITY[1].w, tp.city[1][0], tp.city[1][1], tp.win);
+  // burning skyline fires & smoke vents
   for (const f of [{ x: 60, s: 0, k: .5 }, { x: 150, s: 1.7, k: .7 }, { x: 250, s: 3.1, k: .45 }, { x: 330, s: 2.3, k: .8 }, { x: 410, s: 4.4, k: .55 }, { x: 520, s: 5.9, k: .65 }]) {
     const fx = ((f.x - dist * .04) % (W * 2) + W * 2) % (W * 2) - 40;
-    if (fx < -60 || fx > W + 60) continue;
+    if (fx < -60 || fx > W + 60 || f.k * tp.fires < .24 + .1 * hash(f.s * 7 + L.lv)) continue;
     smokeVent(fx, HOR - 6, f.k * 1.1, .4, f.s * 13.7, T); fireVent(fx, HOR - 2, f.k, .55, f.s * 13.7, Math.floor(f.s), T);
   }
-  { const fl = Math.max(0, Math.sin(T * .53) * Math.sin(T * 1.7 + 1) - .72) * 3.2;
+  { const fl = Math.max(0, Math.sin(T * .53) * Math.sin(T * 1.7 + 1) - .72) * 3.2 * Math.min(1, tp.fires);
     if (fl > 0) { const g2 = cx.createLinearGradient(0, HOR - 90, 0, HOR); g2.addColorStop(0, 'rgba(255,120,40,0)'); g2.addColorStop(1, `rgba(255,140,60,${Math.min(.35, fl * .3)})`); cx.fillStyle = g2; cx.fillRect(0, HOR - 90, W, 90); } }
-  drawCity(CITY[2], (dist * .07) % CITY[2].w, '#070e19', '#16283c', true);
-  // ground: rubble wasteland with broken asphalt highway & cleared lane
+  if (L.cityMode !== 'sparse' || L.dens > 1) drawCity(CITY[2], (dist * .07) % CITY[2].w, tp.city[2][0], tp.city[2][1], tp.win);
+  // ground: this sector's terrain with a broken highway and a cleared lane
+  const gc = B.gnd ? [mixC(tp.gnd[0], B.gnd[0], .6), mixC(tp.gnd[1], B.gnd[1], .6)] : tp.gnd;
   const gg = cx.createLinearGradient(0, HOR, 0, H);
-  gg.addColorStop(0, pal.gnd[0]); gg.addColorStop(1, pal.gnd[1]);
+  gg.addColorStop(0, gc[0]); gg.addColorStop(1, gc[1]);
   cx.fillStyle = gg; cx.fillRect(0, HOR, W, H - HOR);
-  quad(-1, 1, -150, 3200, 'rgba(30,36,46,.45)');                                          // asphalt road base
+  quad(-1, 1, -150, 3200, B.road);                                          // asphalt road base
   quad(-0.95, 0.95, -150, 3200, 'rgba(120,150,195,.06)');                                    // trampled, cleared path center
 
   const BS = 50, base = Math.floor(dist / BS) - 2;
@@ -2814,7 +2955,7 @@ function drawBG(dist, pal) {
     for (let j = 0; j < 7; j++) { // jagged soot scars and slab fragments
       const hx = hash(idx * 31 + j * 5 + 2), hz = hash(idx * 31 + j * 5 + 3), hs = hash(idx * 31 + j * 5 + 4);
       const pq = P(hx * 7 - 3.5, z0 + hz * BS), wd = (.08 + hs * .3) * LANE * pq.s, hh = wd * (.16 + hs * .12), dark = hs < .55;
-      cx.fillStyle = dark ? 'rgba(5,8,13,.55)' : 'rgba(96,120,158,.3)';
+      cx.fillStyle = dark ? B.scar[0] : B.scar[1];
       cx.beginPath(); cx.moveTo(pq.x - wd, pq.y);
       for (let v = 1; v < 7; v++) { const an = Math.PI + v * Math.PI / 6.5, rr = .55 + hash(idx * 71 + j * 13 + v) * .6; cx.lineTo(pq.x + Math.cos(an) * wd * rr * -1, pq.y + Math.sin(an) * hh * rr * -1); }
       cx.lineTo(pq.x + wd, pq.y); cx.closePath(); cx.fill();
@@ -2822,7 +2963,7 @@ function drawBG(dist, pal) {
     }
     for (let j = 0; j < (save.fx === 'low' ? 8 : 22); j++) { // fine debris chips across the whole ground
       const hx = hash(idx * 91 + j * 3 + 11), hz = hash(idx * 91 + j * 3 + 12), pq = P(hx * 8 - 4, z0 + hz * BS), sz = Math.max(1, (1.5 + hash(idx * 7 + j) * 3) * pq.s);
-      cx.fillStyle = j % 4 === 0 ? '#79899f' : j % 4 === 1 ? '#0b1118' : j % 4 === 2 ? '#34445a' : '#4a3a30'; cx.fillRect(pq.x, pq.y, sz * 1.8, sz);
+      cx.fillStyle = B.chip[j % 4]; cx.fillRect(pq.x, pq.y, sz * 1.8, sz);
     }
     for (let j = 0; j < (save.fx === 'low' ? 4 : 12); j++) { // pebbles and shards on the path
       const hx = hash(idx * 53 + j * 3 + 7), hz = hash(idx * 53 + j * 3 + 8), pq = P(hx * 1.9 - .95, z0 + hz * BS), sz = Math.max(1, 2.2 * pq.s);
@@ -2835,40 +2976,33 @@ function drawBG(dist, pal) {
       cx.strokeStyle = 'rgba(2,4,8,.7)'; cx.lineWidth = Math.max(1, 3 * P(hx, z0 + hz).s); cx.stroke();
       if (glow2) { cx.strokeStyle = `rgba(255,${100 + 50 * Math.sin(T * 3 + idx)},30,${.35 + .2 * Math.sin(T * 2 + idx + j)})`; cx.lineWidth = Math.max(.8, 1.3 * P(hx, z0 + idx).s); cx.stroke(); }
     }
-    if (hash(idx * 41 + 3) < .3) { // a standing puddle holding a little of the sky
+    if (hash(idx * 41 + 3) < B.puddle) { // a standing puddle holding a little of the sky
       const hx = hash(idx * 43 + 1) * 5 - 2.5, hz = hash(idx * 43 + 2) * BS, pq = P(hx, z0 + hz), pw = (.14 + hash(idx * 43 + 3) * .2) * LANE * pq.s;
       cx.fillStyle = 'rgba(30,60,100,.5)'; cx.beginPath(); cx.ellipse(pq.x, pq.y, pw, pw * .2, 0, 0, 7); cx.fill(); cx.fillStyle = 'rgba(150,190,240,.28)'; cx.fillRect(pq.x - pw * .5, pq.y - pw * .06, pw * .8, Math.max(1, pw * .05));
     }
-    for (const sd of [-1, 1]) heap(sd * (1.08 + hash(idx * 7 + (sd > 0 ? 1 : 2)) * .1), z0 + hash(idx * 9 + 3) * BS, .24 + hash(idx * 13 + sd) * .14, 24 + hash(idx * 19 + sd) * 30, idx * 5 + sd);
+    for (const sd of [-1, 1]) heap(sd * (1.08 + hash(idx * 7 + (sd > 0 ? 1 : 2)) * .1), z0 + hash(idx * 9 + 3) * BS, .24 + hash(idx * 13 + sd) * .14, 24 + hash(idx * 19 + sd) * 30, idx * 5 + sd, B.heap);
   }
   
-  // Rolling horizon fog & ground mist layers
+  // horizon haze and low mist, in the colour of this time of day
   const fog = cx.createLinearGradient(0, HOR, 0, HOR + 130);
-  fog.addColorStop(0, 'rgba(70,115,170,.38)');
-  fog.addColorStop(0.5, 'rgba(50,90,140,.18)');
-  fog.addColorStop(1, 'rgba(70,115,170,0)');
+  fog.addColorStop(0, `rgba(${tp.haze},${.18 + .2 * Math.max(tp.glow, .3)})`); fog.addColorStop(0.5, `rgba(${tp.haze},.12)`); fog.addColorStop(1, `rgba(${tp.haze},0)`);
   cx.fillStyle = fog; cx.fillRect(0, HOR, W, 130);
-
-  // Animated rolling fog banks along the mid ground
   for (let fIdx = 0; fIdx < 3; fIdx++) {
-    const fx = ((T * (12 + fIdx * 8) + fIdx * 160) % (W + 200)) - 100;
-    const fy = HOR + 15 + fIdx * 25;
-    cx.fillStyle = `rgba(60,100,150,${0.08 + fIdx * 0.03})`;
-    cx.beginPath();
-    cx.ellipse(fx, fy, 140 + fIdx * 30, 18 + fIdx * 6, 0, 0, 7);
-    cx.fill();
+    const fx = ((T * (12 + fIdx * 8) + fIdx * 160) % (W + 200)) - 100, fy = HOR + 15 + fIdx * 25;
+    cx.fillStyle = `rgba(${tp.haze},${0.05 + fIdx * 0.02})`; cx.beginPath(); cx.ellipse(fx, fy, 140 + fIdx * 30, 18 + fIdx * 6, 0, 0, 7); cx.fill();
   }
 }
 
 function drawGrade() {
-  drawEmbers(); // cold blue future-war grade: haze band, tint, vignette
+  drawEmbers(); // the grade of this time of day: haze band, tint, vignette
   cx.setTransform(RS, 0, 0, RS, 0, 0);
+  const L = curLook(), tp = (G && G.tp) || todPal(L, .3), tn = tp.tint;
   const hz = cx.createLinearGradient(0, HOR - 70, 0, HOR + 90);
-  hz.addColorStop(0, 'rgba(90,150,220,0)'); hz.addColorStop(.45, 'rgba(110,170,235,.22)'); hz.addColorStop(1, 'rgba(90,150,220,0)');
+  hz.addColorStop(0, `rgba(${tp.haze},0)`); hz.addColorStop(.45, `rgba(${tp.haze},.18)`); hz.addColorStop(1, `rgba(${tp.haze},0)`);
   cx.fillStyle = hz; cx.fillRect(0, HOR - 70, W, 160);
-  cx.fillStyle = 'rgba(20,60,120,.09)'; cx.fillRect(0, 0, W, H);
+  cx.fillStyle = `rgba(${Math.round(tn[0])},${Math.round(tn[1])},${Math.round(tn[2])},${tn[3].toFixed(3)})`; cx.fillRect(0, 0, W, H);
   const v = cx.createRadialGradient(W / 2, H * .55, H * .3, W / 2, H * .55, H * .75);
-  v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,4,12,.42)');
+  v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, `rgba(0,4,12,${tp.vig.toFixed(3)})`);
   cx.fillStyle = v; cx.fillRect(0, 0, W, H);
 }
 
@@ -2970,6 +3104,7 @@ function render() {
   }
   if (G.flash > 0) { cx.fillStyle = `rgba(255,255,255,${G.flash * .6})`; cx.fillRect(0, 0, W, H); }
   if (G.hurtFlash > 0) { cx.fillStyle = `rgba(255,0,0,${G.hurtFlash * .5})`; cx.fillRect(0, 0, W, H); }
+  safeDraw(drawWeather);
   safeDraw(drawEnv);
   cx.restore();
   safeDraw(drawGrade);
