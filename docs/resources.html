@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cyber Net Attack: resources</title>
+<style>
+  :root{--bg:#0b1220;--panel:#111b2e;--line:#22314d;--text:#cfe0f5;--dim:#7f97ba;--hi:#e8f1ff;--acc:#ff9a4a;--ok:#5fd68a;--warn:#ffcf5a;--bad:#ff7a6a}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:14px system-ui,sans-serif}
+  header{position:sticky;top:0;z-index:20;background:var(--panel);border-bottom:1px solid var(--line)}
+  .top{display:flex;gap:16px;align-items:center;flex-wrap:wrap;padding:10px 18px}
+  h1{margin:0;font-size:15px;color:var(--hi)}
+  h1 small{color:var(--dim);font-weight:400;margin-left:8px}
+  nav{display:flex;gap:4px}
+  nav button{background:#16233a;color:var(--text);border:1px solid var(--line);border-bottom:none;padding:8px 18px;border-radius:8px 8px 0 0;font:inherit;cursor:pointer}
+  nav button.on{background:var(--bg);color:var(--hi);border-color:#34476a;box-shadow:0 2px 0 var(--bg)}
+  .bar{display:flex;gap:16px;align-items:center;flex-wrap:wrap;padding:8px 18px;background:var(--bg);border-top:1px solid var(--line)}
+  .bar label{display:flex;gap:8px;align-items:center;color:var(--dim)}
+  .bar select,.bar input[type=text],.bar input[type=number]{background:#16233a;color:var(--text);border:1px solid var(--line);border-radius:6px;padding:4px 8px;font:inherit}
+  button.b{background:#1c2c48;color:var(--text);border:1px solid #34476a;border-radius:6px;padding:5px 12px;font:inherit;cursor:pointer}
+  button.b:hover{background:#26406a}
+  .tab{display:none;padding:14px 22px 60px}.tab.on{display:block}
+  h2{font-size:15px;color:var(--hi);margin:22px 0 4px}h2:first-child{margin-top:4px}
+  p.note{margin:0 0 10px;color:var(--dim);max-width:900px;line-height:1.45}
+  .grid{display:flex;flex-wrap:wrap;gap:14px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:6px}
+  .card h3{margin:0;font-size:13px;color:var(--hi)}
+  .card small{color:var(--dim)}
+  .views{display:flex;gap:10px;align-items:flex-end;overflow-x:auto;padding-bottom:4px}
+  .views .v{display:flex;flex-direction:column;align-items:center;gap:4px}
+  .views .v b{font-size:10px;color:var(--dim);font-weight:600;letter-spacing:.06em}
+  canvas.px{image-rendering:pixelated;background:#162238;border:1px solid var(--line);border-radius:6px}
+  .badge{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px;font-weight:600}
+  .have{background:#143d27;color:var(--ok)}.ph{background:#3f3512;color:var(--warn)}.miss{background:#44201c;color:var(--bad)}
+  .card.miss-card{border-color:#5a3a30}
+  code{background:#0a1626;border:1px solid var(--line);border-radius:4px;padding:1px 6px;color:#b9d2f2;font-size:12px}
+  a{color:#7fb6ff}
+  .map{display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start}
+  .map canvas{border:1px solid var(--line);border-radius:8px;background:#000}
+  .thumbs{display:flex;flex-wrap:wrap;gap:10px}
+  .thumb{display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;color:var(--dim);font-size:11px}
+  .thumb canvas{border:2px solid var(--line);border-radius:6px;display:block}
+  .thumb:hover canvas{border-color:#7fb6ff}
+  .snd{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px}
+  .snd button{text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:8px;color:var(--text);padding:8px 10px;cursor:pointer;font:inherit}
+  .snd button:hover{background:#1a2b49;border-color:#4a6aa0}.snd button:active{background:#26406a}
+  .snd button b{display:block;color:var(--hi);font-size:13px}.snd button span{color:var(--dim);font-size:12px}
+  .hidden{display:none!important}
+  #stage{position:fixed;left:-9999px;top:0}
+</style></head>
+<body>
+<div id="stage"><div id="wrap"><canvas id="c" width="336" height="560"></canvas><div id="ui"></div><div id="crtfx"></div></div></div>
+<header>
+  <div class="top"><h1>Cyber Net Attack<small>resources</small></h1>
+    <nav id="nav"><button data-t="sprites">Sprites</button><button data-t="maps">Maps</button><button data-t="sounds">Sounds</button></nav>
+    <span style="margin-left:auto;color:var(--dim);font-size:12px">live from <code>game.js</code> and <code>assets/</code>: always matches the game</span></div>
+  <div class="bar" id="bar-sprites">
+    <label>Show <select id="sfilter"><option value="all">everything</option><option value="have">units with art</option><option value="ph">placeholders in use</option><option value="miss">missing art</option></select></label>
+    <label>Search <input type="text" id="ssearch" placeholder="unit name"></label>
+    <label>Speed <input id="fps" type="range" min="2" max="24" value="10"><span id="fpsv">10 fps</span></label>
+    <label>Scale <input id="scale" type="range" min="1" max="8" value="3"><span id="scalev">3x</span></label>
+    <label><input id="ground" type="checkbox" checked> ground line</label>
+  </div>
+  <div class="bar hidden" id="bar-maps">
+    <label>Sector <input type="number" id="msec" min="1" max="999" value="1" style="width:76px"></label>
+    <button class="b" id="mprev">◀</button><button class="b" id="mnext">▶</button><button class="b" id="mrand">Random</button>
+    <label>Time <select id="mtod"></select></label>
+    <label>Weather <select id="mwx"></select></label><label>then <select id="mwx2"></select></label>
+    <label>Land <select id="mbio"></select></label>
+    <label>Skyline <select id="mcity"></select></label>
+    <label>Progress <input type="range" id="mfrac" min="0" max="100" value="30"><span id="mfracv">30%</span></label>
+    <button class="b" id="mbolt">⚡ lightning</button><button class="b" id="mreset">reset to sector</button>
+  </div>
+  <div class="bar hidden" id="bar-sounds">
+    <label>Volume <input id="svol" type="range" min="0" max="100" value="80"></label>
+    <button class="b" id="sstopall">Stop music and ambience</button>
+    <span id="saud" style="color:var(--dim)"></span>
+  </div>
+</header>
+
+<section id="t-sprites" class="tab"><div id="slist"></div></section>
+
+<section id="t-maps" class="tab">
+  <h2>Live preview</h2>
+  <p class="note">The same drawing code the game uses for the sky, skyline, ground and weather. Each sector number gives its own look (time of day, weather, landscape, skyline); the menus above override any part of it. Click any thumbnail below to load that look.</p>
+  <div class="map"><canvas id="mlive" width="300" height="500"></canvas><div id="minfo" style="max-width:380px;line-height:1.55"></div></div>
+  <h2>Times of day</h2><p class="note">Dawn brightens from moonlight and dusk darkens from daylight as a sector progresses.</p><div class="thumbs" id="th-tod"></div>
+  <h2>Weather</h2><p class="note">A sector's weather can change part way through (the "then" menu). Thunderstorms throw lightning and play thunder in the game.</p><div class="thumbs" id="th-wx"></div>
+  <h2>Landscapes</h2><div class="thumbs" id="th-bio"></div>
+  <h2>Skylines</h2><div class="thumbs" id="th-city"></div>
+  <h2>Sectors 1 to 40</h2><p class="note">What a run looks like, sector by sector (sector 1 is always the original moonlit city).</p><div class="thumbs" id="th-sec"></div>
+  <h2>Terrain props</h2><p class="note">Obstacles that appear on the road. Cover (trucks, sandbags) soaks enemy fire; barriers slow the squad; traps stop tracked machines.</p><div class="thumbs" id="th-prop"></div>
+</section>
+
+<section id="t-sounds" class="tab">
+  <p class="note">Every sound is synthesised in the browser (no audio files). Click to play. The first click wakes the audio engine.</p>
+  <div id="slistsnd"></div>
+</section>
+
+<script>
+window.CNA_PREVIEW = true;           // game.js: load for its drawing and sound code only
+window.ASSET_BASE = '../assets/sprites/';
+</script>
+<script src="../assets/sprites/manifest.js"></script>
+<script src="../game.js"></script>
+<script>
+(function () {
+'use strict';
+const $ = id => document.getElementById(id);
+const MAN = window.SPRITE_MANIFEST || {}, BASE = '../assets/sprites/';
+
+// ------------------------------------------------------------------ tabs
+const TABS = ['sprites', 'maps', 'sounds'];
+function showTab(t) {
+  if (!TABS.includes(t)) t = 'sprites';
+  for (const x of TABS) { $('t-' + x).classList.toggle('on', x === t); $('bar-' + x).classList.toggle('hidden', x !== t); }
+  for (const b of document.querySelectorAll('#nav button')) b.classList.toggle('on', b.dataset.t === t);
+  location.hash = t; if (t === 'maps') initMaps(); if (t === 'sounds') initSounds();
+  tab = t;
+}
+let tab = 'sprites';
+for (const b of document.querySelectorAll('#nav button')) b.onclick = () => showTab(b.dataset.t);
+
+// ------------------------------------------------------------------ sprites
+const LABEL = { resistance_rifleman: 'Rifleman (steel helmet)', resistance_captain: 'Captain (field cap)', resistance_goggles: 'Rifleman (goggles, backpack)', resistance_shotgunner: 'Shotgunner (bandana, braid)', resistance_signaller: 'Signaller (headset, antenna)', resistance_tech: 'Tech Operative', resistance_heavy: 'Ordnance Gunner', t800: 'T-800 Endoskeleton', t800_infiltrator: 'T-800 Infiltrator (damaged)', t800_minigun: 'T-800 Endoskeleton (minigun)', t800_crawler: 'T-800 Crawler', t800_reprogrammed: 'Reprogrammed T-800', t47: 'T-47', t1: 'T-1', hk_tank: 'HK-Tank', hk_aerial: 'HK-Aerial', aerostat: 'Aerostat', harvester: 'Harvester', ogre: 'The Ogre' };
+// units the game wants that have no sheet yet, and what is drawn in their place
+const WANTED = [
+  { id: 'resistance_medic', label: 'Field Medic', use: 'FIELD MEDIC class soldiers', stand: 'resistance_rifleman', tint: null, kind: 'soldier' },
+  { id: 'resistance_grenadier', label: 'Grenadier', use: 'GRENADIER class soldiers', stand: 'resistance_heavy', tint: null, kind: 'soldier' },
+  { id: 'resistance_hacker', label: 'Tech-Com Hacker', use: 'TECH-COM HACKER class soldiers', stand: 'resistance_tech', tint: null, kind: 'soldier' },
+  { id: 'resistance_sniper', label: 'Scout Sniper', use: 'SCOUT SNIPER class soldiers', stand: 'resistance_goggles', tint: null, kind: 'soldier' },
+  { id: 'resistance_demolitions', label: 'Demolitions Specialist', use: 'DEMOLITIONS class soldiers', stand: 'resistance_captain', tint: null, kind: 'soldier' },
+  { id: 't700', label: 'T-700 Endoskeleton', use: 'heavy armoured endo with dual SMGs (sector 4+)', stand: 't800_minigun', tint: ['#5a6270', .4], kind: 'walker' },
+  { id: 't1000_blade', label: 'T-1000 (blade stance)', use: 'liquid-metal hunter, charging (sector 6+)', stand: 't800', tint: ['#aebccc', .4], kind: 'walker' },
+  { id: 't1000_chrome', label: 'T-1000 (chrome form)', use: 'liquid-metal hunter, bullet-proof (sector 6+)', stand: 't800_infiltrator', tint: ['#e4f0ff', .6], kind: 'walker' },
+  { id: 'hk_drone', label: 'HK Scout Drone', use: 'swarm flyer, dives at the squad (sector 3+)', stand: 'aerostat', tint: ['#c8ffd0', .25], kind: 'flyer', scale: .55 },
+  { id: 'hk_minelayer', label: 'HK Minelayer', use: 'tracked mine-laying vehicle (sector 4+)', stand: 'hk_tank', tint: ['#6a7a3a', .3], kind: 'vehicle', scale: .9 },
+  { id: 't400', label: 'T-400 Maintenance Endo', use: 'rusty droid with fuel cells (industrial sectors)', stand: 't800', tint: ['#9a5a22', .5], kind: 'walker' },
+  { id: 'hk_centurion', label: 'HK-Centurion', use: 'quad-legged boss with gatlings and mortars (sector 6)', stand: 't47', tint: ['#8a2a2a', .3], kind: 'boss', scale: 1.4 },
+];
+const HOWTO = { soldier: 'soldiers: <code>--groups s:1,n:6,ne:6,nw:6 --height 110</code> (front view, then 6-frame run cycles away and diagonally)', walker: 'walkers: <code>--groups s:6,se:6 --rows 2 --height 230</code> (6-frame walk, front and 3/4 view)', flyer: 'flyers: front and 3/4 hover views, <code>--height 230</code>', vehicle: 'vehicles: <code>--groups s:6,se:6 --height 230</code>; ask for spotlight and muzzle positions in <code>meta.json</code>', boss: 'bosses: draw them 500 to 800 px tall; see the notes in <code>assets/README.md</code>' };
+const imgs = {}, load = f => imgs[f] || (imgs[f] = Object.assign(new Image(), { src: BASE + f }));
+const ORDER = ['s', 'n', 'ne', 'nw', 'e', 'se', 'sw', 'w'];
+const frames = (u, k) => { const v = MAN[u].dirs[k]; return v.files || v; };
+const cards = [];   // { el, kind, unit, views:[{cv, files}] , placeholder? }
+function viewsOf(n) { return Object.keys(MAN[n].dirs || {}).filter(k => ORDER.includes(k)).sort((a, b) => ORDER.indexOf(a) - ORDER.indexOf(b)); }
+function buildSprites() {
+  const list = $('slist'); list.innerHTML = '';
+  const have = Object.keys(MAN).filter(n => viewsOf(n).length);
+  const mkSection = (title, note) => { const h = document.createElement('h2'), p = document.createElement('p'), g = document.createElement('div'); h.textContent = title; p.className = 'note'; p.innerHTML = note; g.className = 'grid'; list.append(h, p, g); return g; };
+  const gHave = mkSection('Units with art (' + have.length + ')', 'Painted sheets in <code>assets/sprites/</code>. Each view animates through its frames; every view of a unit shares one baseline.');
+  for (const n of have) { const c = card(gHave, LABEL[n] || n, n, 'have'); const keys = viewsOf(n); c.unit = n; for (const k of keys) addView(c, k, frames(n, k).map(load), frames(n, k).length > 1 ? frames(n, k).length + ' fr' : 'static'); cards.push(c); }
+  const gMiss = mkSection('Missing art (' + WANTED.length + ')', 'The game already uses these units, with the art shown here standing in. To add real art: generate a sheet (<a href="prompt_builder.html">prompt builder</a>), import it with <code>tools/import_strip.py</code> into a folder of the suggested name, run <code>tools/build_manifest.py assets/sprites</code>, then point <code>EDRAW</code> (enemies) or <code>CLASS</code> (soldiers) in <code>game.js</code> at the new folder. See <code>assets/README.md</code>.');
+  for (const w of WANTED) {
+    const exists = !!MAN[w.id] && viewsOf(w.id).length;
+    const c = card(gMiss, w.label, w.id, exists ? 'have' : 'ph'); c.wanted = w;
+    const d = document.createElement('div'); d.innerHTML = '<small>' + w.use + '</small>'; c.el.insertBefore(d, c.el.children[2]);
+    if (MAN[w.stand]) { const keys = viewsOf(w.stand).slice(0, 3); for (const k of keys) addView(c, k, frames(w.stand, k).map(load), 'placeholder', w.tint, w.scale); }
+    const h = document.createElement('small'); h.innerHTML = 'standing in: <code>' + w.stand + '</code>' + (w.tint ? ' (tinted)' : '') + '<br>' + HOWTO[w.kind]; c.el.appendChild(h);
+    cards.push(c);
+  }
+  applyFilter();
+}
+function card(parent, title, id, status) {
+  const el = document.createElement('div'); el.className = 'card' + (status === 'ph' ? ' miss-card' : '');
+  const h = document.createElement('h3'); h.innerHTML = title + ' <span class="badge ' + status + '">' + (status === 'have' ? 'has art' : status === 'ph' ? 'placeholder' : 'missing') + '</span>';
+  const s = document.createElement('small'); s.innerHTML = '<code>' + id + '</code>';
+  const v = document.createElement('div'); v.className = 'views'; el.append(h, s, v); parent.appendChild(el);
+  return { el, id, status, views: [], box: v };
+}
+function addView(c, k, files, sub, tint, scale) {
+  const w = document.createElement('div'); w.className = 'v'; const cv = document.createElement('canvas'); cv.className = 'px'; const b = document.createElement('b'); b.textContent = k.toUpperCase() + ' · ' + sub; w.append(cv, b); c.box.appendChild(w);
+  c.views.push({ cv, files, tint, scale: scale || 1 });
+}
+function applyFilter() {
+  const f = $('sfilter').value, q = $('ssearch').value.trim().toLowerCase();
+  for (const c of cards) { const okF = f === 'all' || (f === 'have' && !c.wanted) || (f === 'ph' && c.wanted && c.status === 'ph') || (f === 'miss' && c.wanted && c.status === 'ph'); const okQ = !q || (c.id + ' ' + c.el.textContent).toLowerCase().includes(q); c.el.classList.toggle('hidden', !(okF && okQ)); }
+}
+const tintCache = new Map();
+function tinted(im, col) { const key = im.src + col; if (tintCache.has(key)) return tintCache.get(key); const c = document.createElement('canvas'); c.width = im.naturalWidth; c.height = im.naturalHeight; const x = c.getContext('2d'); x.drawImage(im, 0, 0); x.globalCompositeOperation = 'source-in'; x.fillStyle = col; x.fillRect(0, 0, c.width, c.height); tintCache.set(key, c); return c; }
+function drawSprites(t) {
+  const want = +$('scale').value, fps = +$('fps').value, ground = $('ground').checked;
+  for (const c of cards) {
+    if (c.el.classList.contains('hidden')) continue;
+    let W = 1, H = 1; for (const v of c.views) for (const im of v.files) if (im.complete && im.naturalWidth) { W = Math.max(W, im.naturalWidth * v.scale); H = Math.max(H, im.naturalHeight * v.scale); }
+    const sc = Math.max(1, Math.min(want, Math.floor(300 / H), Math.floor(340 / W)));
+    for (const v of c.views) {
+      const cv = v.cv; if (cv.width !== Math.round(W * sc) || cv.height !== Math.round(H * sc) + 10) { cv.width = Math.round(W * sc); cv.height = Math.round(H * sc) + 10; }
+      const x = cv.getContext('2d'); x.imageSmoothingEnabled = false; x.clearRect(0, 0, cv.width, cv.height);
+      if (ground) { x.fillStyle = 'rgba(120,160,220,.25)'; x.fillRect(0, H * sc + 4, cv.width, 2); }
+      const im = v.files[Math.floor(t / 1000 * fps) % v.files.length];
+      if (im && im.complete && im.naturalWidth) { const iw = im.naturalWidth * v.scale * sc, ih = im.naturalHeight * v.scale * sc, dx = (cv.width - iw) / 2, dy = H * sc - ih; x.drawImage(im, dx, dy, iw, ih); if (v.tint) { x.globalAlpha = v.tint[1]; x.drawImage(tinted(im, v.tint[0]), dx, dy, iw, ih); x.globalAlpha = 1; } }
+    }
+  }
+}
+$('fps').oninput = e => $('fpsv').textContent = e.target.value + ' fps';
+$('scale').oninput = e => $('scalev').textContent = e.target.value + 'x';
+$('sfilter').onchange = applyFilter; $('ssearch').oninput = applyFilter;
+
+// ------------------------------------------------------------------ maps
+let mapsReady = false, curLook = null, ovr = {}, PVbolt = null, builtKey = '';
+function lookKey(l) { return [l.lv, l.tod, l.biome, l.cityMode, l.dens].join('|'); }
+function pvLook() { const base = makeLook(+$('msec').value || 1), l = Object.assign({}, base, ovr); if (ovr.tod) l.from = ovr.tod === 'dawn' ? 'moon' : ovr.tod === 'dusk' ? 'day' : ovr.tod; return l; }
+function renderLook(target, look, frac, withBolt) {
+  const key = lookKey(look); if (key !== builtKey) { buildScenery(look); builtKey = key; }
+  G = { look, tp: todPal(look, frac), wx: wxAt(look, frac), bolt: withBolt ? PVbolt : null, dist: frac * 4000 + look.lv * 90, L: 4000, lv: look.lv, t: T, parts: [], lt: [], en: [], gates: [], obs: [], haz: [], texts: [], shake: 0, thunder: 0 };
+  cx.setTransform(RS, 0, 0, RS, 0, 0); cx.globalAlpha = 1; cx.globalCompositeOperation = 'source-over'; cx.clearRect(0, 0, W, H);
+  drawBG(G.dist, null); drawWeather(); drawGrade();
+  const tx = target.getContext('2d'); tx.imageSmoothingEnabled = true; tx.drawImage(cv, 0, 0, cv.width, cv.height, 0, 0, target.width, target.height);
+}
+function fillSelects() {
+  const opt = (sel, vals) => { sel.innerHTML = ''; for (const v of vals) { const o = document.createElement('option'); o.value = v; o.textContent = v; sel.appendChild(o); } };
+  opt($('mtod'), ['(sector)'].concat(Object.keys(TODS))); opt($('mwx'), ['(sector)'].concat(Object.keys(WXT))); opt($('mwx2'), ['(sector)'].concat(Object.keys(WXT))); opt($('mbio'), ['(sector)'].concat(Object.keys(BIOMES))); opt($('mcity'), ['(sector)', 'city', 'sparse', 'ridge']);
+}
+function syncOverrides() {
+  ovr = {}; const g = (id, k) => { const v = $(id).value; if (v && v !== '(sector)') ovr[k] = v; };
+  g('mtod', 'tod'); g('mwx', 'wA'); g('mwx2', 'wB'); g('mbio', 'biome'); g('mcity', 'cityMode');
+  if (ovr.wA && !ovr.wB) ovr.wB = ovr.wA; if (ovr.wB && !ovr.wA) ovr.wA = ovr.wB;
+  if (ovr.wA) ovr.sw = .5;
+}
+function setSel(id, v) { $(id).value = v; }
+function info() {
+  const l = pvLook(); $('minfo').innerHTML = '<b style="color:var(--hi)">Sector ' + l.lv + '</b>' + (SECT ? ' · ' + SECT[(l.lv - 1) % SECT.length] : '') + '<br>time of day: <code>' + l.tod + '</code><br>weather: <code>' + l.wA + '</code>' + (l.wB !== l.wA ? ' then <code>' + l.wB + '</code> (about ' + Math.round(l.sw * 100) + '% through)' : '') + '<br>landscape: <code>' + l.biome + '</code><br>skyline: <code>' + l.cityMode + '</code> (density ' + l.dens.toFixed(2) + ')' + (l.env ? '<br>gameplay effect: <code>' + l.env + '</code> (the sector keeps its own weather rules)' : '');
+}
+const JOBS = [];   // thumbnails are drawn a few at a time so the page stays responsive
+function thumb(parent, label, look, frac, onclick, w, h) {
+  const d = document.createElement('div'); d.className = 'thumb'; const c = document.createElement('canvas'); c.width = w || 120; c.height = h || 200; c.style.background = '#0b1220'; const s = document.createElement('span'); s.textContent = label; d.append(c, s); parent.appendChild(d);
+  JOBS.push(() => { const fx = save.fx; save.fx = 'low'; renderLook(c, look, frac, false); save.fx = fx; }); d.onclick = onclick; return c;
+}
+function propThumb(kind) {
+  const look = Object.assign({}, makeLook(2), { tod: 'overcast', from: 'overcast', wA: 'clear', wB: 'clear', biome: 'wasteland', cityMode: 'sparse' });
+  const key = lookKey(look); if (key !== builtKey) { buildScenery(look); builtKey = key; }
+  G = { look, tp: todPal(look, .3), wx: wxAt(look, .3), bolt: null, dist: 0, L: 4000, lv: 2, t: T, parts: [], lt: [], en: [], gates: [], obs: [], haz: [], texts: [], shake: 0 };
+  cx.setTransform(RS, 0, 0, RS, 0, 0); cx.clearRect(0, 0, W, H); drawBG(0, null);
+  const o = { k: kind, x: 0, hw: kind === 'truck' ? .17 : kind === 'sandbag' ? .22 : kind === 'trap' ? .085 : kind === 'rubble' ? .4 : kind === 'overpass' ? 1.1 : .18, wz: 120, len: 40, hp: 300, max: 380, dead: false, sd: 5, hit: 0, fall: 1, st: 0, open: 1, t: 1, sq: false };
+  if (kind === 'trap') { G.obs.push(o); }
+  drawObs(o);
+  const q = P(0, 120), c = document.createElement('canvas'); c.width = 170; c.height = 150; const x = c.getContext('2d');
+  const sw = 260, sh = 224; x.drawImage(cv, (q.x - sw / 2) * RS, (q.y - sh * .78) * RS, sw * RS, sh * RS, 0, 0, c.width, c.height);
+  return c;
+}
+function initMaps() {
+  if (mapsReady) return; mapsReady = true; RS = 1; cv.width = W; cv.height = H; fillSelects(); curLook = pvLook();   // (preview at 1x: the page does not run the game, so nothing resizes it back)
+  const apply = (o, sec) => { if (sec) $('msec').value = sec; for (const [id, k] of [['mtod', 'tod'], ['mwx', 'wA'], ['mwx2', 'wB'], ['mbio', 'biome'], ['mcity', 'cityMode']]) $(id).value = (o && o[k]) || '(sector)'; syncOverrides(); info(); };
+  for (const id of ['mtod', 'mwx', 'mwx2', 'mbio', 'mcity']) $(id).onchange = () => { syncOverrides(); info(); };
+  $('msec').onchange = () => { apply(null); }; $('mprev').onclick = () => { $('msec').value = Math.max(1, +$('msec').value - 1); apply(null); }; $('mnext').onclick = () => { $('msec').value = Math.min(999, +$('msec').value + 1); apply(null); };
+  $('mrand').onclick = () => { $('msec').value = 1 + Math.floor(Math.random() * 400); apply(null); }; $('mreset').onclick = () => apply(null);
+  $('mfrac').oninput = e => $('mfracv').textContent = e.target.value + '%';
+  $('mbolt').onclick = () => { G = { look: pvLook(), tp: {}, wx: {}, bolt: null, parts: [], thunder: 0 }; makeBolt(); PVbolt = G.bolt; };
+  const base = makeLook(30), mk = (o, name) => Object.assign({}, base, { tod: 'moon', from: 'moon', wA: 'clear', wB: 'clear', biome: 'wasteland', cityMode: 'city', dens: 1 }, o);
+  const tod = $('th-tod'), wx = $('th-wx'), bio = $('th-bio'), cty = $('th-city'), sec = $('th-sec'), prop = $('th-prop');
+  for (const k of Object.keys(TODS)) thumb(tod, k, mk({ tod: k, from: k === 'dawn' ? 'moon' : k === 'dusk' ? 'day' : k }), k === 'dawn' || k === 'dusk' ? 1 : .3, () => { apply({ tod: k }); });
+  for (const k of Object.keys(WXT)) thumb(wx, k, mk({ tod: 'day', from: 'day', wA: k, wB: k }), .3, () => { apply({ tod: 'day', wA: k, wB: k }); });
+  for (const k of Object.keys(BIOMES)) thumb(bio, k, mk({ tod: 'day', from: 'day', biome: k }), .3, () => { apply({ tod: 'day', biome: k }); });
+  for (const k of ['city', 'sparse', 'ridge']) thumb(cty, k, mk({ tod: 'dusk', from: 'dusk', cityMode: k }), 1, () => { apply({ cityMode: k }); });
+  for (let i = 1; i <= 40; i++) { const l = makeLook(i); thumb(sec, 'S' + i + ' ' + l.tod, l, .3, () => apply(null, i), 90, 150); }
+  for (const k of ['jersey', 'rubble', 'trap', 'truck', 'sandbag', 'slab', 'overpass']) { const d = document.createElement('div'); d.className = 'thumb'; d.style.cursor = 'default'; const c = document.createElement('canvas'); c.width = 170; c.height = 150; c.style.cssText = 'border:2px solid var(--line);border-radius:6px;background:#0b1220'; const s = document.createElement('span'); s.textContent = k; d.append(c, s); prop.appendChild(d); JOBS.push(() => { const src = propThumb(k); c.getContext('2d').drawImage(src, 0, 0); }); }
+  info();
+}
+function drawMaps(t) {
+  if (!mapsReady || tab !== 'maps') return;
+  const t0 = performance.now(); while (JOBS.length && performance.now() - t0 < 25) { try { JOBS.shift()(); } catch (e) { console.warn(e); } }
+  if (JOBS.length && Math.floor(t / 16) % 6) return;   // while thumbnails are being made the live view updates every few frames
+  T = t / 1000; const l = pvLook();
+  if (PVbolt) { PVbolt.t -= 1 / 60; if (PVbolt.t <= 0) PVbolt = null; }
+  save.fx = 'full'; renderLook($('mlive'), l, +$('mfrac').value / 100, true);
+}
+
+// ------------------------------------------------------------------ sounds
+let soundsReady = false;
+const SND = [
+  ['Weapons', [['Sidearm', () => sfx.shot(0), 'one shot, small pistol'], ['SMG', () => sfx.shot(1), ''], ['Assault rifle', () => sfx.shot(2), ''], ['Minigun', () => sfx.shot(3), ''], ['Pulse-plasma rifle', () => sfx.shot(4), '40 kW output'], ['Rail cannon', () => sfx.shot(5), ''], ['Shotgun', () => sfx.shotgun(), 'shotgunners'], ['Sniper rifle', () => sfx.sniper(), 'marksman and scout sniper'], ['Rocket launch', () => sfx.rocket(), 'ordnance gunners'], ['40mm launcher', () => sfx.thump(), 'grenadiers']]],
+  ['Impacts', [['Round hits flesh/hull', () => sfx.impact('hp', 2, 'x'), ''], ['Round glances off plating', () => sfx.impact('plate', 2, 'x'), ''], ['Plasma hit', () => sfx.impact('hp', 4, 'Pulse-Plasma Rifle'), ''], ['Hit (small)', () => sfx.hit(), 'a machine goes down'], ['Scrap pickup', () => sfx.clink(), ''], ['Ping', () => sfx.ping(), 'armour / C4 stuck'], ['Tick', () => sfx.tick(), 'shooting a gate']]],
+  ['Explosions and big effects', [['Explosion', () => sfx.boom(), ''], ['Mega explosion', () => sfx.mega(), 'boss death'], ['Distant artillery', () => sfx.distant(), ''], ['EMP / pulse grenade', () => sfx.emp(), ''], ['Plasma cannon (M-25)', () => sfx.cannon(), ''], ['Mini-nuke launch', () => sfx.rocket(), 'the M-38 leaving the tube'], ['Mini-nuke blast', () => { sfx.emp(); sfx.boom(); }, 'flash then boom'], ['Thunder', () => sfx.thunder(), 'storms'], ['Live cable arc', () => sfx.arc(), ''], ['Geiger click', () => sfx.geiger(), 'radioactive rain'], ['Siren', () => sfx.siren(), 'air strike, boss warning'], ['Flare', () => sfx.flare && sfx.flare(), ''], ['Spike', () => sfx.spike && sfx.spike(), '']]],
+  ['Machines', [['Plasma bolt', () => sfx.zap(false), 'enemy fire'], ['Heavy plasma bolt', () => sfx.zap(true), 'tanks, bosses'], ['Minigun burst', () => sfx.mg(), 'T-1, T-700, gatlings']]],
+  ['Game events', [['Gate collected', () => sfx.gate(), ''], ['Bad gate', () => sfx.bad(), ''], ['Squad hit', () => sfx.hurt(), ''], ['Sector cleared', () => sfx.win(), ''], ['Squad lost', () => sfx.lose(), '']]],
+  ['Radio', [['Key-up squelch', () => sfx.squelch(), 'start of a bark'], ['Key-down click', () => sfx.squelchEnd(), 'end of a bark']]],
+];
+function initSounds() {
+  if (soundsReady) return; soundsReady = true; const root = $('slistsnd');
+  for (const [title, items] of SND) {
+    const h = document.createElement('h2'); h.textContent = title; const g = document.createElement('div'); g.className = 'snd'; root.append(h, g);
+    for (const [name, fn, note] of items) { const b = document.createElement('button'); b.innerHTML = '<b>▶ ' + name + '</b><span>' + (note || '&nbsp;') + '</span>'; b.onclick = () => { try { unlockAudio(); fn(); } catch (e) { console.warn(e); } }; g.appendChild(b); }
+  }
+  const known = new Set(); for (const [, items] of SND) for (const it of items) known.add(it[0]);
+  // music, ambience and speech
+  const h = document.createElement('h2'); h.textContent = 'Music, ambience and radio chatter'; const g = document.createElement('div'); g.className = 'snd'; root.append(h, g);
+  const add = (name, note, fn) => { const b = document.createElement('button'); b.innerHTML = '<b>' + name + '</b><span>' + note + '</span>'; b.onclick = () => { try { unlockAudio(); fn(); } catch (e) { console.warn(e); } }; g.appendChild(b); };
+  add('▶ Title music', 'an original industrial march in E minor', () => { musicStop(); musicStart(); });
+  add('■ Stop music', '', () => musicStop());
+  add('▶ Battle ambience', 'wind and distant machinery', () => { ambStop(); ambStart(); });
+  add('■ Stop ambience', '', () => ambStop());
+  add('▶ Radio bark', 'frantic voice over static (browser speech)', () => { save.mute = false; BK.last = 0; for (const k in BK) delete BK[k]; bark('t', ['T-800 incoming! T-800 incoming!', 'Man down!', 'Clear the lane!', 'Drop the C4!', 'Get down! Warhead!'][Math.floor(Math.random() * 5)], 0); });
+  add('▶ Sector 7 scene', 'rain, thunder, a distant gun', () => { sfx.thunder(); setTimeout(() => sfx.distant(), 900); setTimeout(() => sfx.geiger(), 300); });
+  add('▶ Firefight', 'a few seconds of shots, hits and an explosion', () => { for (let i = 0; i < 10; i++) setTimeout(() => sfx.shot(2), i * 120); for (let i = 0; i < 4; i++) setTimeout(() => sfx.impact('plate', 2, 'x'), 200 + i * 260); setTimeout(() => sfx.zap(true), 500); setTimeout(() => sfx.boom(), 1300); });
+}
+$('svol').oninput = e => { save.vol = e.target.value / 100; if (typeof OUT !== 'undefined' && OUT) OUT.gain.value = 1.5 * save.vol; };
+$('sstopall').onclick = () => { try { musicStop(); ambStop(); } catch (e) {} };
+setInterval(() => { try { $('saud').textContent = 'audio: ' + audioStatus(); } catch (e) {} }, 1000);
+save.vol = .8;
+
+// ------------------------------------------------------------------ loop
+function frame(t) { if (tab === 'sprites') drawSprites(t); else if (tab === 'maps') drawMaps(t); requestAnimationFrame(frame); }
+buildSprites();
+showTab((location.hash || '').slice(1));
+requestAnimationFrame(frame);
+})();
+</script>
+</body></html>

@@ -35,7 +35,7 @@ T-400 (`t800`, rust tint), HK-Centurion (`t47`, red tint, boss scale 2.5). Sugge
 3. `tools/defringe.py` removes any pink haze left on the edges (safe to re-run).
 3b. `tools/optimize_sprites.py` shrinks the PNGs about 4x with no visible change (run it after importing).
 4. `tools/gen_vents.py <unit>` once for big sprites (where boss/vehicle fire starts), then `tools/build_manifest.py assets/sprites`.
-5. Check it in `docs/sprite_demo.html`.
+5. Check it in `docs/resources.html` (Sprites tab; units that still lack art are listed there with the art standing in for them).
 
 Sizing: machines about 230 px tall, soldiers about 110 px. Bosses are drawn up to ~270 canvas px tall, so ask the generator for
 500-800 px tall figures for them. `tools/render3d/run.py model.glb <unit> --install` turns a 3D model into 8-direction sprites.

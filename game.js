@@ -2997,7 +2997,7 @@ function makeLook(lv) { // deterministic per sector: the same sector always look
   const h = k => hash(lv * 1000003 + k * 40503 + 99991), pick = (a, k) => a[Math.floor(h(k) * a.length) % a.length];
   let tod = lv === 1 ? 'moon' : pick(['dawn', 'day', 'dusk', 'moon', 'dark', 'overcast', 'day', 'moon', 'dusk', 'dark', 'overcast', 'dawn'], 1);
   const wxs = { dawn: ['clear', 'fog', 'wind', 'clear', 'rain', 'fog'], day: ['clear', 'clear', 'wind', 'dust', 'rain', 'storm', 'fog', 'dust', 'storm'], dusk: ['clear', 'wind', 'fog', 'storm', 'rain', 'storm', 'dust'], moon: ['clear', 'clear', 'fog', 'wind', 'rain', 'ash', 'storm'], dark: ['clear', 'rain', 'storm', 'fog', 'ash', 'storm'], overcast: ['rain', 'storm', 'storm', 'fog', 'ash', 'wind'] };
-  let wA = lv === 1 ? 'clear' : pick(wxs[tod], 2), wB = h(3) < .55 ? pick(wxs[tod], 4) : wA;
+  let wA = lv === 1 ? 'clear' : pick(wxs[tod], 2), wB = lv === 1 ? 'clear' : h(3) < .55 ? pick(wxs[tod], 4) : wA;
   const env = ENVS[SECT[(lv - 1) % SECT.length]];
   if (env === 'dark') { tod = 'dark'; wA = 'clear'; wB = h(3) < .5 ? 'fog' : 'clear'; }
   else if (env === 'rain') { wA = 'wind'; wB = 'wind'; }   // (the radioactive rain of the Salt Flats is its own effect)
@@ -3407,6 +3407,8 @@ function frame0(ts) {
 }
 applyCRT();
 function spriteLoad() { let ok = 0, tot = 0; for (const n of Object.keys(SPR)) for (const k of Object.keys(SPR[n].dirs)) for (const f of SPR[n].dirs[k].frames) { tot++; if (f.ok) ok++; } return [ok, tot]; }
+if (typeof window !== 'undefined' && window.CNA_PREVIEW) {   // docs/resources.html loads this file only for its drawing and sound code: no menu, no game loop
+} else {
 if (typeof Image !== 'undefined' && spriteLoad()[1] > 0) { // show a loading bar until the sprites are in (or a few seconds have passed), so nothing pops in during play
   const t0 = performance.now(); state = 'loading';
   const tick = () => { const [ok, tot] = spriteLoad(), done = ok >= tot - 1 || performance.now() - t0 > 7000; if (done) { showMenu(); return; }
@@ -3414,3 +3416,4 @@ if (typeof Image !== 'undefined' && spriteLoad()[1] > 0) { // show a loading bar
   tick();
 } else showMenu();
 requestAnimationFrame(frame);
+}
