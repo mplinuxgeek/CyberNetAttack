@@ -1195,8 +1195,8 @@ function update(dt) {
   }
   decor = decor.filter(d => d.wz - G.dist > -150);
 
-  // fire
-  if (!G.over) {
+  // fire (the squad keeps shooting while it marches on after the boss: any endos left over are cut down)
+  if (!G.over || G.sweep) {
     G.fcd -= dt;
     const last = G.n > 0 && G.peak >= 12 && G.n <= G.peak * .25 ? 1.2 : 1;   // last stand: a battered squad fights harder
     const iv = G.fiv = WEAPONS[G.tier].int / ((1 + RATE_K * save.up.rate) * G.rateG * (1 + Math.min(.3, .05 * G.cls.officer)) * (G.od > 0 ? 1.8 : 1) * (G.rn > .5 ? .9 : 1) * last);
@@ -3272,7 +3272,7 @@ function render() {
       const q = P(G.px + ox, oz + (G.adv || 0)), nm = cl && sprReady(CLASS[cl].spr) ? CLASS[cl].spr : 'resistance_rifleman', fc = ox < -.02 ? -1 : 1;
       const pv = drawSpr(nm, q.x, q.y, q.s, { head: [clamp((G.tx - G.px) * 5, -.9, .9), 1], flip: fc, walk: G.t * 8 + i, amp: .8, rim: true });
       if (pv) {
-        if (!G.over && i % 2 === 0 && ((G.t / (G.fiv || .2) + i * .618) % 1) < .22) {   // each fighter flashes on his own beat
+        if ((!G.over || G.sweep) && i % 2 === 0 && ((G.t / (G.fiv || .2) + i * .618) % 1) < .22) {   // each fighter flashes on his own beat
            const mz = pv.muz, fx = mz ? q.x + mz[0] * pv.flip * q.s : q.x + fc * 25 * q.s, fy = mz ? q.y - mz[1] * q.s : q.y - 36 * q.s; flare(fx, fy, 4.4 * q.s + 1.4, '255,214,130', Math.floor(G.t * 20) + i * 3.7); }
       }
     } });
