@@ -10,6 +10,9 @@
   let slowRun = [], lv = OPT.start, playLv = OPT.start, tries = 0, best = 0, runs = 0, rounds = 0, wins = 0, losses = 0, started = false, handled = true, done = '', speed = OPT.speed, frame = 0, farming = false, last = '';
   if (OPT.mute) save.mute = true;
 
+  let canvases = 0; { const ce0 = document.createElement.bind(document); document.createElement = (t, o) => { if (String(t).toLowerCase() === 'canvas') canvases++; return ce0(t, o); }; }   // leak check: offscreen canvases created so far
+  const errs = []; const ce = console.error; console.error = (...a) => { errs.push(String((a[0] && a[0].stack) || a[0]).split('\n').slice(0, 3).join(' | ').slice(0, 300)); ce.apply(console, a); };
+  window.addEventListener('error', e => errs.push('ERR ' + e.message + ' @' + (e.filename || '').split('/').pop() + ':' + e.lineno));
   const hud = document.createElement('div');
   hud.style.cssText = 'position:fixed;left:6px;top:6px;z-index:99;font:11px/1.35 ui-monospace,Menlo,Consolas,monospace;color:#9ff;background:rgba(0,8,12,.66);padding:6px 8px;border:1px solid #2a6a7a;border-radius:4px;pointer-events:none;white-space:pre;max-width:46vw';
   document.body.appendChild(hud);
@@ -20,7 +23,7 @@
     hud.textContent = `BOT PLAYING  speed x${speed}  ( [ ] to change, H hides )\n` +
       `sector ${playLv}/${OPT.max}  try ${tries + 1}/${OPT.attempts}${farming ? '  (farming scrap)' : ''}  best ${best}\n` +
       `runs ${runs}  won ${wins}  lost ${losses}  upgrade rounds ${rounds}\n` + (g && state === 'play' ? `squad ${g.n}/${g.peak}  kills ${g.kills}  ${Math.round(g.dist)}/${g.L}\n` : '\n') +
-      `${upLine()}\nscrap ${save.scrap}\n${done || last}`;
+      `${upLine()}\nscrap ${save.scrap}\n${done || last}` + `\ncanvases created ${canvases}` + (errs.length ? `\nJS ERRORS ${errs.length}: ${errs[errs.length - 1]}` : '');
     if (Date.now() - lastPost > 1500) { lastPost = Date.now(); try { fetch('/__status', { method: 'POST', body: hud.textContent || lastText, keepalive: true }).catch(() => {}); } catch (e) {} }
     lastText = hud.textContent || lastText;
   }
@@ -75,7 +78,7 @@
   function capture() { // screenshot of the canvas (as drawn, HUD panel excluded) and the facts needed to explain a glitch
     try {
       const g = G, ens = g ? g.en.filter(e => !e.dead).slice(0, 40).map(e => ({ t: e.t, boss: !!e.boss, x: +e.x.toFixed(2), rel: Math.round(e.wz - g.dist), hp: Math.round(e.hp), max: Math.round(e.max), sc: e.sc, stun: e.stun, flash: e.flash, gl: e.gl, crash: e.crash })) : [];
-      const state = { when: new Date().toISOString(), speed, sector: g && g.lv, n: g && g.n, dist: g && Math.round(g.dist), env: g && g.env, form: g && g.form, parts: g && g.parts.length, lights: g && g.lt.length, bullets: g && g.bullets.length, bolts: g && g.bolts.length, rockets: g && g.rockets.length, strikes: g && g.strikes.length, waves: g && g.waves.length, flash: g && g.flash, shake: g && g.shake, mz: g && g.mz, fx: save.fx, crt: save.crt, zoom: zoomLevel(), rs: RS, sizePx: [cv.width, cv.height], dpr: window.devicePixelRatio, enemies: ens };
+      const state = { when: new Date().toISOString(), speed, sector: g && g.lv, n: g && g.n, dist: g && Math.round(g.dist), env: g && g.env, form: g && g.form, parts: g && g.parts.length, lights: g && g.lt.length, bullets: g && g.bullets.length, bolts: g && g.bolts.length, rockets: g && g.rockets.length, strikes: g && g.strikes.length, waves: g && g.waves.length, flash: g && g.flash, shake: g && g.shake, mz: g && g.mz, fx: save.fx, crt: save.crt, zoom: zoomLevel(), rs: RS, sizePx: [cv.width, cv.height], canvasesCreated: canvases, dpr: window.devicePixelRatio, enemies: ens };
       fetch('/__capture', { method: 'POST', body: JSON.stringify({ png: cv.toDataURL('image/png'), state }) }).catch(() => {});
       last = 'captured a screenshot (tests/captures)';
     } catch (e) { last = 'capture failed: ' + e.message; }

@@ -395,4 +395,6 @@ const arena=(lv,...en)=>{ const G=fresh(lv,[]); G.n=40; G.gates=[]; G.en=[]; G.o
   t.save.up=Object.assign({},base,{orbital:10}); G=fresh(4,[]); G.gates=[]; G.obs=[]; const tg=t.mk('tank',1,0,1); tg.hp=tg.max=1e6; tg.armor=0; tg.plate=0; tg.plateMax=0; tg.stun=99; G.en=[tg]; tg.wz=G.dist+500; G.px=0; G.tx=0; for(let i=0;i<60*9;i++){ G.n=40; G.fcd=1e9; tg.wz=G.dist+500; t.update(1/60); }
   check('Orbital Uplink strikes for a share of health on its own', tg.max-tg.hp>1e6*.02, ((tg.max-tg.hp)/1e6*100).toFixed(1)+'%');
   t.save.up=Object.assign({},base,{overdrive:10}); G=fresh(4,[]); G.gates=[]; G.obs=[]; G.en=[]; let odSeen=0; for(let i=0;i<60*20;i++){ G.n=40; G.fcd=1e9; t.update(1/60); if(G.od>0) odSeen++; } check('Overdrive Cells switch themselves on', odSeen>60*3, odSeen/60); t.save.up=base; }
+// a light with a negative size (an object far behind the squad) must not break drawing, and a draw that throws must not leak canvas state
+{ const G=arena(4); G.lt.push({x:100,y:100,r:-63.9,col:'rgba(255,0,0,',life:1,max:1,gr:true}); let err=null; try{ t.render(); }catch(e){ err=e.message; } check('a negative-radius light does not throw', err===null, err); }
 console.log(pass+' passed, '+fail+' failed');

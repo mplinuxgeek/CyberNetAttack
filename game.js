@@ -18,6 +18,15 @@ function setRS() { // match the backing store to the physical pixels the canvas 
 setRS();
 if (typeof window !== 'undefined' && window.addEventListener) { let rt = 0; const re = () => { clearTimeout(rt); rt = setTimeout(setRS, 150); }; window.addEventListener('resize', re); window.addEventListener('orientationchange', re); }
 const cx = cv.getContext('2d');
+// Draw safety: one bad draw call (say a negative radius from an object far behind the squad) must never leave a clip, blend mode or unbalanced save() behind for every later frame.
+let SAVED = 0; { const s0 = cx.save.bind(cx), r0 = cx.restore.bind(cx); cx.save = () => { SAVED++; s0(); }; cx.restore = () => { if (SAVED > 0) { SAVED--; r0(); } }; }
+const DRAW_ERRS = {};
+function safeDraw(f) {
+  const d = SAVED;
+  try { f(); } catch (e) { const k = String(e && e.message); if (!DRAW_ERRS[k]) { DRAW_ERRS[k] = 1; console.error(e); } }
+  while (SAVED > d) cx.restore();
+  cx.globalAlpha = 1; cx.globalCompositeOperation = 'source-over';
+}
 const $ = id => document.getElementById(id);
 const rnd = (a, b) => a + Math.random() * (b - a);
 const rint = (a, b) => Math.floor(rnd(a, b + 1));
@@ -2657,6 +2666,7 @@ function drawStrike(st) {
 }
 
 function lightPool(x, y, r, col, a, ground) { // stepped, flat-shaded glow so it suits the pixel look
+  if (!(r > 0) || !Number.isFinite(r) || !Number.isFinite(x) || !Number.isFinite(y)) return;   // (an object far behind the squad has a negative projected size)
   cx.save(); cx.globalCompositeOperation = 'lighter';
   for (const k of [1, .64, .34]) { cx.fillStyle = col + (a * (1.1 - k * .55)).toFixed(3) + ')'; cx.beginPath(); cx.ellipse(x, y, r * k, ground ? r * k * .3 : r * k, 0, 0, 7); cx.fill(); }
   cx.restore();
@@ -2868,7 +2878,8 @@ function zoomLevel() { if (save.zoom !== undefined) return save.zoom; return (ty
 function camZ() { return ZOOMS[clamp(zoomLevel(), 0, 2)]; }
 const depthKey = e => (e.wz - G.dist) - (ET[e.t].fly ? 45 : 0);   // a hovering machine is drawn over ground units standing at about its depth (it is above them, and its sprite reaches over their heads)
 function render() {
-  cx.setTransform(RS, 0, 0, RS, 0, 0);
+  if (typeof cx.reset === 'function') { SAVED = 0; cx.reset(); }   // a clean canvas state every frame, whatever happened in the last one
+  cx.setTransform(RS, 0, 0, RS, 0, 0); cx.globalAlpha = 1; cx.globalCompositeOperation = 'source-over'; cx.shadowBlur = 0;
   cx.clearRect(0, 0, W, H);
   const pal = PAL[((G ? G.lv : save.sel) - 1) % PAL.length];
   cx.save();
@@ -2925,8 +2936,8 @@ function render() {
     } });
   }
   items.sort((a, b) => b.z - a.z);
-  for (const it of items) it.f();
-  drawLights();
+  for (const it of items) safeDraw(it.f);
+  safeDraw(drawLights);
 
   // bullets
   for (const b of G.bullets) {
@@ -2959,10 +2970,10 @@ function render() {
   }
   if (G.flash > 0) { cx.fillStyle = `rgba(255,255,255,${G.flash * .6})`; cx.fillRect(0, 0, W, H); }
   if (G.hurtFlash > 0) { cx.fillStyle = `rgba(255,0,0,${G.hurtFlash * .5})`; cx.fillRect(0, 0, W, H); }
-  drawEnv();
+  safeDraw(drawEnv);
   cx.restore();
-  drawGrade();
-  drawHUD();
+  safeDraw(drawGrade);
+  safeDraw(drawHUD);
 }
 
 function drawHUD() {
@@ -3041,7 +3052,7 @@ function drawHUD() {
 // ---------------------------------------------------------------- loop
 let acc = 0;
 function frame(ts) {
-  try { frame0(ts); } catch (err) { console.error(err); last = ts; acc = 0; requestAnimationFrame(frame); }   // one bad frame must never freeze the game
+  try { frame0(ts); } catch (err) { console.error(err); try { cv.width = cv.width; } catch (e2) {} last = ts; acc = 0; requestAnimationFrame(frame); }   // (re-assigning the width resets the canvas state: a draw that threw half way must not leave a clip, blend mode or save() behind for every later frame)   // one bad frame must never freeze the game
 }
 function frame0(ts) {
   const dt = Math.min(.1, (ts - last) / 1000 || 0); last = ts; T += dt;
