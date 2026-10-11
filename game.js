@@ -8,7 +8,7 @@ function setRS() { // match the backing store to the physical pixels the canvas 
   let rs = 1.4;
   try {
     const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 0, cssW = cv.clientWidth || (cv.getBoundingClientRect && cv.getBoundingClientRect().width) || 0;
-    if (dpr && cssW) { const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches; rs = clamp(Math.round(cssW * dpr / W / .05) * .05, 1, coarse ? 1.6 : 2); }
+    if (dpr && cssW) { const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches; rs = clamp(Math.round(cssW * dpr / W / .05) * .05, 1, coarse ? 1.6 : 2); if (typeof save !== 'undefined' && save && save.fps === 30) rs = Math.min(rs, 1.2); }
   } catch (e) {}
   RS = Math.round(rs * 20) / 20;
   const w = Math.round(W * RS), h = Math.round(H * RS);
@@ -116,6 +116,7 @@ const CLS = Object.keys(CLASS);        // display / sprite order
 const MAXPICK = 3;
 const SQUAD_CONE = .22;   // how far off its own line (in lane widths) a squad round will curve toward a machine
 const classStart = () => Math.max(2, Math.round((6 + SQUAD_K * save.up.squad) * .15));   // soldiers each picked class starts with: 2, growing with Squad Size upgrades
+const FPS_OPTS = [60, 30, 0];   // 60 (default), 30 (battery saver), 0 = as fast as the display goes
 function sanitizeSave() { // a hand-edited, corrupted or older save can never break the game: every field is clamped to what is legal
   const n = (v, lo, hi, d) => Number.isFinite(+v) ? Math.min(hi, Math.max(lo, Math.floor(+v))) : d;
   if (!save.up || typeof save.up !== 'object') save.up = {}; if (!save.paid || typeof save.paid !== 'object') save.paid = {}; if (!save.fails || typeof save.fails !== 'object') save.fails = {}; if (!save.stars || typeof save.stars !== 'object') save.stars = {};
@@ -125,7 +126,7 @@ function sanitizeSave() { // a hand-edited, corrupted or older save can never br
   for (const k of Object.keys(save.unlocked)) if (!CLASS[k]) delete save.unlocked[k]; save.unlocked.heavy = 1; save.unlocked.tech = 1;
   save.loadout = (Array.isArray(save.loadout) ? save.loadout : []).filter((k, i, a) => CLASS[k] && save.unlocked[k] && a.indexOf(k) === i).slice(0, MAXPICK);
   for (const k of Object.keys(save.stars)) save.stars[k] = n(save.stars[k], 0, 3, 0);
-  save.mute = !!save.mute; save.crt = !!save.crt; save.v = 2; if (!FORMS[save.form]) save.form = 'free';
+  save.mute = !!save.mute; save.crt = !!save.crt; save.v = 2; if (!FORMS[save.form]) save.form = 'free'; if (!FPS_OPTS.includes(save.fps)) save.fps = 60;
   if (!Array.isArray(save.presets)) save.presets = [];
   save.presets = [0, 1, 2].map(i => { const p = save.presets[i]; if (!p || !Array.isArray(p.l)) return null; return { l: p.l.filter((k, j, a) => CLASS[k] && a.indexOf(k) === j).slice(0, MAXPICK), f: FORMS[p.f] ? p.f : 'free' }; });
   save.chat = save.chat !== false;
@@ -1640,6 +1641,7 @@ function showSettings(from) {
     <label class="sl">Effects volume <input id="vol" type="range" min="0" max="100" value="${Math.round((save.vol === undefined ? 1 : save.vol) * 100)}"></label>
     <label class="sl">Music volume <input id="mvol" type="range" min="0" max="100" value="${Math.round((save.mvol === undefined ? 1 : save.mvol) * 100)}"></label>
     <button id="zm">Camera: ${ZNAMES[clamp(zoomLevel(), 0, 2)]}</button>
+    <button id="fps">Frame rate: ${save.fps === 30 ? '30 (battery saver)' : save.fps === 0 ? 'UNCAPPED' : '60'}</button>
     <button id="fxq">Effects: ${save.fx === 'low' ? 'REDUCED (faster)' : 'FULL'}</button>
     <button id="vib">Vibration: ${save.vib === false ? 'OFF' : 'ON'}</button>
     <button id="chat">Radio chatter: ${save.chat === false ? 'OFF' : 'ON'}</button>
@@ -1653,6 +1655,7 @@ function showSettings(from) {
   $('vol').onchange = () => { unlockAudio(); sfx.shot(2); };
   $('mvol').oninput = e => { save.mvol = e.target.value / 100; if (MUS && AC) MUS.gain.setTargetAtTime(.5 * save.mvol, AC.currentTime, .05); persist(); };
   $('zm').onclick = () => { save.zoom = (clamp(zoomLevel(), 0, 2) + 1) % 3; persist(); showSettings(); };
+  $('fps').onclick = () => { save.fps = FPS_OPTS[(FPS_OPTS.indexOf(save.fps) + 1) % FPS_OPTS.length]; persist(); setRS(); showSettings(); };
   $('fxq').onclick = () => { save.fx = save.fx === 'low' ? 'full' : 'low'; persist(); showSettings(); };
   $('vib').onclick = () => { save.vib = save.vib === false; persist(); if (save.vib) buzz(60); showSettings(); };
   $('chat').onclick = () => { save.chat = save.chat === false; persist(); if (save.chat) bark('test', 'Radio check. Resistance, copy.', 0); showSettings(); };
@@ -1666,7 +1669,7 @@ function confirmReset() { // wipes scrap, upgrades, sectors and unlocked classes
     <button class="big" id="yes" style="background:#8a1d1d">YES, START FRESH</button><button id="no">Cancel</button></div>`);
   $('no').onclick = showSettings;
   $('yes').onclick = () => {
-    const keep = { mute: save.mute, crt: save.crt, vib: save.vib, music: save.music, vol: save.vol, mvol: save.mvol, fx: save.fx, zoom: save.zoom, chat: save.chat, form: save.form };
+    const keep = { mute: save.mute, crt: save.crt, vib: save.vib, music: save.music, vol: save.vol, mvol: save.mvol, fx: save.fx, zoom: save.zoom, chat: save.chat, form: save.form, fps: save.fps };
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(keep)); } catch (e) {}
     try { location.reload(); } catch (e) {}
   };
@@ -3394,7 +3397,12 @@ function drawHUD() {
 
 // ---------------------------------------------------------------- loop
 let acc = 0;
+let lastDraw = 0;
+function fpsCap() { const f = save.fps === undefined ? 60 : save.fps; return state === 'menu' ? Math.min(f || 60, 30) : f; }   // the menu is nearly still: 30 is plenty there
 function frame(ts) {
+  const cap = fpsCap();
+  if (cap && ts - lastDraw < 1000 / cap - 2) { requestAnimationFrame(frame); return; }   // a 120 Hz screen would otherwise draw twice as often as needed, and run the CPU, GPU and battery hot
+  lastDraw = ts;
   try { frame0(ts); } catch (err) { console.error(err); try { cv.width = cv.width; } catch (e2) {} last = ts; acc = 0; requestAnimationFrame(frame); }   // (re-assigning the width resets the canvas state: a draw that threw half way must not leave a clip, blend mode or save() behind for every later frame)   // one bad frame must never freeze the game
 }
 function frame0(ts) {
