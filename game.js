@@ -2197,15 +2197,54 @@ function drawEnemy(e) {
   }
 }
 
+function armSeg(x1, y1, x2, y2, w, flash, sd) { // an armoured arm segment: plated shell, panel seams, rivets, hazard paint, a hydraulic ram and cable run, grit over it all
+  const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy) || 1, an = Math.atan2(dy, dx), n = Math.max(2, Math.round(L / (w * 1.5)));
+  cx.save(); cx.translate(x1, y1); cx.rotate(an);
+  cx.fillStyle = 'rgba(0,0,0,.35)'; cx.fillRect(w * .1, w * .55, L, w * .22);   // shadow under the arm
+  // hydraulic ram along the lower flank
+  const ry = w * .62; cx.fillStyle = '#12161c'; cx.fillRect(L * .1, ry - w * .13, L * .62, w * .26); cx.fillStyle = flash ? '#fff' : '#c6ced6'; cx.fillRect(L * .5, ry - w * .06, L * .4, w * .12); cx.fillStyle = '#3a424c'; cx.fillRect(L * .1, ry - w * .13, L * .12, w * .26); cx.fillRect(L * .72, ry - w * .13, L * .05, w * .26);
+  // shell
+  const g = cx.createLinearGradient(0, -w / 2, 0, w / 2); g.addColorStop(0, flash ? '#fff' : '#a3b2c4'); g.addColorStop(.22, flash ? '#fff' : '#5a6878'); g.addColorStop(.6, flash ? '#fff' : '#2f3945'); g.addColorStop(1, flash ? '#fff' : '#12161c');
+  cx.fillStyle = g; cx.beginPath(); cx.moveTo(0, -w * .45); cx.lineTo(L, -w * .5); cx.lineTo(L, w * .5); cx.lineTo(0, w * .45); cx.closePath(); cx.fill();
+  for (let i = 0; i < n; i++) {   // panels
+    const px = i * L / n; cx.fillStyle = 'rgba(0,0,0,.55)'; cx.fillRect(px, -w * .5, Math.max(1, w * .05), w);
+    cx.fillStyle = 'rgba(255,255,255,.22)'; cx.fillRect(px + w * .06, -w * .45, L / n - w * .12, Math.max(1, w * .07));
+    cx.fillStyle = flash ? '#fff' : '#9aa6b4'; for (const ry2 of [-w * .32, w * .3]) { cx.beginPath(); cx.arc(px + w * .18, ry2, Math.max(.8, w * .045), 0, 7); cx.arc(px + L / n - w * .18, ry2, Math.max(.8, w * .045), 0, 7); cx.fill(); }
+    if (i === 1) { cx.save(); cx.beginPath(); cx.rect(px + w * .12, -w * .22, L / n - w * .24, w * .44); cx.clip(); for (let k2 = -6; k2 < 12; k2++) { cx.fillStyle = k2 % 2 ? 'rgba(230,185,30,.85)' : 'rgba(18,18,20,.85)'; cx.beginPath(); cx.moveTo(px + k2 * w * .2, w * .22); cx.lineTo(px + k2 * w * .2 + w * .2, w * .22); cx.lineTo(px + k2 * w * .2 + w * .42, -w * .22); cx.lineTo(px + k2 * w * .2 + w * .22, -w * .22); cx.fill(); } cx.restore(); }
+  }
+  gritIn(() => cx.rect(0, -w / 2, L, w), 0, -w / 2, L, w, 'metal', .55, .45);
+  gritIn(() => cx.rect(0, -w / 2, L, w), 0, -w / 2, L, w, 'dirt', .25, .6);
+  cx.strokeStyle = '#0c0f13'; cx.lineWidth = Math.max(1, w * .08); cx.beginPath(); cx.moveTo(L * .08, -w * .56); cx.bezierCurveTo(L * .3, -w * .9, L * .6, -w * .2, L * .92, -w * .56); cx.stroke();   // cable run
+  cx.strokeStyle = 'rgba(120,200,255,.3)'; cx.lineWidth = Math.max(.6, w * .025); cx.stroke();
+  cx.restore();
+}
+function armJoint(x, y, r, flash) { // a big ball-and-collar joint with a ring of bolts and a status light
+  cx.fillStyle = '#0c0f13'; cx.beginPath(); cx.arc(x, y, r * 1.12, 0, 7); cx.fill();
+  const g = cx.createRadialGradient(x - r * .3, y - r * .3, r * .1, x, y, r); g.addColorStop(0, flash ? '#fff' : '#b3bfcc'); g.addColorStop(.5, flash ? '#fff' : '#4d5967'); g.addColorStop(1, flash ? '#fff' : '#161b22'); cx.fillStyle = g; cx.beginPath(); cx.arc(x, y, r, 0, 7); cx.fill();
+  cx.strokeStyle = 'rgba(0,0,0,.6)'; cx.lineWidth = Math.max(1, r * .12); cx.beginPath(); cx.arc(x, y, r * .62, 0, 7); cx.stroke();
+  cx.fillStyle = flash ? '#fff' : '#cfd6de'; for (let i = 0; i < 6; i++) { const an = i / 6 * 6.283 + .4; cx.beginPath(); cx.arc(x + Math.cos(an) * r * .8, y + Math.sin(an) * r * .8, Math.max(.8, r * .08), 0, 7); cx.fill(); }
+  const on = Math.sin(G.t * 6 + x) > -.2; cx.fillStyle = on ? '#ff3a22' : '#601208'; cx.beginPath(); cx.arc(x + r * .1, y + r * .1, Math.max(1, r * .16), 0, 7); cx.fill(); if (on) { cx.globalAlpha = .35; cx.beginPath(); cx.arc(x + r * .1, y + r * .1, r * .4, 0, 7); cx.fill(); cx.globalAlpha = 1; }
+}
+function armClaw(x, y, cw, open, flash, face) { // the grab: a plated palm and three two-jointed talons
+  cx.fillStyle = '#0c0f13'; cx.fillRect(x - 9 * cw, y - 5 * cw, 18 * cw, 10 * cw);
+  const g = cx.createLinearGradient(0, y - 5 * cw, 0, y + 5 * cw); g.addColorStop(0, flash ? '#fff' : '#8795a6'); g.addColorStop(1, flash ? '#fff' : '#242c36'); cx.fillStyle = g; cx.fillRect(x - 8 * cw, y - 4 * cw, 16 * cw, 8 * cw);
+  cx.fillStyle = 'rgba(255,255,255,.2)'; cx.fillRect(x - 8 * cw, y - 4 * cw, 16 * cw, 1.4 * cw); cx.fillStyle = flash ? '#fff' : '#ff8a30'; cx.fillRect(x - 3 * cw, y - 1 * cw, 6 * cw, 1.2 * cw);   // glowing slit
+  for (let i = -1; i <= 1; i++) {
+    const bx = x + i * 6.5 * cw, spread = i * 11 * cw * open, jx = bx + spread * .55, jy = y + 12 * cw, tx = bx + spread * (1 + .3 * open) + i * 2 * cw, ty = y + 25 * cw + (1 - open) * 4 * cw;
+    for (const [x1, y1, x2, y2, wd] of [[bx, y + 3 * cw, jx, jy, 3.6 * cw], [jx, jy, tx, ty, 2.8 * cw]]) { cx.strokeStyle = '#0c0f13'; cx.lineWidth = wd + 1.2; cx.lineCap = 'round'; line(x1, y1, x2, y2); cx.strokeStyle = flash ? '#fff' : '#7b8998'; cx.lineWidth = wd; line(x1, y1, x2, y2); cx.strokeStyle = flash ? '#fff' : '#cfd8e2'; cx.lineWidth = Math.max(.7, wd * .25); line(x1 - wd * .2, y1, x2 - wd * .2, y2); }
+    cx.fillStyle = flash ? '#fff' : '#e4e9ee'; cx.beginPath(); cx.moveTo(tx - 1.6 * cw, ty - 1 * cw); cx.lineTo(tx + 1.6 * cw, ty - 1 * cw); cx.lineTo(tx + i * .6 * cw, ty + 5 * cw); cx.closePath(); cx.fill();   // talon
+    cx.fillStyle = '#0c0f13'; cx.beginPath(); cx.arc(jx, jy, 2.2 * cw, 0, 7); cx.fill(); cx.fillStyle = '#aab6c4'; cx.beginPath(); cx.arc(jx - .5 * cw, jy - .5 * cw, .8 * cw, 0, 7); cx.fill();
+  }
+}
 function drawGrabArm(e, q, ss, face, flash) { // the reaching arm over the painted harvester body
-  const c = MC(flash), S = { x: q.x + face * 56 * ss, y: q.y - 132 * ss }, R = { x: S.x + face * 8 * ss, y: S.y + 74 * ss }, RE = { x: S.x + face * 18 * ss, y: S.y + 36 * ss };
+  const S = { x: q.x + face * 56 * ss, y: q.y - 132 * ss }, R = { x: S.x + face * 8 * ss, y: S.y + 74 * ss }, RE = { x: S.x + face * 18 * ss, y: S.y + 36 * ss };
   const T = P(e.tx, 0), t = { x: T.x, y: T.y - 22 }, ex = e.ext, H = { x: R.x + (t.x - R.x) * ex, y: R.y + (t.y - R.y) * ex };
   const mid = { x: (S.x + H.x) / 2 + face * 26 * ss, y: (S.y + H.y) / 2 - 12 * ss };
-  const E = { x: RE.x + (mid.x - RE.x) * ex, y: RE.y + (mid.y - RE.y) * ex }, w = 12 * ss * (1 + ex * .6);
-  limb(S.x, S.y, E.x, E.y, w, c); limb(E.x, E.y, H.x, H.y, w * .9, c); joint(E.x, E.y, 6 * ss * (1 + ex * .4), c);
+  const E = { x: RE.x + (mid.x - RE.x) * ex, y: RE.y + (mid.y - RE.y) * ex }, w = 12 * ss * (1 + ex * .6), sd = e.id * 7;
+  armSeg(S.x, S.y, E.x, E.y, w, flash, sd); armSeg(E.x, E.y, H.x, H.y, w * .9, flash, sd + 3);
+  armJoint(S.x, S.y, 6.5 * ss, flash); armJoint(E.x, E.y, 7 * ss * (1 + ex * .4), flash);
   const open = (e.gs === 'slam' || e.gs === 'recover') ? .3 : 1, cw = ss * (1 + ex * .8);
-  cx.strokeStyle = flash ? '#fff' : '#8a96a4'; cx.lineWidth = 3.4 * cw; cx.lineCap = 'round';
-  for (let i = -1; i <= 1; i++) line(H.x, H.y, H.x + i * 10 * cw * open, H.y + 12 * cw);
+  armClaw(H.x, H.y, cw, open, flash, face);
   if (e.cap > 0 && ex < .5) { cx.font = `${Math.max(10, 18 * ss)}px ${FONT}`; cx.textAlign = 'center'; cx.lineWidth = 3; cx.strokeStyle = '#000'; cx.strokeText('x' + e.cap, H.x, H.y - 6 * ss); cx.fillStyle = '#6fb5ff'; cx.fillText('x' + e.cap, H.x, H.y - 6 * ss); }
   if (e.gs === 'aim' || e.gs === 'lock') { // ground warning marker
     const lk = e.gs === 'lock', pr = lk ? 1 : .5 + .5 * Math.sin(G.t * 14);
@@ -2436,59 +2475,86 @@ function drawFlare(f) { // a red signal flare burning on the road, smoke rising,
   for (let i = 0; i < 6; i++) { const t = (G.t * .5 + i / 6) % 1; cx.fillStyle = `rgba(255,${90 + 60 * t | 0},${70 + 80 * t | 0},${(1 - t) * .3})`; cx.beginPath(); cx.arc(q.x + Math.sin(t * 5 + i) * 6 * s, q.y - t * 150 * s, (4 + t * 16) * s, 0, 7); cx.fill(); }
   cx.restore();
 }
+function gritIn(path, x, y, w, h, kind, al, sc) { // roughen a shape: clip to its outline and lay a texture over it
+  const tx = getTex(kind); if (!tx || save.fx === 'low') return;
+  cx.save(); cx.beginPath(); path(); cx.clip(); cx.globalAlpha = al; cx.imageSmoothingEnabled = false;
+  const tw = Math.max(tx.width * sc, w / 7), th2 = Math.max(tx.height * sc, h / 7);
+  for (let ox = x; ox < x + w; ox += tw) for (let oy = y; oy < y + h; oy += th2) cx.drawImage(tx, ox, oy, tw, th2);
+  cx.restore();
+}
+const poly = (pts, qx, qy) => () => { pts.forEach((p, i) => i ? cx.lineTo(qx + p[0], qy + p[1]) : cx.moveTo(qx + p[0], qy + p[1])); cx.closePath(); };
+function crackAt(x, y, len, sd, s, col) { cx.strokeStyle = col || 'rgba(12,12,16,.85)'; cx.lineWidth = Math.max(.8, s * .7); cx.beginPath(); cx.moveTo(x, y); let px = x, py = y, a = hash(sd) * 6.28; for (let i = 0; i < 6; i++) { a += (hash(sd + i * 3) - .5) * 1.4; px += Math.cos(a) * len / 6; py += Math.abs(Math.sin(a)) * len / 6 + len * .03; cx.lineTo(px, py); if (i === 2) { cx.moveTo(px, py); } } cx.stroke(); }
+function drawJersey(o, q, s, w, sd) { // a battered concrete barrier: sloped base, chipped top, faded hazard paint, cracks, rebar where it is broken
+  const h = 34 * s, tw = w * .56, x = q.x, y = q.y, hp = o.hp / 120, fl = o.hit > 0;
+  const pts = [[-w, 0], [-w * .92, -h * .24], [-w * .64, -h * .42], [-tw, -h], [tw, -h], [w * .64, -h * .42], [w * .92, -h * .24], [w, 0]];
+  cx.fillStyle = 'rgba(0,0,0,.5)'; cx.beginPath(); cx.ellipse(x, y + 2 * s, w * 1.25, 7 * s, 0, 0, 7); cx.fill();
+  const g = cx.createLinearGradient(x - w, 0, x + w, 0); g.addColorStop(0, fl ? '#fff' : '#b4b7ba'); g.addColorStop(.45, fl ? '#eee' : '#8c9094'); g.addColorStop(1, fl ? '#ccc' : '#585c61');
+  cx.fillStyle = g; cx.beginPath(); poly(pts, x, y)(); cx.fill();
+  const gd = cx.createLinearGradient(0, y - h, 0, y); gd.addColorStop(0, 'rgba(255,255,255,.1)'); gd.addColorStop(.55, 'rgba(0,0,0,0)'); gd.addColorStop(1, 'rgba(20,12,6,.55)'); cx.fillStyle = gd; cx.beginPath(); poly(pts, x, y)(); cx.fill();
+  cx.fillStyle = '#cfd2d4'; cx.beginPath(); cx.moveTo(x - tw, y - h); cx.lineTo(x + tw, y - h); cx.lineTo(x + tw * .94, y - h * .88); cx.lineTo(x - tw * .94, y - h * .88); cx.fill();   // lit top edge
+  cx.strokeStyle = 'rgba(0,0,0,.45)'; cx.lineWidth = Math.max(1, s * .9); cx.beginPath(); cx.moveTo(x - w * .64, y - h * .42); cx.lineTo(x + w * .64, y - h * .42); cx.moveTo(x, y - h * .9); cx.lineTo(x + (hash(sd) - .5) * 3 * s, y); cx.stroke();   // the knee of the profile and the expansion seam
+  for (const sgn of [-1, 1]) { cx.fillStyle = 'rgba(255,255,255,.18)'; cx.beginPath(); cx.moveTo(x + sgn * tw, y - h); cx.lineTo(x + sgn * w * .64, y - h * .42); cx.lineTo(x + sgn * w * .66, y - h * .38); cx.lineTo(x + sgn * tw * 1.04, y - h * .96); cx.fill(); }
+  // faded safety stripes
+  cx.save(); cx.beginPath(); cx.rect(x - tw * .86, y - h * .84, tw * 1.72, h * .26); cx.clip();
+  for (let i = -8; i < 9; i++) { cx.fillStyle = i % 2 ? 'rgba(215,90,30,.8)' : 'rgba(225,225,220,.75)'; cx.beginPath(); cx.moveTo(x + i * tw * .22, y - h * .58); cx.lineTo(x + i * tw * .22 + tw * .22, y - h * .58); cx.lineTo(x + i * tw * .22 + tw * .22 + h * .2, y - h * .84); cx.lineTo(x + i * tw * .22 + h * .2, y - h * .84); cx.fill(); }
+  cx.restore();
+  gritIn(poly(pts, x, y), x - w, y - h, w * 2, h, 'dirt', .62, .6);
+  gritIn(poly(pts, x, y), x - w, y - h, w * 2, h, 'ash', .25, .9);
+  crackAt(x - w * .5, y - h * .28, h * .7, sd + 1, s); crackAt(x + w * .3, y - h * .8, h * .5, sd + 5, s);
+  for (let i = 0; i < 3; i++) { const bx = x + (hash(sd + 20 + i) - .3) * w, by = y - h * (.3 + hash(sd + 30 + i) * .45); cx.fillStyle = 'rgba(15,15,18,.85)'; cx.beginPath(); cx.arc(bx, by, 1.5 * s, 0, 7); cx.fill(); cx.strokeStyle = 'rgba(15,15,18,.4)'; cx.lineWidth = .8; for (let k = 0; k < 4; k++) { cx.beginPath(); cx.moveTo(bx, by); cx.lineTo(bx + Math.cos(k * 1.57 + i) * 4 * s, by + Math.sin(k * 1.57 + i) * 4 * s); cx.stroke(); } }   // bullet strikes
+  if (hp < .75) { // a chunk knocked out of the top corner, rebar showing
+    cx.fillStyle = '#17181a'; cx.beginPath(); cx.moveTo(x + tw * .3, y - h); cx.lineTo(x + tw * .98, y - h); cx.lineTo(x + tw * .9, y - h * .72); cx.lineTo(x + tw * .62, y - h * .8); cx.lineTo(x + tw * .5, y - h * .66); cx.closePath(); cx.fill();
+    cx.strokeStyle = '#8a4a26'; cx.lineWidth = Math.max(1.2, s * 1.2); cx.beginPath(); for (let i = 0; i < 3; i++) { cx.moveTo(x + tw * (.5 + i * .18), y - h * .72); cx.lineTo(x + tw * (.55 + i * .2), y - h * (1.12 + i * .06)); } cx.stroke();
+  }
+  const dust = cx.createRadialGradient(x, y, 1, x, y, w * 1.2); dust.addColorStop(0, 'rgba(150,125,95,.3)'); dust.addColorStop(1, 'rgba(150,125,95,0)'); cx.fillStyle = dust; cx.beginPath(); cx.ellipse(x, y, w * 1.2, 7 * s, 0, 0, 7); cx.fill();
+}
+function drawRubble(o, q, s, w, sd) { // a berm of broken slabs, brick, pipe and tangled rebar, shaded chunk by chunk
+  const rx = w * 1.2, ry = Math.max(8, rx * .34), x = q.x, y = q.y;
+  cx.fillStyle = 'rgba(0,0,0,.5)'; cx.beginPath(); cx.ellipse(x, y + 2 * s, rx * 1.12, ry * 1.1, 0, 0, 7); cx.fill();
+  const chunks = []; for (let i = 0; i < 24; i++) chunks.push({ px: (hash(sd * 3 + i) - .5) * rx * 1.75, py: -hash(sd * 5 + i) * ry * 1.35, sz: (7 + hash(sd * 7 + i) * 17) * s, i });
+  chunks.sort((a, b) => a.py - b.py);
+  for (const c of chunks) {
+    const kind = hash(sd * 9 + c.i), base = kind < .58 ? 70 + hash(sd + c.i) * 70 | 0 : 0, cx0 = x + c.px, cy0 = y + c.py;
+    const col = kind < .58 ? [base, base - 3, base - 10] : kind < .8 ? [120 + hash(sd + c.i * 3) * 40 | 0, 52, 40] : [34, 32, 32];
+    const pts = []; for (let k = 0; k < 6; k++) { const an = k / 6 * 6.283 + hash(sd * 11 + c.i + k) * .6, rr = c.sz * (.55 + hash(sd * 13 + c.i * 7 + k) * .6); pts.push([Math.cos(an) * rr, Math.sin(an) * rr * .62 - c.sz * .3]); }
+    const pa = poly(pts, cx0, cy0);
+    cx.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`; cx.beginPath(); pa(); cx.fill();
+    const gl = cx.createLinearGradient(cx0 - c.sz, cy0 - c.sz, cx0 + c.sz, cy0 + c.sz * .4); gl.addColorStop(0, 'rgba(255,255,255,.22)'); gl.addColorStop(.5, 'rgba(0,0,0,0)'); gl.addColorStop(1, 'rgba(0,0,0,.45)'); cx.fillStyle = gl; cx.beginPath(); pa(); cx.fill();
+    gritIn(pa, cx0 - c.sz, cy0 - c.sz, c.sz * 2, c.sz * 1.6, 'dirt', .5, .5);
+    cx.strokeStyle = 'rgba(0,0,0,.55)'; cx.lineWidth = Math.max(.8, s * .6); cx.beginPath(); pa(); cx.stroke();
+    if (kind >= .58 && kind < .8) { cx.strokeStyle = 'rgba(30,14,10,.5)'; cx.lineWidth = .7; for (let r2 = -1; r2 <= 1; r2++) { cx.beginPath(); cx.moveTo(cx0 - c.sz * .6, cy0 + r2 * c.sz * .22 - c.sz * .3); cx.lineTo(cx0 + c.sz * .6, cy0 + r2 * c.sz * .22 - c.sz * .3); cx.stroke(); } }   // brick courses
+  }
+  cx.lineCap = 'round';
+  for (let i = 0; i < 14; i++) { // rebar: rusty, bent, with a bright edge
+    const px = x + (hash(sd * 11 + i) - .5) * rx * 1.7, py = y - hash(sd * 13 + i) * ry * .9, ex = px + (hash(sd * 15 + i) - .5) * 38 * s, ey = py - (14 + hash(sd * 19 + i) * 32) * s;
+    cx.strokeStyle = '#4a2410'; cx.lineWidth = Math.max(1.6, s * 1.5); cx.beginPath(); cx.moveTo(px, py); cx.quadraticCurveTo(px + (hash(sd * 17 + i) - .5) * 22 * s, py - 14 * s, ex, ey); cx.stroke();
+    cx.strokeStyle = '#a8602c'; cx.lineWidth = Math.max(.7, s * .6); cx.stroke();
+  }
+  cx.strokeStyle = 'rgba(30,30,34,.7)'; cx.lineWidth = Math.max(.7, s * .6); cx.beginPath(); for (let i = 0; i < 3; i++) { const px = x + (hash(sd + 80 + i) - .5) * rx, py = y - ry * (.6 + hash(sd + 90 + i) * .5); cx.moveTo(px, py); cx.bezierCurveTo(px + 14 * s, py - 24 * s, px - 18 * s, py - 30 * s, px + 8 * s, py - 44 * s); } cx.stroke();   // loose cable
+  for (let i = 0; i < 14; i++) { cx.fillStyle = `rgba(${90 + hash(sd + i * 4) * 60 | 0},${86 + hash(sd + i * 4) * 50 | 0},${80 + hash(sd + i * 4) * 40 | 0},.8)`; cx.fillRect(x + (hash(sd + 200 + i) - .5) * rx * 2.1, y + hash(sd + 210 + i) * ry * .5, 1.6 * s, 1.2 * s); }
+  const dust = cx.createRadialGradient(x, y - ry, 2, x, y - ry, rx); dust.addColorStop(0, 'rgba(160,140,120,.16)'); dust.addColorStop(1, 'rgba(160,140,120,0)'); cx.fillStyle = dust; cx.beginPath(); cx.ellipse(x, y - ry, rx, ry * 1.3, 0, 0, 7); cx.fill();
+}
+function drawTrap(o, q, s, w, sd) { // czech hedgehog: three welded steel beams, rust-streaked, gusseted and bolted
+  const r = w * 1.35 + 8 * s, x = q.x, y = q.y - 2 * s, bt = Math.max(4, 11 * s);
+  cx.fillStyle = 'rgba(0,0,0,.5)'; cx.beginPath(); cx.ellipse(x, q.y + 2 * s, r * 1.1, 5 * s, 0, 0, 7); cx.fill();
+  for (const [a, b] of [[-1, 1], [1, 1], [0, 1.3]]) {
+    const x2 = x + a * r, y2 = y - b * r * 1.4, x1 = x - a * r, L = Math.hypot(x2 - x1, y2 - y), an = Math.atan2(y2 - y, x2 - x1);
+    cx.save(); cx.translate(x1, y); cx.rotate(an);
+    const g = cx.createLinearGradient(0, -bt / 2, 0, bt / 2); g.addColorStop(0, '#9aa4ae'); g.addColorStop(.3, '#59616a'); g.addColorStop(1, '#1d2025'); cx.fillStyle = g; cx.fillRect(0, -bt / 2, L, bt);
+    cx.fillStyle = 'rgba(0,0,0,.45)'; cx.fillRect(0, bt * .12, L, bt * .12); cx.fillStyle = 'rgba(255,255,255,.28)'; cx.fillRect(0, -bt * .42, L, Math.max(1, bt * .1));   // the I-beam's web shadow and top edge
+    gritIn(() => cx.rect(0, -bt / 2, L, bt), 0, -bt / 2, L, bt, 'metal', .6, .5);
+    for (let i = 0; i < 5; i++) { cx.fillStyle = `rgba(${130 + hash(sd + i) * 40 | 0},${60 + hash(sd + i) * 30 | 0},20,.55)`; cx.beginPath(); cx.ellipse(hash(sd + i * 3) * L, (hash(sd + i * 5) - .5) * bt * .6, bt * (.5 + hash(sd + i) * .8), bt * .28, 0, 0, 7); cx.fill(); }   // rust bloom
+    cx.fillStyle = '#c9ced4'; for (const e2 of [bt * .5, L - bt * .5]) { cx.beginPath(); cx.arc(e2, 0, Math.max(1, bt * .12), 0, 7); cx.fill(); }
+    cx.restore();
+  }
+  cx.fillStyle = '#3a3f46'; cx.beginPath(); cx.arc(x, y - r * .1, bt * .85, 0, 7); cx.fill(); cx.fillStyle = '#7a838c'; cx.beginPath(); cx.arc(x - bt * .2, y - r * .1 - bt * .2, bt * .3, 0, 7); cx.fill();   // the weld at the crossing
+}
 function drawObs(o) {
   const rel = o.wz - G.dist, q = P(o.x, rel), s = q.s * 1.75, w = o.hw * LANE * q.s * 1.35, k = o.k, sd = o.sd || o.x * 50 + o.wz;
   cx.save();
-  if (k === 'jersey') { // concrete barrier: substantial 3D-shaded block with weathering, rebar, warning stripes & shadow
-    const h = 30 * s, tw = w * .6;
-    // Ground drop shadow
-    cx.fillStyle = 'rgba(0,0,0,.45)'; cx.beginPath(); cx.ellipse(q.x, q.y + 2 * s, w * 1.25, 6.5 * s, 0, 0, 7); cx.fill();
-    // Front face with gradient weathering
-    const gFace = cx.createLinearGradient(0, q.y - h, 0, q.y);
-    gFace.addColorStop(0, '#a0a5ad'); gFace.addColorStop(0.5, '#787d85'); gFace.addColorStop(1, '#4f535a');
-    cx.fillStyle = gFace;
-    cx.beginPath(); cx.moveTo(q.x - w, q.y); cx.lineTo(q.x - w * .82, q.y - h * .42); cx.lineTo(q.x - tw, q.y - h); cx.lineTo(q.x + tw, q.y - h); cx.lineTo(q.x + w * .82, q.y - h * .42); cx.lineTo(q.x + w, q.y); cx.fill();
-    
-    // Top bevel highlight
-    cx.fillStyle = '#c5cacb'; cx.fillRect(q.x - tw, q.y - h, tw * 2, h * .18);
-    // Side bevel shadow
-    cx.fillStyle = '#3a3d43'; cx.beginPath(); cx.moveTo(q.x + w * .82, q.y - h * .42); cx.lineTo(q.x + w, q.y); cx.lineTo(q.x + w * .28, q.y); cx.lineTo(q.x + tw, q.y - h); cx.fill();
-    
-    // Industrial safety warning stripes (hazard tone)
-    cx.fillStyle = '#d49b28';
-    for (let i = -1; i <= 1; i += 2) cx.fillRect(q.x + i * w * .35 - w * .12, q.y - h * .78, w * .24, h * .28);
-    cx.fillStyle = '#1e2024';
-    for (let i = -1; i <= 1; i += 2) cx.fillRect(q.x + i * w * .35 - w * .05, q.y - h * .78, w * .1, h * .28);
-    
-    // Concrete cracks & bullet pockmarks
-    cx.strokeStyle = 'rgba(20,20,25,.8)'; cx.lineWidth = Math.max(1, s * .8);
-    cx.beginPath(); cx.moveTo(q.x - w * .55, q.y - h * .25); cx.lineTo(q.x - w * .15, q.y - h * .55); cx.lineTo(q.x - w * .05, q.y - h * .45); cx.stroke();
-    cx.fillStyle = '#222'; cx.beginPath(); cx.arc(q.x + w * .2, q.y - h * .35, 1.8 * s, 0, 7); cx.fill();
-  } else if (k === 'rubble') { // detailed berm of shattered reinforced concrete slabs & rebar webbing
-    const rx = w * 1.2, ry = Math.max(7, rx * .32);
-    cx.fillStyle = 'rgba(0,0,0,.45)'; cx.beginPath(); cx.ellipse(q.x, q.y + 2 * s, rx * 1.1, ry * 1.1, 0, 0, 7); cx.fill();
-    for (let i = 0; i < 18; i++) {
-      const px = q.x + (hash(sd * 3 + i) - .5) * rx * 1.8, py = q.y - hash(sd * 5 + i) * ry * 1.25, sz = (8 + hash(sd * 7 + i) * 16) * s, g = 60 + hash(sd + i) * 70 | 0;
-      cx.fillStyle = `rgb(${g},${g - 4},${g - 12})`;
-      cx.beginPath(); cx.moveTo(px - sz, py); cx.lineTo(px - sz * .35, py - sz * .95); cx.lineTo(px + sz * .55, py - sz * .75); cx.lineTo(px + sz, py + sz * 0.1); cx.fill();
-      cx.strokeStyle = `rgba(${g + 40},${g + 40},${g + 40},0.6)`; cx.lineWidth = Math.max(0.8, s * 0.6); cx.stroke();
-    }
-    cx.strokeStyle = '#8a4822'; cx.lineWidth = Math.max(1.2, s * 1.1);
-    for (let i = 0; i < 12; i++) {
-      const px = q.x + (hash(sd * 11 + i) - .5) * rx * 1.7, py = q.y - hash(sd * 13 + i) * ry;
-      cx.beginPath(); cx.moveTo(px, py);
-      cx.quadraticCurveTo(px + (hash(sd * 15 + i) - .5) * 20 * s, py - (15 + hash(sd * 19 + i) * 20) * s, px + (hash(sd * 17 + i) - .5) * 35 * s, py - (10 + hash(sd * 23 + i) * 30) * s);
-      cx.stroke();
-    }
-  } else if (k === 'trap') { // Czech hedgehog: heavy reinforced steel I-beams with highlights
-    const r = w * 1.35 + 8 * s;
-    cx.fillStyle = 'rgba(0,0,0,.45)'; cx.beginPath(); cx.ellipse(q.x, q.y + 2 * s, r * 1.05, 4 * s, 0, 0, 7); cx.fill();
-    cx.lineCap = 'square';
-    for (const [a, b] of [[-1, 1], [1, 1], [0, 1.3]]) {
-      cx.strokeStyle = '#1b1e22'; cx.lineWidth = Math.max(3, 9.5 * s); cx.beginPath(); cx.moveTo(q.x - a * r, q.y - 2 * s); cx.lineTo(q.x + a * r, q.y - 2 * s - b * r * 1.4); cx.stroke();
-      cx.strokeStyle = '#4a525a'; cx.lineWidth = Math.max(2, 5 * s); cx.beginPath(); cx.moveTo(q.x - a * r, q.y - 3 * s); cx.lineTo(q.x + a * r, q.y - 3 * s - b * r * 1.4); cx.stroke();
-      cx.strokeStyle = '#8a95a2'; cx.lineWidth = Math.max(0.8, 1.8 * s); cx.beginPath(); cx.moveTo(q.x - a * r, q.y - 4 * s); cx.lineTo(q.x + a * r, q.y - 4 * s - b * r * 1.4); cx.stroke();
-    }
+  if (k === 'jersey') { drawJersey(o, q, s, w, sd);
+  } else if (k === 'rubble') { drawRubble(o, q, s, w, sd);
+  } else if (k === 'trap') { drawTrap(o, q, s, w, sd);
   } else if (k === 'cable') { // Power line: heavy pylons, sagging cable with pulsing electricity
     const xa = P(o.x - o.hw, rel), xb = P(o.x + o.hw, rel), hgt = 40 * s, sag = 13 * s, live = !o.sq || rel > -60;
     for (const p of [xa, xb]) {
@@ -2523,6 +2589,13 @@ function drawObs(o) {
     cx.strokeStyle = '#1a120b'; cx.lineWidth = Math.max(1, s * .9); cx.strokeRect(q.x - bw, q.y - bh * .82, bw * 2, bh * .54);
     if (dm > .35) { cx.strokeStyle = 'rgba(10,8,5,.85)'; cx.lineWidth = Math.max(1.2, s * 1.1); cx.beginPath(); cx.moveTo(q.x - bw * .5, q.y - bh * .95); cx.lineTo(q.x - bw * .18, q.y - bh * .45); cx.moveTo(q.x + bw * .45, q.y - bh * 1.25); cx.lineTo(q.x + bw * .12, q.y - bh * .65); cx.stroke(); }
     if (dm > .6 && Math.random() < .25 && G.parts.length < 380) pushPart({ x: q.x + rnd(-bw, bw) * .5, y: q.y - bh, vx: rnd(-6, 6), vy: -30, life: .8, max: .8, col: '#2a2d33', r: 3, g: -20 });
+    gritIn(() => cx.rect(q.x - bw, q.y - bh * 1.55, bw * 2, bh * 1.55), q.x - bw, q.y - bh * 1.55, bw * 2, bh * 1.55, 'metal', .55, .5);
+    gritIn(() => cx.rect(q.x - bw, q.y - bh * 1.55, bw * 2, bh * 1.55), q.x - bw, q.y - bh * 1.55, bw * 2, bh * 1.55, 'dirt', .3, .6);
+    for (let i = 0; i < 6; i++) { cx.fillStyle = `rgba(${120 + hash(sd + i) * 40 | 0},${58 + hash(sd + i) * 24 | 0},22,.5)`; cx.beginPath(); cx.ellipse(q.x + (hash(sd + i * 3) - .5) * bw * 1.8, q.y - bh * (.15 + hash(sd + i * 5) * 1.3), bw * (.1 + hash(sd + i) * .2), bh * .07, 0, 0, 7); cx.fill(); }   // rust blooms
+    { const wx0 = q.x, wy0 = q.y - bh * 1.27; cx.strokeStyle = 'rgba(210,225,235,.55)'; cx.lineWidth = Math.max(.7, s * .5); cx.beginPath(); for (let i = 0; i < 7; i++) { const an = i / 7 * 6.28 + .3; cx.moveTo(wx0, wy0); cx.lineTo(wx0 + Math.cos(an) * bw * .5, wy0 + Math.sin(an) * bh * .22); } cx.stroke(); }   // shattered rear window
+    cx.fillStyle = 'rgba(0,0,0,.4)'; cx.beginPath(); cx.moveTo(q.x - bw * .98, q.y - bh * .8); cx.lineTo(q.x - bw * .6, q.y - bh * .72); cx.lineTo(q.x - bw * .66, q.y - bh * .35); cx.lineTo(q.x - bw * .97, q.y - bh * .4); cx.fill();   // a dent in the bed
+    cx.fillStyle = '#b8bcc0'; cx.fillRect(q.x - bw * .12, q.y - bh * .38, bw * .24, bh * .07);   // tailgate handle
+    cx.fillStyle = 'rgba(0,0,0,.45)'; cx.beginPath(); cx.ellipse(q.x - bw * .78, q.y - 5 * s, bw * .18, 6 * s, 0, 0, 7); cx.fill(); cx.fillStyle = 'rgba(70,70,76,.8)'; cx.fillRect(q.x - bw * .95, q.y - 12 * s, bw * .35, 2 * s);   // a flat tyre
   } else if (k === 'sandbag') { // Multi-layered fortified sandbag wall with canvas outline
     const rows = 4, fl = o.hit > 0, dm = 1 - o.hp / o.max, vis = Math.max(1, Math.ceil(rows * (1 - dm * .6)));
     cx.fillStyle = 'rgba(0,0,0,.4)'; cx.beginPath(); cx.ellipse(q.x, q.y + 2 * s, w * 1.25, 5 * s, 0, 0, 7); cx.fill();
@@ -2533,8 +2606,13 @@ function drawObs(o) {
         cx.fillStyle = fl ? '#fff' : `rgb(${c},${c - 30},${c - 68})`;
         cx.beginPath(); cx.ellipse(x, y + 4 * s, bw * .58, 6.2 * s, 0, 0, 7); cx.fill();
         cx.strokeStyle = 'rgba(35,24,12,.65)'; cx.lineWidth = Math.max(1, s * .7); cx.stroke();
+        gritIn(() => cx.ellipse(x, y + 4 * s, bw * .58, 6.2 * s, 0, 0, 7), x - bw * .6, y - 3 * s, bw * 1.2, 14 * s, 'sand', .55, .4);
+        cx.strokeStyle = 'rgba(40,28,14,.4)'; cx.lineWidth = .7; cx.beginPath(); cx.moveTo(x - bw * .5, y + 4 * s); cx.lineTo(x + bw * .5, y + 4 * s); for (let t2 = -2; t2 <= 2; t2++) { cx.moveTo(x + t2 * bw * .2, y + 2 * s); cx.lineTo(x + t2 * bw * .2, y + 6 * s); } cx.stroke();   // the sewn mouth of the bag
+        cx.fillStyle = 'rgba(255,255,255,.14)'; cx.beginPath(); cx.ellipse(x - bw * .15, y + 1.5 * s, bw * .3, 1.8 * s, 0, 0, 7); cx.fill();
       }
     }
+    if (dm > .3) { cx.fillStyle = `rgb(${150},${126},${82})`; for (let i = 0; i < 18; i++) cx.fillRect(q.x + (hash(sd + i) - .5) * w * 2.2, q.y - hash(sd + 30 + i) * 6 * s, 1.6 * s, 1.4 * s); }   // spilled sand
+    const dd = cx.createRadialGradient(q.x, q.y, 2, q.x, q.y, w * 1.3); dd.addColorStop(0, 'rgba(170,140,95,.25)'); dd.addColorStop(1, 'rgba(170,140,95,0)'); cx.fillStyle = dd; cx.beginPath(); cx.ellipse(q.x, q.y, w * 1.3, 6 * s, 0, 0, 7); cx.fill();
   } else if (k === 'overpass') {
     const xa = P(-1.12, rel), xb = P(1.12, rel), top = 260 * q.s * 1.4, dk = 48 * q.s * 1.4, col = o.st === 1 ? 1 : 0;
     cx.fillStyle = '#3a3d42';
@@ -2552,6 +2630,8 @@ function drawObs(o) {
     cx.translate(0, -drop); cx.fillStyle = 'rgba(0,0,0,.45)'; cx.beginPath(); cx.ellipse(q.x, q.y + drop, w * 1.15, 6 * s, 0, 0, 7); cx.fill();
     cx.fillStyle = '#5c6066'; cx.beginPath(); cx.moveTo(q.x - w, q.y); cx.lineTo(q.x - w * .9, q.y - h); cx.lineTo(q.x + w * .85, q.y - h * 1.38); cx.lineTo(q.x + w, q.y); cx.fill();
     cx.fillStyle = '#7a7e84'; cx.beginPath(); cx.moveTo(q.x - w * .9, q.y - h); cx.lineTo(q.x + w * .85, q.y - h * 1.38); cx.lineTo(q.x + w * .85, q.y - h * 1.2); cx.lineTo(q.x - w * .9, q.y - h * .82); cx.fill();
+    gritIn(() => { cx.moveTo(q.x - w, q.y); cx.lineTo(q.x - w * .9, q.y - h); cx.lineTo(q.x + w * .85, q.y - h * 1.38); cx.lineTo(q.x + w, q.y); cx.closePath(); }, q.x - w, q.y - h * 1.4, w * 2, h * 1.4, 'dirt', .6, .6);
+    crackAt(q.x - w * .3, q.y - h * .9, h * .8, sd + 2, s); crackAt(q.x + w * .4, q.y - h * 1.1, h * .6, sd + 7, s);
     cx.strokeStyle = '#7a4222'; cx.lineWidth = Math.max(1.2, s * 1.1); for (let i = 0; i < 7; i++) { const px = q.x - w * .8 + i * w * .28; cx.beginPath(); cx.moveTo(px, q.y - h * 1.1); cx.lineTo(px + (hash(sd + i) - .5) * 16 * s, q.y - h * 1.1 - (10 + hash(sd * 2 + i) * 16) * s); cx.stroke(); }
   }
   cx.restore();
@@ -2827,7 +2907,7 @@ function getTex(kind) { // a tileable grit overlay: dark pits, pale chips, speck
     for (let i = 0; i < 4; i++) { const px = th(i, 3, 31) * size, py = th(i, 4, 31) * size, g = x.createRadialGradient(px, py, 2, px, py, 16 + th(i, 5, 31) * 14); g.addColorStop(0, 'rgba(0,0,0,.4)'); g.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g; x.fillRect(px - 40, py - 40, 80, 80); }
     for (let i = 0; i < 3; i++) { x.fillStyle = 'rgba(200,200,205,.07)'; x.fillRect(th(i, 7, 33) * size, th(i, 8, 33) * size, 30 + th(i, 9, 33) * 40, 20 + th(i, 10, 33) * 30); }
   } else {
-    for (let i = 0; i < K.cracks; i++) crackLine(th(i, 1, 51) * size, th(i, 2, 51) * size, i + sd, x, size, K.glow && i % 2 ? 'rgba(255,110,30,.75)' : 'rgba(0,0,0,.42)', K.glow && i % 2 ? 1 : 1, 24 + (i % 5) * 7);
+    for (let i = 0; i < K.cracks; i++) { const ember = K.glow && i % 4 === 0; crackLine(th(i, 1, 51) * size, th(i, 2, 51) * size, i + sd, x, size, ember ? 'rgba(255,100,30,.42)' : 'rgba(0,0,0,.42)', 1, ember ? 14 + (i % 3) * 5 : 24 + (i % 5) * 7); }   // (scorched ground: a few short, dim ember cracks among the dark ones)
     for (let i = 0; i < K.stains; i++) { const px = th(i, 3, 61) * size, py = th(i, 4, 61) * size, r = 14 + th(i, 5, 61) * 28, g = x.createRadialGradient(px, py, 1, px, py, r); g.addColorStop(0, i % 3 ? 'rgba(0,0,0,.34)' : 'rgba(120,70,30,.22)'); g.addColorStop(1, 'rgba(0,0,0,0)'); for (const ox of [-size, 0, size]) for (const oy of [-size, 0, size]) { x.save(); x.translate(ox, oy); x.fillStyle = g; x.fillRect(px - r, py - r, r * 2, r * 2); x.restore(); } }
     if (K.plates) { x.strokeStyle = 'rgba(0,0,0,.55)'; x.lineWidth = 1.4; for (let i = 0; i <= size; i += 64) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i, size); x.moveTo(0, i); x.lineTo(size, i); x.stroke(); } x.fillStyle = 'rgba(215,195,175,.35)'; for (let i = 0; i < size; i += 64) for (let j = 0; j < size; j += 64) for (const [a, b] of [[6, 6], [58, 6], [6, 58], [58, 58]]) x.fillRect(i + a, j + b, 2, 2); }
   }

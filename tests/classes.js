@@ -416,4 +416,7 @@ const arena=(lv,...en)=>{ const G=fresh(lv,[]); G.n=40; G.gates=[]; G.en=[]; G.o
   const G=arena(14); G.look=Object.assign({},G.look,{biome:'desert'}); t.save.fx='full'; let e2=null; try{ t.render(); G.look=Object.assign({},G.look,{biome:'winter',cityMode:'ridge'}); t.buildScenery(G.look); G.tp=t.todPal(G.look,.4); G.wx=t.wxAt(G.look,.4); t.render(); }catch(e){ e2=e.message; } check('the textured floor, skyline overlays, cloud sprites and grain render without errors', e2===null, e2);
   check('cloud sprites and film grain build', !!t.cloudTex(0,true) && !!t.cloudTex(1,false) && !!t.grainTex());
   document.createElement=realCE; t.resetTextures(); }
+// the detailed props and the harvester's armoured arm draw cleanly in every state
+{ const hv=t.mk('harvester',1,0,1); const G=arena(5,hv); hv.wz=G.dist+200; hv.hp=hv.max=1e6; let err=null; try{ for(const gs of ['idle','aim','lock','slam','recover']){ hv.gs=gs; hv.ext=gs==='idle'?0:.8; hv.tx=.3; hv.cap=3; hv.flash=gs==='slam'?.2:0; t.render(); }
+  G.en=[]; G.obs=[]; for(const k of ['jersey','rubble','trap','truck','sandbag','slab']) for(const hp of [20,120,380]) G.obs.push({k,x:(G.obs.length%5-2)*.3,hw:.18,wz:G.dist+120+G.obs.length*10,len:30,hp,max:380,dead:false,sd:3+G.obs.length,hit:G.obs.length%2?.1:0,fall:1}); t.render(); }catch(e){ err=e.message; } check('props and the harvester arm render in every state', err===null, err); }
 console.log(pass+' passed, '+fail+' failed');
