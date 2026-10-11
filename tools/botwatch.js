@@ -23,7 +23,7 @@
     hud.textContent = `BOT PLAYING  speed x${speed}  ( [ ] to change, H hides )\n` +
       `sector ${playLv}/${OPT.max}  try ${tries + 1}/${OPT.attempts}${farming ? '  (farming scrap)' : ''}  best ${best}\n` +
       `runs ${runs}  won ${wins}  lost ${losses}  upgrade rounds ${rounds}\n` + (g && state === 'play' ? `squad ${g.n}/${g.peak}  kills ${g.kills}  ${Math.round(g.dist)}/${g.L}\n` : '\n') +
-      `${upLine()}\nscrap ${save.scrap}\n${done || last}` + `\ncanvases created ${canvases}` + (errs.length ? `\nJS ERRORS ${errs.length}: ${errs[errs.length - 1]}` : '');
+      `${upLine()}\nscrap ${save.scrap}\n${done || last}` + `\ncanvases created ${canvases}  render ${renderMs.toFixed(1)} ms` + (errs.length ? `\nJS ERRORS ${errs.length}: ${errs[errs.length - 1]}` : '');
     if (Date.now() - lastPost > 1500) { lastPost = Date.now(); try { fetch('/__status', { method: 'POST', body: hud.textContent || lastText, keepalive: true }).catch(() => {}); } catch (e) {} }
     lastText = hud.textContent || lastText;
   }
@@ -59,6 +59,7 @@
   }
 
   // the bot steers and fires items four times a frame-step; extra steps give the speed-up
+  let renderMs = 0; { const r0 = render; render = function () { const t0 = performance.now(); r0(); renderMs = renderMs * .94 + (performance.now() - t0) * .06; }; }   // how long drawing a frame takes (smoothed)
   const orig = update;
   function think() { if (!done && state === 'play' && G && !G.over && !G.sweep && !G.paused && (frame++ & 3) === 0) { bot.pilot(G); bot.useItems(G); } }
   update = function (dt) {

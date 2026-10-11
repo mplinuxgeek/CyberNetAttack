@@ -472,6 +472,7 @@ function buildScenery(look) { // every sector gets its own skyline: dense city, 
   CITY = [makeCity(26, 70, 80 * dens, 160 * dens, .01), makeCity(22, 60, 60 * dens, 125 * dens, .035), makeCity(18, 52, 40 * dens, 95 * dens, .07)];
   if (m === 'sparse') for (const L of CITY) L.b = L.b.filter((b, i) => i % 3 === 0);
   RIDGE = makeRidge(look.tod === 'dark' ? 40 : 30, 60 + 90 * look.sx, 18 + 20 * look.sx);
+  try { for (const L of CITY) L.ov = bakeCityOverlay(L, 280); RIDGE.ov = bakeRidgeOverlay(RIDGE, look.biome === 'winter'); } catch (e) { for (const L of CITY) L.ov = null; RIDGE.ov = null; }
 }
 let decor = [], decorNext = 0, wallNext = 0;
 
@@ -2756,6 +2757,7 @@ function drawCity(layer, off, col, edge, win) {
       }
     }
   }
+  if (layer.ov && save.fx !== 'low') for (let rep = 0; rep < 2; rep++) cx.drawImage(layer.ov, -off + rep * layer.w, HOR - 280);   // grit, blown-out windows, rust runs
 }
 
 function heap(xc, z, hw, hh, seed, col) { // rubble berm along the edge of the cleared path
@@ -2766,6 +2768,127 @@ function heap(xc, z, hw, hh, seed, col) { // rubble berm along the edge of the c
   cx.fillStyle = '#1b2431'; cx.fillRect(q.x + w * .1, q.y - h * .45, w * .4, h * .2);
   cx.strokeStyle = '#5e4332'; cx.lineWidth = Math.max(1, 1.5 * q.s); line(q.x + w * .2, q.y - h * .6, q.x + w * .3, q.y - h * 1.15);
 }
+
+// ---------------------------------------------------------------- procedural textures: grit for the ground, road, skylines, clouds and the film
+function mkCanvas(w, h) { // (null where there is no real canvas: headless tests)
+  try { if (typeof document === 'undefined' || typeof document.createElement !== 'function') return null; const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext && c.getContext('2d'); return x && typeof x.createImageData === 'function' ? c : null; } catch (e) { return null; }
+}
+const th = (x, y, sd) => { let n = Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263) + Math.imul(sd | 0, 1442695041); n = Math.imul(n ^ (n >>> 13), 1274126177); return ((n ^ (n >>> 16)) >>> 0) / 4294967296; };
+function vnoise(x, y, per, sd) { // value noise on a lattice that wraps every `per` cells, so the texture tiles seamlessly
+  const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi, u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf), X = ((xi % per) + per) % per, X1 = (X + 1) % per, Y = ((yi % per) + per) % per, Y1 = (Y + 1) % per;
+  return lerp(lerp(th(X, Y, sd), th(X1, Y, sd), u), lerp(th(X, Y1, sd), th(X1, Y1, sd), u), v);
+}
+function fbm(u, v, base, oct, sd) { let a = .5, sum = 0, nrm = 0, per = base; for (let o = 0; o < oct; o++) { sum += a * vnoise(u * per, v * per, per, sd + o * 17); nrm += a; a *= .5; per *= 2; } return sum / nrm; }
+const TEXK = {   // dark / light thresholds and gains, light tint, speckle density, number of cracks and stains
+  dirt:   { d0: .47, dg: 2.4, l0: .63, lg: 1.5, lc: [205, 208, 218], spk: .02, cracks: 6, stains: 5 },
+  ash:    { d0: .49, dg: 1.7, l0: .57, lg: 1.9, lc: [228, 228, 232], spk: .035, cracks: 3, stains: 6 },
+  sand:   { d0: .45, dg: 1.5, l0: .6, lg: 1.7, lc: [255, 228, 172], spk: .015, cracks: 1, stains: 2, ripple: true },
+  scorch: { d0: .51, dg: 2.8, l0: .72, lg: 1.1, lc: [200, 120, 90], spk: .02, cracks: 10, stains: 4, glow: true },
+  snow:   { d0: .4, dg: 1, l0: .5, lg: 2.4, lc: [255, 255, 255], dc: [70, 90, 125], spk: .025, cracks: 2, stains: 3 },
+  wet:    { d0: .5, dg: 2.5, l0: .66, lg: 1.2, lc: [165, 205, 225], spk: .015, cracks: 4, stains: 4, streak: true },
+  metal:  { d0: .48, dg: 2.1, l0: .62, lg: 1.3, lc: [215, 195, 175], spk: .02, cracks: 3, stains: 8, plates: true },
+};
+const TEXC = {};
+function crackLine(x, y, sd, ctx, size, col, w, len) { // a jagged wandering fracture, drawn three times so it wraps around the tile
+  let a = th(sd, 1, 7) * 6.28, px = x, py = y; const pts = [[px, py]];
+  for (let i = 0; i < len; i++) { a += (th(sd, i, 9) - .5) * 1.1; px += Math.cos(a) * (3 + th(sd, i, 5) * 5); py += Math.sin(a) * (3 + th(sd, i, 5) * 5); pts.push([px, py]); }
+  ctx.strokeStyle = col; ctx.lineWidth = w; for (const ox of [-size, 0, size]) for (const oy of [-size, 0, size]) { ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(p[0] + ox, p[1] + oy) : ctx.moveTo(p[0] + ox, p[1] + oy)); ctx.stroke(); }
+}
+function getTex(kind) { // a tileable grit overlay: dark pits, pale chips, speckle, cracks, stains. Transparent, so the ground's own colour shows through.
+  if (kind in TEXC) return TEXC[kind];
+  const size = kind === 'road' ? 256 : 256, c = mkCanvas(size, size); if (!c) return (TEXC[kind] = null);
+  const x = c.getContext('2d'), id = x.createImageData(size, size); if (!id || !id.data) return (TEXC[kind] = null);
+  const d = id.data, sd = kind.length * 101 + kind.charCodeAt(0) * 7, K = TEXK[kind] || TEXK.dirt;
+  if (kind === 'road') { // cracked asphalt: fine grain, worn tyre tracks, patches
+    for (let py = 0; py < size; py++) for (let px = 0; px < size; px++) {
+      const u = px / size, v = py / size, n = fbm(u, v, 6, 4, sd), g = th(px, py, 3), tr = Math.max(0, 1 - Math.abs(u - .3) / .08) + Math.max(0, 1 - Math.abs(u - .7) / .08), wear = tr * (.4 + .6 * fbm(u * 3, v, 8, 3, 77));
+      let r = 0, gg = 0, b = 0, a = 0;
+      if (n < .46) { a = (.46 - n) * 2.2; } else if (n > .62) { r = gg = b = 200; a = (n - .62) * 1.2; }
+      if (g < .025) { r = gg = b = g < .012 ? 20 : 190; a = .4; }
+      if (wear > .05) { r = gg = b = 0; a = Math.max(a, wear * .5); }
+      const i = (py * size + px) * 4; d[i] = r; d[i + 1] = gg; d[i + 2] = b; d[i + 3] = Math.min(255, a * 255);
+    }
+  } else {
+    for (let py = 0; py < size; py++) for (let px = 0; px < size; px++) {
+      const u = px / size, v = py / size; let n = fbm(u, v, 5, 5, sd);
+      if (K.ripple) n += Math.sin((v + fbm(u, v, 4, 2, sd + 5) * .25) * 60) * .06;
+      if (K.streak) n = n * .5 + .5 * fbm(u * 6, v * .5 + .001, 8, 2, sd + 9);
+      let r = 0, gg = 0, b = 0, a = 0;
+      if (n < K.d0) { a = Math.min(.85, (K.d0 - n) * K.dg); if (K.dc) { r = K.dc[0]; gg = K.dc[1]; b = K.dc[2]; } }
+      else if (n > K.l0) { a = Math.min(.7, (n - K.l0) * K.lg); r = K.lc[0]; gg = K.lc[1]; b = K.lc[2]; }
+      const g = th(px, py, sd + 3); if (g < K.spk) { a = Math.max(a, .38); if (g < K.spk * .5) { r = K.lc[0]; gg = K.lc[1]; b = K.lc[2]; } else { r = gg = b = 0; } }
+      const i = (py * size + px) * 4; d[i] = r; d[i + 1] = gg; d[i + 2] = b; d[i + 3] = Math.min(255, a * 255);
+    }
+  }
+  x.putImageData(id, 0, 0);
+  x.lineCap = 'round';
+  if (kind === 'road') {
+    for (let i = 0; i < 5; i++) crackLine(th(i, 1, 21) * size, th(i, 2, 21) * size, i + 40, x, size, 'rgba(0,0,0,.45)', 1, 30 + i * 6);
+    for (let i = 0; i < 4; i++) { const px = th(i, 3, 31) * size, py = th(i, 4, 31) * size, g = x.createRadialGradient(px, py, 2, px, py, 16 + th(i, 5, 31) * 14); g.addColorStop(0, 'rgba(0,0,0,.4)'); g.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g; x.fillRect(px - 40, py - 40, 80, 80); }
+    for (let i = 0; i < 3; i++) { x.fillStyle = 'rgba(200,200,205,.07)'; x.fillRect(th(i, 7, 33) * size, th(i, 8, 33) * size, 30 + th(i, 9, 33) * 40, 20 + th(i, 10, 33) * 30); }
+  } else {
+    for (let i = 0; i < K.cracks; i++) crackLine(th(i, 1, 51) * size, th(i, 2, 51) * size, i + sd, x, size, K.glow && i % 2 ? 'rgba(255,110,30,.75)' : 'rgba(0,0,0,.42)', K.glow && i % 2 ? 1 : 1, 24 + (i % 5) * 7);
+    for (let i = 0; i < K.stains; i++) { const px = th(i, 3, 61) * size, py = th(i, 4, 61) * size, r = 14 + th(i, 5, 61) * 28, g = x.createRadialGradient(px, py, 1, px, py, r); g.addColorStop(0, i % 3 ? 'rgba(0,0,0,.34)' : 'rgba(120,70,30,.22)'); g.addColorStop(1, 'rgba(0,0,0,0)'); for (const ox of [-size, 0, size]) for (const oy of [-size, 0, size]) { x.save(); x.translate(ox, oy); x.fillStyle = g; x.fillRect(px - r, py - r, r * 2, r * 2); x.restore(); } }
+    if (K.plates) { x.strokeStyle = 'rgba(0,0,0,.55)'; x.lineWidth = 1.4; for (let i = 0; i <= size; i += 64) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i, size); x.moveTo(0, i); x.lineTo(size, i); x.stroke(); } x.fillStyle = 'rgba(215,195,175,.35)'; for (let i = 0; i < size; i += 64) for (let j = 0; j < size; j += 64) for (const [a, b] of [[6, 6], [58, 6], [6, 58], [58, 58]]) x.fillRect(i + a, j + b, 2, 2); }
+  }
+  return (TEXC[kind] = c);
+}
+const BIOMETEX = { wasteland: 'dirt', ash: 'ash', desert: 'sand', scorched: 'scorch', winter: 'snow', flooded: 'wet', industrial: 'metal' };
+const TWG = 2.6, TZG = 300, TZR = 360;   // ground tile: 2.6 lane-widths across, 300 px deep; road tile 360 px deep
+function drawFloor(dist, tp, B, L, wx) { // the textured ground, sliced row by row in perspective: grit on the dirt and a worn, cracked road down the middle
+  const gt = getTex(BIOMETEX[L.biome] || 'dirt'), rt = getTex('road'); if (!gt) return;
+  const lum = clamp(1 - tp.stars * .6 - (tp.vig - .3) * .25, .4, 1), base = .5 + .4 * lum, step = save.fx === 'low' ? 4 : 2, y0 = HOR + (PY - HOR) * .1;
+  cx.imageSmoothingEnabled = false;
+  for (let y = y0; y < H; y += step) {
+    const s = (y - HOR) / (PY - HOR), z = (1 / s - 1) / K, a = clamp((s - .1) / .3, 0, 1) * base * clamp(1.5 - s * .5, .6, 1); if (a <= .01) continue;
+    const vg = Math.floor((((dist + z) / TZG) % 1 + 1) % 1 * gt.height), tilePx = TWG * LANE * s;
+    let frac = ((-W / 2 / (LANE * s) / TWG) % 1 + 1) % 1, sx = 0; cx.globalAlpha = a;
+    for (let guard = 0; sx < W - .01 && guard < 40; guard++) { const take = Math.min(W - sx, (1 - frac) * tilePx); if (take > .01) cx.drawImage(gt, frac * gt.width, vg, Math.max(.5, take / tilePx * gt.width), 1, sx, y, take, step); sx += take; frac = 0; }
+    if (rt) { const vr = Math.floor((((dist + z) / TZR) % 1 + 1) % 1 * rt.height); cx.globalAlpha = Math.min(1, a * 1.25); cx.drawImage(rt, 0, vr, rt.width, 1, W / 2 - LANE * s, y, 2 * LANE * s, step); }
+  }
+  if ((wx.rain || 0) > .05 || L.biome === 'flooded') { // wet ground: a pale sheen of sky
+    const w = Math.max(wx.rain || 0, L.biome === 'flooded' ? .55 : 0), g = cx.createLinearGradient(0, HOR, 0, H); g.addColorStop(0, `rgba(${tp.haze},${.2 * w})`); g.addColorStop(.5, `rgba(${tp.haze},${.07 * w})`); g.addColorStop(1, `rgba(${tp.haze},0)`); cx.globalAlpha = 1; cx.fillStyle = g; cx.fillRect(0, HOR, W, H - HOR);
+  }
+  cx.globalAlpha = 1; cx.imageSmoothingEnabled = true;
+}
+function bakeOverlay(w, h, drawMask, details, grainSeed) { // texture for a silhouette: dark window panes, rust streaks, cracks and grit, clipped to the shape and drawn over its flat colour
+  const c = mkCanvas(w, h); if (!c) return null; const x = c.getContext('2d');
+  x.fillStyle = 'rgba(0,0,0,0.006)'; drawMask(x); x.globalCompositeOperation = 'source-atop'; details(x);
+  const gr = getTex('dirt'); if (gr) { x.globalAlpha = .55; for (let ox = 0; ox < w; ox += gr.width) for (let oy = 0; oy < h; oy += gr.height) x.drawImage(gr, ox, oy); x.globalAlpha = 1; }
+  return c;
+}
+function bakeCityOverlay(layer, OH) {
+  return bakeOverlay(Math.ceil(layer.w), OH, x => { for (const b of layer.b) for (let i = 0; i < b.cols; i++) x.fillRect(b.x + i * 5, OH - b.hs[i], 5.4, b.hs[i] + 2); }, x => {
+    for (const b of layer.b) {
+      x.fillStyle = 'rgba(0,0,0,.34)'; for (let r = 14; r < b.h - 6; r += 9) for (let q = 3; q < b.w - 3; q += 7) { const ci = Math.min(b.cols - 1, Math.floor(q / 5)); if (r < b.hs[ci] - 5 && th(b.x + q, r, 5) < .7) x.fillRect(b.x + q, OH - r, 3.2, 3.2); }   // blown-out window panes
+      x.fillStyle = 'rgba(0,0,0,.4)'; for (let r = 14; r < b.h; r += 14) x.fillRect(b.x, OH - r, b.w, 1.4);
+      for (let k = 0; k < 3; k++) { const sx = b.x + th(b.x, k, 71) * b.w, top = OH - b.h * (.4 + th(k, b.x, 72) * .6); x.fillStyle = k ? 'rgba(90,50,30,.28)' : 'rgba(0,0,0,.3)'; x.fillRect(sx, top, 1.6 + th(k, 3, 73) * 2, 20 + th(b.x, k, 74) * 60); }   // rust and soot runs
+      const g = x.createLinearGradient(0, OH - b.h, 0, OH); g.addColorStop(0, 'rgba(255,255,255,.07)'); g.addColorStop(1, 'rgba(0,0,0,.28)'); x.fillStyle = g; x.fillRect(b.x, OH - b.h, b.w, b.h);
+    }
+  });
+}
+function bakeRidgeOverlay(R, snow) {
+  const OH = 200;
+  return bakeOverlay(Math.ceil(R.w), OH, x => { x.beginPath(); x.moveTo(0, OH); for (const p of R.p) x.lineTo(p[0], OH - p[1]); x.lineTo(R.w, OH); x.closePath(); x.fill(); }, x => {
+    x.strokeStyle = 'rgba(0,0,0,.28)'; x.lineWidth = 1.2; for (let k = 0; k < 9; k++) { x.beginPath(); for (let px = 0; px <= R.w; px += 14) { const yy = OH - 12 - k * 15 + Math.sin(px * .03 + k * 2) * 5 + (th(px, k, 9) - .5) * 4; px ? x.lineTo(px, yy) : x.moveTo(px, yy); } x.stroke(); }
+    const g = x.createLinearGradient(0, 0, 0, OH); g.addColorStop(0, 'rgba(255,255,255,.1)'); g.addColorStop(1, 'rgba(0,0,0,.3)'); x.fillStyle = g; x.fillRect(0, 0, R.w, OH);
+    if (snow) { x.fillStyle = 'rgba(240,246,255,.75)'; for (let i = 1; i < R.p.length - 1; i++) { const p = R.p[i]; if (p[1] > 70 && p[1] >= R.p[i - 1][1] && p[1] >= R.p[i + 1][1]) { x.beginPath(); x.moveTo(p[0], OH - p[1]); x.lineTo(p[0] - 14, OH - p[1] + 22); x.lineTo(p[0] + 14, OH - p[1] + 22); x.closePath(); x.fill(); } } }
+  });
+}
+const CLOUDT = [];
+function cloudTex(k, dark) { // a soft, lumpy cloud: fractal noise inside a squashed ellipse
+  const key = k * 2 + (dark ? 1 : 0); if (key in CLOUDT) return CLOUDT[key];
+  const w = 300, h = 80, c = mkCanvas(w, h); if (!c) return (CLOUDT[key] = null); const x = c.getContext('2d'), id = x.createImageData(w, h); if (!id || !id.data) return (CLOUDT[key] = null);
+  for (let py = 0; py < h; py++) for (let px = 0; px < w; px++) {
+    const ex = (px / w - .5) * 2, ey = (py / h - .5) * 2, fall = 1 - (ex * ex + ey * ey * 1.6), n = fbm(px / w, py / h, 4, 4, k * 31 + 5), a = clamp((fall * 1.3 + (n - .5) * 1.5) , 0, 1) * (dark ? .6 : .5), i = (py * w + px) * 4;
+    setPx(id.data, i, dark ? 0 : 255, dark ? 6 : 255, dark ? 14 : 255, a * 255 * (.6 + .4 * n));
+  }
+  x.putImageData(id, 0, 0); return (CLOUDT[key] = c);
+}
+function setPx(a, i, r, g, b, al) { a[i] = r; a[i + 1] = g; a[i + 2] = b; a[i + 3] = al; }
+let GRAIN = null, GRAINP = null;
+function resetTextures() { for (const k of Object.keys(TEXC)) delete TEXC[k]; CLOUDT.length = 0; GRAIN = null; GRAINP = null; }   // (tests swap the canvas implementation)
+function grainTex() { if (GRAIN !== null) return GRAIN; const c = mkCanvas(160, 160); if (!c) return (GRAIN = false); const x = c.getContext('2d'), id = x.createImageData(160, 160); if (!id || !id.data) return (GRAIN = false); for (let i = 0; i < 160 * 160; i++) { const g = Math.random(), v = g < .5 ? 0 : 255, a = Math.abs(g - .5) * 2; setPx(id.data, i * 4, v, v, v, a * a * 90); } x.putImageData(id, 0, 0); try { GRAINP = cx.createPattern(c, 'repeat'); } catch (e) { GRAINP = null; } return (GRAIN = c); }
 
 // ---------------------------------------------------------------- level looks: time of day, weather, biome and skyline differ from sector to sector
 const mixC = (a, b, t) => { const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16), f = sh => Math.round(((pa >> sh) & 255) * (1 - t) + ((pb >> sh) & 255) * t); return '#' + ((1 << 24) | (f(16) << 16) | (f(8) << 8) | f(0)).toString(16).slice(1); };
@@ -2858,17 +2981,20 @@ function drawStars(look, tp, wx) {
   for (let i = 0; i < 90; i++) { const sx = hash(look.lv * 31 + i) * W, sy = hash(look.lv * 53 + i * 3) * (HOR - 30), tw = .55 + .45 * Math.sin(T * (1 + hash(i) * 2) + i); cx.fillStyle = `rgba(235,242,255,${k * tw * (.4 + hash(i * 7) * .6)})`; const sz = hash(i * 11) < .12 ? 2 : 1; cx.fillRect(sx, sy, sz, sz); }
 }
 function drawClouds(look, tp, wx) {
-  const grey = clamp((wx.storm || 0) * .9 + (wx.rain || 0) * .4 + (wx.ash || 0) * .5, 0, 1), n = Math.round(5 + 9 * grey + (look.tod === 'overcast' ? 5 : 0)), sp = 1.8 + (wx.wind || 0) * 9;
+  const grey = clamp((wx.storm || 0) * .9 + (wx.rain || 0) * .4 + (wx.ash || 0) * .5, 0, 1), n = Math.round(5 + 9 * grey + (look.tod === 'overcast' ? 5 : 0)), sp = 1.8 + (wx.wind || 0) * 9, night = tp.stars > .25 || look.tod === 'dark';
   for (let i = 0; i < n; i++) {
-    const xx = ((i * 185 + T * (sp + i * .5)) % (W + 360)) - 180, yy = 16 + (i * 47) % 130, big = 145 + (i % 3) * 45 + grey * 40;
+    const xx = ((i * 185 + T * (sp + i * .5)) % (W + 360)) - 180, yy = 16 + (i * 47) % 130, big = 145 + (i % 3) * 45 + grey * 40, hgt = 15 + (i % 2) * 10 + grey * 8, dark = night || grey > .5 || i % 2 === 0 && look.tod !== 'day';
+    const sprite = save.fx !== 'low' && cloudTex(i % 3, dark);
+    if (sprite) { cx.globalAlpha = dark ? clamp(.55 + .35 * grey + .1 * tp.stars, 0, 1) : clamp(.5 + .3 * (1 - tp.stars), 0, 1); cx.drawImage(sprite, xx - big, yy - hgt * 1.6, big * 2, hgt * 3.2); cx.globalAlpha = 1; if (!dark) { cx.fillStyle = `rgba(${tp.haze},.05)`; cx.beginPath(); cx.ellipse(xx, yy, big * .9, hgt * .6, 0, 0, 7); cx.fill(); } continue; }
     cx.fillStyle = i % 2 ? `rgba(${tp.haze},${.10 + .22 * (1 - tp.stars) * (1 - grey)})` : `rgba(8,14,24,${.18 + .25 * grey + .1 * tp.stars})`;
-    cx.beginPath(); cx.ellipse(xx, yy, big, 15 + (i % 2) * 10 + grey * 8, 0, 0, 7); cx.fill();
+    cx.beginPath(); cx.ellipse(xx, yy, big, hgt, 0, 0, 7); cx.fill();
   }
 }
 function drawRidge(col, edge, off) {
   const R = RIDGE; cx.fillStyle = col; cx.beginPath(); cx.moveTo(-10, HOR + 4);
   for (let rep = 0; rep < 2; rep++) for (const p of R.p) { const x = p[0] - off + rep * R.w; if (x > -40 && x < W + 40) cx.lineTo(x, HOR - p[1]); }
   cx.lineTo(W + 10, HOR + 4); cx.closePath(); cx.fill(); cx.strokeStyle = edge; cx.lineWidth = 1.2; cx.stroke();
+  if (R.ov && save.fx !== 'low') for (let rep = 0; rep < 2; rep++) cx.drawImage(R.ov, -off + rep * R.w, HOR - 200);   // rock strata and snow
 }
 function drawWeather() { // in front of the world: fog, rain, ash, dust, wind-blown debris, and the flash of lightning
   const L = curLook(), wx = (G && G.wx) || wxAt(L, .3), tp = (G && G.tp) || todPal(L, .3), gust = .75 + .25 * Math.sin(T * .35);
@@ -2940,6 +3066,7 @@ function drawBG(dist, pal) {
   cx.fillStyle = gg; cx.fillRect(0, HOR, W, H - HOR);
   quad(-1, 1, -150, 3200, B.road);                                          // asphalt road base
   quad(-0.95, 0.95, -150, 3200, 'rgba(120,150,195,.06)');                                    // trampled, cleared path center
+  drawFloor(dist, tp, B, L, wx);
 
   const BS = 50, base = Math.floor(dist / BS) - 2;
   for (let k = 0; k < 42; k++) {
@@ -2961,7 +3088,7 @@ function drawBG(dist, pal) {
       cx.lineTo(pq.x + wd, pq.y); cx.closePath(); cx.fill();
       if (!dark) { cx.fillStyle = 'rgba(190,210,240,.35)'; cx.fillRect(pq.x - wd * .5, pq.y - hh * .6, wd * .7, Math.max(1, hh * .18)); }
     }
-    for (let j = 0; j < (save.fx === 'low' ? 8 : 22); j++) { // fine debris chips across the whole ground
+    for (let j = 0; j < (save.fx === 'low' ? 4 : 10); j++) { // debris chips across the ground
       const hx = hash(idx * 91 + j * 3 + 11), hz = hash(idx * 91 + j * 3 + 12), pq = P(hx * 8 - 4, z0 + hz * BS), sz = Math.max(1, (1.5 + hash(idx * 7 + j) * 3) * pq.s);
       cx.fillStyle = B.chip[j % 4]; cx.fillRect(pq.x, pq.y, sz * 1.8, sz);
     }
@@ -3004,6 +3131,7 @@ function drawGrade() {
   const v = cx.createRadialGradient(W / 2, H * .55, H * .3, W / 2, H * .55, H * .75);
   v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, `rgba(0,4,12,${tp.vig.toFixed(3)})`);
   cx.fillStyle = v; cx.fillRect(0, 0, W, H);
+  if (save.fx !== 'low' && grainTex() && GRAINP) { const ox = Math.floor(Math.random() * 160), oy = Math.floor(Math.random() * 160); cx.save(); cx.translate(-ox, -oy); cx.fillStyle = GRAINP; cx.globalAlpha = .38; cx.fillRect(0, 0, W + 160, H + 160); cx.restore(); }   // film grain
 }
 
 // camera zoom: the world is drawn magnified about the squad's feet so everything is larger on a phone (the HUD stays put). Wide 1.0 / Close 1.15 / Closer 1.3
