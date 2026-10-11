@@ -2862,18 +2862,6 @@ function drawGrade() {
   cx.fillStyle = v; cx.fillRect(0, 0, W, H);
 }
 
-function drawGrade() {
-  drawEmbers(); // cold blue future-war grade: haze band, tint, vignette
-  cx.setTransform(RS, 0, 0, RS, 0, 0);
-  const hz = cx.createLinearGradient(0, HOR - 70, 0, HOR + 90);
-  hz.addColorStop(0, 'rgba(90,150,220,0)'); hz.addColorStop(.45, 'rgba(110,170,235,.22)'); hz.addColorStop(1, 'rgba(90,150,220,0)');
-  cx.fillStyle = hz; cx.fillRect(0, HOR - 70, W, 160);
-  cx.fillStyle = 'rgba(20,60,120,.09)'; cx.fillRect(0, 0, W, H);
-  const v = cx.createRadialGradient(W / 2, H * .55, H * .3, W / 2, H * .55, H * .75);
-  v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,4,12,.42)');
-  cx.fillStyle = v; cx.fillRect(0, 0, W, H);
-}
-
 // camera zoom: the world is drawn magnified about the squad's feet so everything is larger on a phone (the HUD stays put). Wide 1.0 / Close 1.15 / Closer 1.3
 const ZOOMS = [1, 1.15, 1.3], ZNAMES = ['Wide', 'Close', 'Closer'];
 function zoomLevel() { if (save.zoom !== undefined) return save.zoom; return (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches) ? 1 : 0; }   // phones start on Close

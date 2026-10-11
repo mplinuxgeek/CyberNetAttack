@@ -1,6 +1,6 @@
 // Watch the bot play: loaded into the real game page by `node tests/bot.js --watch` (see tools/watch.js).
 // Same brain as the headless bot (tools/botlib.js), same progression rules, but it drives the live game and you see every frame.
-// Keys: ] faster   [ slower   H hide this panel   P pause (the game's own pause)
+// Keys: ] faster   [ slower   H hide this panel   C capture a screenshot + game state   P pause (the game's own pause)
 (function () {
   const q = new URLSearchParams(location.search);
   const num = (k, d) => (q.has(k) && Number.isFinite(+q.get(k)) ? +q.get(k) : d);
@@ -72,8 +72,18 @@
     }
     paint();
   }, 150);
+  function capture() { // screenshot of the canvas (as drawn, HUD panel excluded) and the facts needed to explain a glitch
+    try {
+      const g = G, ens = g ? g.en.filter(e => !e.dead).slice(0, 40).map(e => ({ t: e.t, boss: !!e.boss, x: +e.x.toFixed(2), rel: Math.round(e.wz - g.dist), hp: Math.round(e.hp), max: Math.round(e.max), sc: e.sc, stun: e.stun, flash: e.flash, gl: e.gl, crash: e.crash })) : [];
+      const state = { when: new Date().toISOString(), speed, sector: g && g.lv, n: g && g.n, dist: g && Math.round(g.dist), env: g && g.env, form: g && g.form, parts: g && g.parts.length, lights: g && g.lt.length, bullets: g && g.bullets.length, bolts: g && g.bolts.length, rockets: g && g.rockets.length, strikes: g && g.strikes.length, waves: g && g.waves.length, flash: g && g.flash, shake: g && g.shake, mz: g && g.mz, fx: save.fx, crt: save.crt, zoom: zoomLevel(), rs: RS, sizePx: [cv.width, cv.height], dpr: window.devicePixelRatio, enemies: ens };
+      fetch('/__capture', { method: 'POST', body: JSON.stringify({ png: cv.toDataURL('image/png'), state }) }).catch(() => {});
+      last = 'captured a screenshot (tests/captures)';
+    } catch (e) { last = 'capture failed: ' + e.message; }
+  }
+  if (q.has('capture')) setTimeout(capture, num('capture', 10) * 1000);   // (for testing the capture path without a keyboard)
   window.addEventListener('keydown', e => {
     if (e.key === ']') speed = Math.min(16, speed + 1); else if (e.key === '[') speed = Math.max(1, speed - 1);
     else if (e.key === 'h' || e.key === 'H') hud.dataset.off = hud.dataset.off ? '' : '1';
+    else if (e.key === 'c' || e.key === 'C') capture();
   });
 })();

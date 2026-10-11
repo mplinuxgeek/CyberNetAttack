@@ -4,3 +4,4 @@ __pycache__/
 tools/render3d/_*
 tools/scores.json
 scores.json
+tests/captures/

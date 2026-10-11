@@ -22,7 +22,7 @@ const REAL = { setTimeout, setInterval, clearInterval };   // (the headless bot 
 global.setTimeout = () => {}; global.setInterval = () => 0; global.clearInterval = noop;
 
 const args = process.argv.slice(2);
-const KNOWN = ['max-sector', 'attempts', 'time', 'assist', 'seed', 'why', 'form', 'start', 'up', 'help', 'watch', 'speed', 'mute', 'chrome', 'port', 'size', 'shot', 'shot-after', 'headless', 'verbose', 'level-time', 'slow-time', 'slow-levels'], ALIAS = { max: 'max-sector', levels: 'max-sector', sectors: 'max-sector' };
+const KNOWN = ['max-sector', 'attempts', 'time', 'assist', 'seed', 'why', 'form', 'start', 'up', 'help', 'watch', 'speed', 'mute', 'chrome', 'port', 'size', 'shot', 'shot-after', 'headless', 'verbose', 'level-time', 'slow-time', 'slow-levels', 'capture'], ALIAS = { max: 'max-sector', levels: 'max-sector', sectors: 'max-sector' };
 if (args.includes('--help') || args.includes('-h')) {
   console.log(`usage: node tests/bot.js [options]
   --max-sector N   stop after clearing sector N (default 100; aliases --max, --levels)

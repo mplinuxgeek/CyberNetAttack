@@ -8,7 +8,7 @@ module.exports = function watch(args) {
   const alias = k => { for (const a of [k, ...(k === 'max-sector' ? ['max', 'levels', 'sectors'] : [])]) if (has(a)) return val(a); return undefined; };
   const qs = new URLSearchParams();
   for (const [k, p] of [['max', 'max-sector'], ['start', 'start'], ['up', 'up'], ['attempts', 'attempts'], ['speed', 'speed'], ['form', 'form'], ['leveltime', 'level-time'], ['slowtime', 'slow-time'], ['slowlevels', 'slow-levels']]) { const v = alias(p); if (v !== undefined) qs.set(k, v); }
-  if (has('assist')) qs.set('assist', '1'); if (has('mute')) qs.set('mute', '1');
+  if (val('capture')) qs.set('capture', val('capture')); if (has('assist')) qs.set('assist', '1'); if (has('mute')) qs.set('mute', '1');
   const shot = val('shot'), headless = has('headless') || !!shot;
 
   const page = () => fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8')
@@ -16,6 +16,9 @@ module.exports = function watch(args) {
     .replace('</body>', '<script src="tools/botlib.js"></script><script src="tools/botwatch.js"></script></body>');
   let status = '', lastLine = '';
   const srv = http.createServer((req, res) => {
+    if (req.method === 'POST' && req.url === '/__capture') { // press C in the window: a screenshot of the canvas plus a dump of the game state, for chasing visual glitches
+      let b = ''; req.on('data', d => { if (b.length < 20e6) b += d; }); req.on('end', () => { try { const j = JSON.parse(b), dir = path.join(ROOT, 'tests', 'captures'); fs.mkdirSync(dir, { recursive: true }); const id = new Date().toISOString().replace(/[:.]/g, '-');
+        fs.writeFileSync(path.join(dir, id + '.png'), Buffer.from(String(j.png).split(',')[1] || '', 'base64')); fs.writeFileSync(path.join(dir, id + '.json'), JSON.stringify(j.state, null, 1)); console.log('captured ' + path.join('tests/captures', id + '.png') + ' (+ .json)'); } catch (e) { console.log('capture failed: ' + e.message); } res.writeHead(204); res.end(); }); return; }
     if (req.method === 'POST' && req.url === '/__status') { let b = ''; req.on('data', d => { if (b.length < 4000) b += d; }); req.on('end', () => { status = b; const m = /sector (\d+)\/\d+  try (\d+)\/\d+[^\n]*\nruns (\d+)  won (\d+)  lost (\d+)  upgrade rounds (\d+)/.exec(b); const line = m ? `sector ${m[1]} try ${m[2]}  runs ${m[3]} won ${m[4]} lost ${m[5]} upgrade rounds ${m[6]}` : ''; if (line && line !== lastLine && !headless) { lastLine = line; console.log(line); } res.writeHead(204); res.end(); }); return; }
     let u = decodeURIComponent(req.url.split('?')[0]); if (u === '/' || u === '/index.html') { res.writeHead(200, { 'Content-Type': MIME['.html'], 'Cache-Control': 'no-store' }); return res.end(page()); }
     const f = path.normalize(path.join(ROOT, u)); if (!f.startsWith(ROOT + path.sep) || /\/(tests|docs|\.git|node_modules)\//.test(f.replace(ROOT, '') + '/')) { res.writeHead(403); return res.end(); }
@@ -37,6 +40,6 @@ module.exports = function watch(args) {
     if (headless && !shot) setTimeout(() => { console.log(status || '(no status received)'); stop(); }, Math.round(+val('shot-after', 30) * 1000));
     const stop = () => { if (status && !(headless && !shot)) console.log('\nlast bot panel:\n' + status); try { ch.kill(); } catch (e) {} try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) {} srv.close(); process.exit(0); };
     ch.on('exit', () => setTimeout(stop, 200)); process.on('SIGINT', stop);
-    console.log('close the window (or Ctrl+C) to stop. Keys in the window: ] faster, [ slower, H hides the panel.');
+    console.log('close the window (or Ctrl+C) to stop. Keys in the window: ] faster, [ slower, H hides the panel, C saves a screenshot + game state to tests/captures/.');
   });
 };
