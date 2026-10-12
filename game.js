@@ -3461,12 +3461,16 @@ function drawHUD() {
 let acc = 0;
 let lastDraw = 0;
 function fpsCap() { const f = save.fps === undefined ? 60 : save.fps; return state === 'menu' ? Math.min(f || 60, 30) : f; }   // the menu is nearly still: 30 is plenty there
+// the benchmark leaves requestAnimationFrame (locked to the display refresh) and loops on a message channel, so it really runs uncapped
+const BMC = typeof MessageChannel !== 'undefined' ? new MessageChannel() : null;
+if (BMC) BMC.port1.onmessage = () => frame(performance.now());
+function nextFrame() { if (BENCH && BMC) BMC.port2.postMessage(0); else requestAnimationFrame(frame); }
 function frame(ts) {
   const cap = BENCH ? 0 : fpsCap();   // (the benchmark draws as fast as the browser allows)
-  if (cap && ts - lastDraw < 1000 / cap - 2) { requestAnimationFrame(frame); return; }   // a 120 Hz screen would otherwise draw twice as often as needed, and run the CPU, GPU and battery hot
+  if (cap && ts - lastDraw < 1000 / cap - 2) { nextFrame(); return; }   // a 120 Hz screen would otherwise draw twice as often as needed, and run the CPU, GPU and battery hot
   if (BENCH) { if (BENCH.last && BENCH.skip-- <= 0 && state === 'play') BENCH.frames.push(ts - BENCH.last); BENCH.last = ts; if (document.hidden) BENCH.bad = 'the tab was hidden during the run: the numbers are unreliable'; }
   lastDraw = ts;
-  try { frame0(ts); } catch (err) { console.error(err); try { cv.width = cv.width; } catch (e2) {} last = ts; acc = 0; requestAnimationFrame(frame); }   // (re-assigning the width resets the canvas state: a draw that threw half way must not leave a clip, blend mode or save() behind for every later frame)   // one bad frame must never freeze the game
+  try { frame0(ts); } catch (err) { console.error(err); try { cv.width = cv.width; } catch (e2) {} last = ts; acc = 0; nextFrame(); }   // (re-assigning the width resets the canvas state: a draw that threw half way must not leave a clip, blend mode or save() behind for every later frame)   // one bad frame must never freeze the game
 }
 function frame0(ts) {
   const dt = Math.min(.1, (ts - last) / 1000 || 0); last = ts; T += dt;
@@ -3478,7 +3482,7 @@ function frame0(ts) {
   render();
   if (BENCH && state === 'play' && BENCH.skip <= 0) { const tw2 = performance.now(); BENCH.work.push(tw2 - tw0); BENCH.rend.push(tw2 - tw1); }
   if (BENCH && G && G.bench && G.t >= BENCH_SECS) benchNext();
-  requestAnimationFrame(frame);
+  nextFrame();
 }
 applyCRT();
 function spriteLoad() { let ok = 0, tot = 0; for (const n of Object.keys(SPR)) for (const k of Object.keys(SPR[n].dirs)) for (const f of SPR[n].dirs[k].frames) { tot++; if (f.ok) ok++; } return [ok, tot]; }
