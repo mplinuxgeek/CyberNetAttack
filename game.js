@@ -523,6 +523,7 @@ function squadPos() { const q = P(G.px, G.adv || 0); return q; }
 function gateWait(e) { const g = gateBefore(e); return !!g && G.dist < g.wz - 380; }   // still frozen behind a gate
 function gateBefore(e) { let best = null; for (const g of G.gates) if (!g.used && g.wz < e.wz && g.wz > G.dist - 5 && (!best || g.wz > best.wz)) best = g; return best; }
 function clAt(ci) { let c = ci; for (const k of CLS) { if (c < G.cls[k]) return k; c -= G.cls[k]; } return null; }   // which class the ci-th special soldier belongs to
+const RIFLEMEN = ['resistance_rifleman', 'resistance_goggles', 'resistance_captain', 'resistance_shotgunner'];   // the line soldiers: steel helmet, goggles and pack, field cap, and the rifle-woman
 function slotOf(i, shown) { // where the i-th soldier stands: x offset in lane units, z offset in world px
   const f = (G && G.form) || 'free';
   if (f === 'v') { const r = Math.ceil(i / 2), sd = i % 2 ? 1 : -1; return { ox: i === 0 ? 0 : sd * r * .02 + sd * .01, oz: -r * 2.4 + 20 }; }
@@ -1003,14 +1004,14 @@ function pushShot(b, src, zo) { // every fighter fires on his own clock: each ro
   G.bullets.push(b);
 }
 function volley() {
-  const w = WEAPONS[G.tier], B = clamp(1 + Math.floor(G.n / 7), 1, 8);
+  const w = WEAPONS[G.tier], B = clamp(Math.ceil(Math.min(G.n, 40) / 2), 1, 20);   // about one round per two soldiers on the field
   const total = w.dmg * (1 + DMG_K * save.up.dmg) * G.dmgG * (1 + Math.min(G.n, 60) * .35 + Math.max(0, G.n - 60) * .1);
   const each = total / B;
   const shown = Math.min(G.n, 40);
   for (let i = 0; i < B; i++) {
     const k = Math.floor(Math.random() * shown), sl = slotOf(k, shown), ox = sl.ox, zo = sl.oz + 7;   // a random fighter of the formation takes this shot, from his own spot (rounds leave from where he stands, not from the squad's centre)
     const x = clamp(G.px + ox + rnd(-w.spread, w.spread), -.95, .95);
-    pushShot({ x, dmg: each * (Math.random() < CRIT_K * U('crit') ? 2.5 : 1), w, hit: [], vx: 0, tg: aimTarget(x, zo, SQUAD_CONE * formK().cone, true) }, 'px', zo);   // soldiers lean their shots toward a machine just off their line, but still have to be steered at the rest
+    pushShot({ k, snd: i < 4, x, dmg: each * (Math.random() < CRIT_K * U('crit') ? 2.5 : 1), w, hit: [], vx: 0, tg: aimTarget(x, zo, SQUAD_CONE * formK().cone, true) }, 'px', zo);   // soldiers lean their shots toward a machine just off their line, but still have to be steered at the rest
   }
   const base = w.dmg * (1 + DMG_K * save.up.dmg) * G.dmgG;
   const fz = frontZ();   // specialists fire from the front rank
@@ -1197,7 +1198,7 @@ function update(dt) {
   decor = decor.filter(d => d.wz - G.dist > -150);
 
   // fire (the squad keeps shooting while it marches on after the boss: any endos left over are cut down)
-  if (!G.over || G.sweep) {
+  if (!G.over || (G.sweep && G.en.some(e => !e.dead && e.wz > G.dist - 20))) {   // after the boss falls the squad marches on and only fires while a machine is left
     G.fcd -= dt;
     const last = G.n > 0 && G.peak >= 12 && G.n <= G.peak * .25 ? 1.2 : 1;   // last stand: a battered squad fights harder
     const iv = G.fiv = WEAPONS[G.tier].int / ((1 + RATE_K * save.up.rate) * G.rateG * (1 + Math.min(.3, .05 * G.cls.officer)) * (G.od > 0 ? 1.8 : 1) * (G.rn > .5 ? .9 : 1) * last);
@@ -1218,7 +1219,7 @@ function update(dt) {
 
   // bullets
   for (const b of G.bullets) {
-    if (b.d > 0) { b.d -= dt; if (b.d <= 0 && b.src === 'px' && !b.rng && !b.pen) sfx.shot(G.tier); b.x = G[b.src] + b.rx; b.wz = b.pz = G.dist + b.zo; if (b.sz !== undefined) b.sz = b.wz; continue; }   // still waiting for his turn to fire
+    if (b.d > 0) { b.d -= dt; if (b.d <= 0) { b.z0 = G.dist + b.zo; if (b.src === 'px' && !b.rng && !b.pen) { if (b.snd) sfx.shot(G.tier); if (b.k !== undefined) (G.fk || (G.fk = {}))[b.k] = G.t; } } b.x = G[b.src] + b.rx; b.wz = b.pz = G.dist + b.zo; if (b.sz !== undefined) b.sz = b.wz; continue; }   // still waiting for his turn to fire
     b.pz = b.wz; b.wz += 1100 * dt;
     if (b.tg) { if (!b.tg.dead && b.tg.wz > b.wz + 20) b.vx = clamp((b.tg.x - b.x) / ((b.tg.wz - b.wz) / 1100), -2.2, 2.2); }   // aimed rounds home in on their target
     if (b.vx) b.x += b.vx * dt;
@@ -2270,12 +2271,12 @@ function armSeg(x1, y1, x2, y2, w, flash, sd) { // an armoured arm segment: plat
   // hydraulic ram along the lower flank
   const ry = w * .62; cx.fillStyle = '#12161c'; cx.fillRect(L * .1, ry - w * .13, L * .62, w * .26); cx.fillStyle = flash ? '#fff' : '#c6ced6'; cx.fillRect(L * .5, ry - w * .06, L * .4, w * .12); cx.fillStyle = '#3a424c'; cx.fillRect(L * .1, ry - w * .13, L * .12, w * .26); cx.fillRect(L * .72, ry - w * .13, L * .05, w * .26);
   // shell
-  const g = cx.createLinearGradient(0, -w / 2, 0, w / 2); g.addColorStop(0, flash ? '#fff' : '#a3b2c4'); g.addColorStop(.22, flash ? '#fff' : '#5a6878'); g.addColorStop(.6, flash ? '#fff' : '#2f3945'); g.addColorStop(1, flash ? '#fff' : '#12161c');
+  const g = cx.createLinearGradient(0, -w / 2, 0, w / 2); g.addColorStop(0, flash ? '#fff' : '#6a7686'); g.addColorStop(.22, flash ? '#fff' : '#3c4551'); g.addColorStop(.6, flash ? '#fff' : '#1f262e'); g.addColorStop(1, flash ? '#fff' : '#0b0e12');
   cx.fillStyle = g; cx.beginPath(); cx.moveTo(0, -w * .45); cx.lineTo(L, -w * .5); cx.lineTo(L, w * .5); cx.lineTo(0, w * .45); cx.closePath(); cx.fill();
   for (let i = 0; i < n; i++) {   // panels
     const px = i * L / n; cx.fillStyle = 'rgba(0,0,0,.55)'; cx.fillRect(px, -w * .5, Math.max(1, w * .05), w);
-    cx.fillStyle = 'rgba(255,255,255,.22)'; cx.fillRect(px + w * .06, -w * .45, L / n - w * .12, Math.max(1, w * .07));
-    cx.fillStyle = flash ? '#fff' : '#9aa6b4'; for (const ry2 of [-w * .32, w * .3]) { cx.beginPath(); cx.arc(px + w * .18, ry2, Math.max(.8, w * .045), 0, 7); cx.arc(px + L / n - w * .18, ry2, Math.max(.8, w * .045), 0, 7); cx.fill(); }
+    cx.fillStyle = 'rgba(255,255,255,.12)'; cx.fillRect(px + w * .06, -w * .45, L / n - w * .12, Math.max(1, w * .07));
+    cx.fillStyle = flash ? '#fff' : '#6c7684'; for (const ry2 of [-w * .32, w * .3]) { cx.beginPath(); cx.arc(px + w * .18, ry2, Math.max(.8, w * .045), 0, 7); cx.arc(px + L / n - w * .18, ry2, Math.max(.8, w * .045), 0, 7); cx.fill(); }
     if (i === 1) { cx.save(); cx.beginPath(); cx.rect(px + w * .12, -w * .22, L / n - w * .24, w * .44); cx.clip(); for (let k2 = -6; k2 < 12; k2++) { cx.fillStyle = k2 % 2 ? 'rgba(230,185,30,.85)' : 'rgba(18,18,20,.85)'; cx.beginPath(); cx.moveTo(px + k2 * w * .2, w * .22); cx.lineTo(px + k2 * w * .2 + w * .2, w * .22); cx.lineTo(px + k2 * w * .2 + w * .42, -w * .22); cx.lineTo(px + k2 * w * .2 + w * .22, -w * .22); cx.fill(); } cx.restore(); }
   }
   gritIn(() => cx.rect(0, -w / 2, L, w), 0, -w / 2, L, w, 'metal', .55, .45);
@@ -2286,24 +2287,26 @@ function armSeg(x1, y1, x2, y2, w, flash, sd) { // an armoured arm segment: plat
 }
 function armJoint(x, y, r, flash) { // a big ball-and-collar joint with a ring of bolts and a status light
   cx.fillStyle = '#0c0f13'; cx.beginPath(); cx.arc(x, y, r * 1.12, 0, 7); cx.fill();
-  const g = cx.createRadialGradient(x - r * .3, y - r * .3, r * .1, x, y, r); g.addColorStop(0, flash ? '#fff' : '#b3bfcc'); g.addColorStop(.5, flash ? '#fff' : '#4d5967'); g.addColorStop(1, flash ? '#fff' : '#161b22'); cx.fillStyle = g; cx.beginPath(); cx.arc(x, y, r, 0, 7); cx.fill();
+  const g = cx.createRadialGradient(x - r * .3, y - r * .3, r * .1, x, y, r); g.addColorStop(0, flash ? '#fff' : '#76828f'); g.addColorStop(.5, flash ? '#fff' : '#343d48'); g.addColorStop(1, flash ? '#fff' : '#0f1318'); cx.fillStyle = g; cx.beginPath(); cx.arc(x, y, r, 0, 7); cx.fill();
   cx.strokeStyle = 'rgba(0,0,0,.6)'; cx.lineWidth = Math.max(1, r * .12); cx.beginPath(); cx.arc(x, y, r * .62, 0, 7); cx.stroke();
-  cx.fillStyle = flash ? '#fff' : '#cfd6de'; for (let i = 0; i < 6; i++) { const an = i / 6 * 6.283 + .4; cx.beginPath(); cx.arc(x + Math.cos(an) * r * .8, y + Math.sin(an) * r * .8, Math.max(.8, r * .08), 0, 7); cx.fill(); }
+  cx.fillStyle = flash ? '#fff' : '#8a94a0'; for (let i = 0; i < 6; i++) { const an = i / 6 * 6.283 + .4; cx.beginPath(); cx.arc(x + Math.cos(an) * r * .8, y + Math.sin(an) * r * .8, Math.max(.8, r * .08), 0, 7); cx.fill(); }
   const on = Math.sin(G.t * 6 + x) > -.2; cx.fillStyle = on ? '#ff3a22' : '#601208'; cx.beginPath(); cx.arc(x + r * .1, y + r * .1, Math.max(1, r * .16), 0, 7); cx.fill(); if (on) { cx.globalAlpha = .35; cx.beginPath(); cx.arc(x + r * .1, y + r * .1, r * .4, 0, 7); cx.fill(); cx.globalAlpha = 1; }
 }
 function armClaw(x, y, cw, open, flash, face) { // the grab: a plated palm and three two-jointed talons
   cx.fillStyle = '#0c0f13'; cx.fillRect(x - 9 * cw, y - 5 * cw, 18 * cw, 10 * cw);
-  const g = cx.createLinearGradient(0, y - 5 * cw, 0, y + 5 * cw); g.addColorStop(0, flash ? '#fff' : '#8795a6'); g.addColorStop(1, flash ? '#fff' : '#242c36'); cx.fillStyle = g; cx.fillRect(x - 8 * cw, y - 4 * cw, 16 * cw, 8 * cw);
+  const g = cx.createLinearGradient(0, y - 5 * cw, 0, y + 5 * cw); g.addColorStop(0, flash ? '#fff' : '#566170'); g.addColorStop(1, flash ? '#fff' : '#171d25'); cx.fillStyle = g; cx.fillRect(x - 8 * cw, y - 4 * cw, 16 * cw, 8 * cw);
   cx.fillStyle = 'rgba(255,255,255,.2)'; cx.fillRect(x - 8 * cw, y - 4 * cw, 16 * cw, 1.4 * cw); cx.fillStyle = flash ? '#fff' : '#ff8a30'; cx.fillRect(x - 3 * cw, y - 1 * cw, 6 * cw, 1.2 * cw);   // glowing slit
   for (let i = -1; i <= 1; i++) {
     const bx = x + i * 6.5 * cw, spread = i * 11 * cw * open, jx = bx + spread * .55, jy = y + 12 * cw, tx = bx + spread * (1 + .3 * open) + i * 2 * cw, ty = y + 25 * cw + (1 - open) * 4 * cw;
-    for (const [x1, y1, x2, y2, wd] of [[bx, y + 3 * cw, jx, jy, 3.6 * cw], [jx, jy, tx, ty, 2.8 * cw]]) { cx.strokeStyle = '#0c0f13'; cx.lineWidth = wd + 1.2; cx.lineCap = 'round'; line(x1, y1, x2, y2); cx.strokeStyle = flash ? '#fff' : '#7b8998'; cx.lineWidth = wd; line(x1, y1, x2, y2); cx.strokeStyle = flash ? '#fff' : '#cfd8e2'; cx.lineWidth = Math.max(.7, wd * .25); line(x1 - wd * .2, y1, x2 - wd * .2, y2); }
+    for (const [x1, y1, x2, y2, wd] of [[bx, y + 3 * cw, jx, jy, 3.6 * cw], [jx, jy, tx, ty, 2.8 * cw]]) { cx.strokeStyle = '#0c0f13'; cx.lineWidth = wd + 1.2; cx.lineCap = 'round'; line(x1, y1, x2, y2); cx.strokeStyle = flash ? '#fff' : '#525d6b'; cx.lineWidth = wd; line(x1, y1, x2, y2); cx.strokeStyle = flash ? '#fff' : '#cfd8e2'; cx.lineWidth = Math.max(.7, wd * .25); line(x1 - wd * .2, y1, x2 - wd * .2, y2); }
     cx.fillStyle = flash ? '#fff' : '#e4e9ee'; cx.beginPath(); cx.moveTo(tx - 1.6 * cw, ty - 1 * cw); cx.lineTo(tx + 1.6 * cw, ty - 1 * cw); cx.lineTo(tx + i * .6 * cw, ty + 5 * cw); cx.closePath(); cx.fill();   // talon
     cx.fillStyle = '#0c0f13'; cx.beginPath(); cx.arc(jx, jy, 2.2 * cw, 0, 7); cx.fill(); cx.fillStyle = '#aab6c4'; cx.beginPath(); cx.arc(jx - .5 * cw, jy - .5 * cw, .8 * cw, 0, 7); cx.fill();
   }
 }
-function drawGrabArm(e, q, ss, face, flash) { // the reaching arm over the painted harvester body
-  const S = { x: q.x + face * 56 * ss, y: q.y - 132 * ss }, R = { x: S.x + face * 8 * ss, y: S.y + 74 * ss }, RE = { x: S.x + face * 18 * ss, y: S.y + 36 * ss };
+const HARV_SH = { s: [42, 124], se: [38, 128] };   // where the arm leaves the painted body (world px from the centre line / the feet) in each view, measured from the sprites
+function drawGrabArm(e, q, ss, face, flash) { // the reaching arm over the painted harvester body, rooted in the shoulder of whichever view is showing
+  face = e.vf || face; const sh = HARV_SH[e.vk] || HARV_SH.s, bob = Math.sin(G.t * 3 + e.id) * .6;
+  const S = { x: q.x + face * sh[0] * ss, y: q.y - (sh[1] + bob) * ss }, R = { x: S.x + face * 8 * ss, y: S.y + 74 * ss }, RE = { x: S.x + face * 18 * ss, y: S.y + 36 * ss };
   const T = P(e.tx, 0), t = { x: T.x, y: T.y - 22 }, ex = e.ext, H = { x: R.x + (t.x - R.x) * ex, y: R.y + (t.y - R.y) * ex };
   const mid = { x: (S.x + H.x) / 2 + face * 26 * ss, y: (S.y + H.y) / 2 - 12 * ss };
   const E = { x: RE.x + (mid.x - RE.x) * ex, y: RE.y + (mid.y - RE.y) * ex }, w = 12 * ss * (1 + ex * .6), sd = e.id * 7;
@@ -3335,10 +3338,10 @@ function render() {
     const { ox, oz } = slotOf(i, shown);
     const ci = shown - 1 - i, cl = clAt(ci);
     items.push({ z: oz + (G.adv || 0), f: () => {   // the Meshy soldiers (rifle3 rifleman, rifle2 cap, rifle1 goggles, rifle0 bandana, rifle4 radio; all views + run cycle) are used for now; class soldiers reuse them
-      const q = P(G.px + ox, oz + (G.adv || 0)), nm = cl && sprReady(CLASS[cl].spr) ? CLASS[cl].spr : 'resistance_rifleman', fc = ox < -.02 ? -1 : 1;
-      const pv = drawSpr(nm, q.x, q.y, q.s, { head: [clamp((G.tx - G.px) * 5, -.9, .9), 1], flip: fc, walk: G.t * 8 + i, amp: .8, rim: true });
+      const q = P(G.px + ox, oz + (G.adv || 0)), nm = cl && sprReady(CLASS[cl].spr) ? CLASS[cl].spr : RIFLEMEN[Math.floor(hash(i * 3.7 + 1) * RIFLEMEN.length)], fc = ox < -.02 ? -1 : 1;
+      const pv = drawSpr(nm, q.x, q.y, q.s, { head: [clamp((G.tx - G.px) * 5, -.9, .9), 1], flip: fc, walk: G.t * 8 * (.85 + .3 * hash(i * 5.1 + 2)) + i * 2.4 + hash(i + 9) * 6, amp: .65 + .3 * hash(i * 1.7 + 4), rim: true });   // every soldier runs on his own beat, pace and stride
       if (pv) {
-        if ((!G.over || G.sweep) && i % 2 === 0 && ((G.t / (G.fiv || .2) + i * .618) % 1) < .22) {   // each fighter flashes on his own beat
+        if (G.fk && G.t - (G.fk[i] === undefined ? -9 : G.fk[i]) < .07) {   // a fighter's muzzle flashes when his own round leaves
            const mz = pv.muz, fx = mz ? q.x + mz[0] * pv.flip * q.s : q.x + fc * 25 * q.s, fy = mz ? q.y - mz[1] * q.s : q.y - 36 * q.s; flare(fx, fy, 4.4 * q.s + 1.4, '255,214,130', Math.floor(G.t * 20) + i * 3.7); }
       }
     } });
@@ -3350,7 +3353,7 @@ function render() {
   // bullets
   for (const b of G.bullets) {
     if (b.d > 0) continue;
-    const len = b.w.pierce ? 90 : b.w.splash ? 46 : 30, rel = b.wz - G.dist, q = P(b.x, rel), q2 = P(b.x - (b.vx || 0) * len / 1100, rel - len), c = b.w.col, rgb = [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16)).join(',');
+    const len = b.w.pierce ? 90 : b.w.splash ? 46 : 30, rel = b.wz - G.dist, q = P(b.x, rel), tl = b.z0 !== undefined ? Math.min(len, b.wz - b.z0) : len, q2 = P(b.x - (b.vx || 0) * tl / 1100, rel - tl), c = b.w.col, rgb = [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16)).join(',');
     cx.save(); cx.globalCompositeOperation = 'lighter';
     streak(q2.x, q2.y - 34 * q2.s, q.x, q.y - 34 * q.s, Math.max(1.4, (b.w.pierce ? 6 : b.w.splash ? 5.5 : 3) * q.s * 1.9), rgb, .45);
     streak(q2.x, q2.y - 34 * q2.s, q.x, q.y - 34 * q.s, Math.max(.9, (b.w.pierce ? 2.6 : b.w.splash ? 2.4 : 1.4) * q.s * 1.6), '255,250,235', .95);
