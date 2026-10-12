@@ -24,8 +24,7 @@ hk_tank, t1, hk_aerial, aerostat, t47, harvester, ogre.
 ## Placeholder sprites (art still needed)
 Done: FIELD MEDIC (`resistance_medic`), GRENADIER, TECH-COM HACKER (`resistance_hacker`), SCOUT SNIPER, DEMOLITIONS, HK Scout Drone (`hk_drone`), HK Minelayer (`hk_minelayer`, mortar tank; front/3/4 views only).
 `resistance_scout` and `resistance_scavenger` are installed but no class uses them yet.
-Done: T-700 (`t700`), T-1000 (`t1000_blade`, `t1000_chrome`), T-400 (`t400`).
-Still a placeholder: HK-Centurion (`t47`, red tint, boss scale 2.5); suggested folder `hk_centurion`, then change `EDRAW` in game.js.
+Done: T-700 (`t700`), T-1000 (`t1000_blade`, `t1000_chrome`), T-400 (`t400`), HK-Centurion (`hk_centurion`). Every unit now has its own art.
 
 ## Adding art
 1. Generate a sheet (prompts: `docs/prompt_builder.html`), flat fuchsia background.
