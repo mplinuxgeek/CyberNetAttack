@@ -120,19 +120,12 @@ let tab = 'sprites';
 for (const b of document.querySelectorAll('#nav button')) b.onclick = () => showTab(b.dataset.t);
 
 // ------------------------------------------------------------------ sprites
-const LABEL = { resistance_rifleman: 'Rifleman (steel helmet)', resistance_captain: 'Captain (field cap)', resistance_goggles: 'Rifleman (goggles, backpack)', resistance_shotgunner: 'Shotgunner (bandana, braid)', resistance_signaller: 'Signaller (headset, antenna)', resistance_tech: 'Tech Operative', resistance_heavy: 'Ordnance Gunner', t800: 'T-800 Endoskeleton', t800_infiltrator: 'T-800 Infiltrator (damaged)', t800_minigun: 'T-800 Endoskeleton (minigun)', t800_crawler: 'T-800 Crawler', t800_reprogrammed: 'Reprogrammed T-800', t47: 'T-47', t1: 'T-1', hk_tank: 'HK-Tank', hk_aerial: 'HK-Aerial', aerostat: 'Aerostat', harvester: 'Harvester', ogre: 'The Ogre' };
+const LABEL = { resistance_medic: 'Field Medic (red-cross helmet, aid bags)', resistance_grenadier: 'Grenadier (goggled helmet, 40mm launcher)', resistance_hacker: 'Tech-Com Hacker (ghillie hood, laptop)', resistance_sniper: 'Scout Sniper (ghillie suit, rifle)', resistance_demolitions: 'Demolitions (boonie hat, charge pack)', resistance_scout: 'Scout (unused so far: beanie, black kit)', resistance_scavenger: 'Scavenger (unused so far: big pack, pickaxe)', hk_drone: 'HK Scout Drone (twin rotors, gun pods)', hk_minelayer: 'HK Minelayer (mortar tank)', resistance_rifleman: 'Rifleman (steel helmet)', resistance_captain: 'Captain (field cap)', resistance_goggles: 'Rifleman (goggles, backpack)', resistance_shotgunner: 'Shotgunner (bandana, braid)', resistance_signaller: 'Signaller (headset, antenna)', resistance_tech: 'Tech Operative', resistance_heavy: 'Ordnance Gunner', t800: 'T-800 Endoskeleton', t800_infiltrator: 'T-800 Infiltrator (damaged)', t800_minigun: 'T-800 Endoskeleton (minigun)', t800_crawler: 'T-800 Crawler', t800_reprogrammed: 'Reprogrammed T-800', t47: 'T-47', t1: 'T-1', hk_tank: 'HK-Tank', hk_aerial: 'HK-Aerial', aerostat: 'Aerostat', harvester: 'Harvester', ogre: 'The Ogre' };
 // units the game wants that have no sheet yet, and what is drawn in their place
 const WANTED = [
-  { id: 'resistance_medic', label: 'Field Medic', use: 'FIELD MEDIC class soldiers', stand: 'resistance_rifleman', tint: null, kind: 'soldier' },
-  { id: 'resistance_grenadier', label: 'Grenadier', use: 'GRENADIER class soldiers', stand: 'resistance_heavy', tint: null, kind: 'soldier' },
-  { id: 'resistance_hacker', label: 'Tech-Com Hacker', use: 'TECH-COM HACKER class soldiers', stand: 'resistance_tech', tint: null, kind: 'soldier' },
-  { id: 'resistance_sniper', label: 'Scout Sniper', use: 'SCOUT SNIPER class soldiers', stand: 'resistance_goggles', tint: null, kind: 'soldier' },
-  { id: 'resistance_demolitions', label: 'Demolitions Specialist', use: 'DEMOLITIONS class soldiers', stand: 'resistance_captain', tint: null, kind: 'soldier' },
   { id: 't700', label: 'T-700 Endoskeleton', use: 'heavy armoured endo with dual SMGs (sector 4+)', stand: 't800_minigun', tint: ['#5a6270', .4], kind: 'walker' },
   { id: 't1000_blade', label: 'T-1000 (blade stance)', use: 'liquid-metal hunter, charging (sector 6+)', stand: 't800', tint: ['#aebccc', .4], kind: 'walker' },
   { id: 't1000_chrome', label: 'T-1000 (chrome form)', use: 'liquid-metal hunter, bullet-proof (sector 6+)', stand: 't800_infiltrator', tint: ['#e4f0ff', .6], kind: 'walker' },
-  { id: 'hk_drone', label: 'HK Scout Drone', use: 'swarm flyer, dives at the squad (sector 3+)', stand: 'aerostat', tint: ['#c8ffd0', .25], kind: 'flyer', scale: .55 },
-  { id: 'hk_minelayer', label: 'HK Minelayer', use: 'tracked mine-laying vehicle (sector 4+)', stand: 'hk_tank', tint: ['#6a7a3a', .3], kind: 'vehicle', scale: .9 },
   { id: 't400', label: 'T-400 Maintenance Endo', use: 'rusty droid with fuel cells (industrial sectors)', stand: 't800', tint: ['#9a5a22', .5], kind: 'walker' },
   { id: 'hk_centurion', label: 'HK-Centurion', use: 'quad-legged boss with gatlings and mortars (sector 6)', stand: 't47', tint: ['#8a2a2a', .3], kind: 'boss', scale: 1.4 },
 ];

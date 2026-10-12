@@ -459,6 +459,420 @@ window.SPRITE_MANIFEST = {
   },
   "h": 140.0
  },
+ "hk_drone": {
+  "dirs": {
+   "se": {
+    "files": [
+     "hk_drone/se_0.png",
+     "hk_drone/se_1.png",
+     "hk_drone/se_2.png",
+     "hk_drone/se_3.png"
+    ],
+    "muz": [
+     18.9,
+     15.1
+    ],
+    "vents": [
+     [
+      0.499,
+      0.398
+     ],
+     [
+      0.816,
+      0.944
+     ],
+     [
+      0.034,
+      0.299
+     ],
+     [
+      0.909,
+      0.329
+     ],
+     [
+      0.431,
+      0.9
+     ],
+     [
+      0.357,
+      0.03
+     ],
+     [
+      0.252,
+      0.506
+     ],
+     [
+      0.72,
+      0.584
+     ],
+     [
+      0.584,
+      0.074
+     ],
+     [
+      0.632,
+      0.844
+     ],
+     [
+      0.711,
+      0.29
+     ],
+     [
+      0.215,
+      0.221
+     ],
+     [
+      0.904,
+      0.61
+     ],
+     [
+      0.411,
+      0.632
+     ]
+    ]
+   },
+   "s": {
+    "files": [
+     "hk_drone/s_0.png",
+     "hk_drone/s_1.png",
+     "hk_drone/s_2.png",
+     "hk_drone/s_3.png"
+    ],
+    "muz": [
+     19.4,
+     16.8
+    ],
+    "vents": [
+     [
+      0.499,
+      0.398
+     ],
+     [
+      0.02,
+      0.498
+     ],
+     [
+      0.975,
+      0.446
+     ],
+     [
+      0.575,
+      0.974
+     ],
+     [
+      0.292,
+      0.762
+     ],
+     [
+      0.263,
+      0.108
+     ],
+     [
+      0.745,
+      0.242
+     ],
+     [
+      0.68,
+      0.641
+     ],
+     [
+      0.235,
+      0.437
+     ],
+     [
+      0.476,
+      0.074
+     ],
+     [
+      0.796,
+      0.9
+     ],
+     [
+      0.484,
+      0.701
+     ],
+     [
+      0.105,
+      0.277
+     ],
+     [
+      0.81,
+      0.481
+     ]
+    ]
+   }
+  },
+  "h": 26.0
+ },
+ "hk_minelayer": {
+  "dirs": {
+   "se": {
+    "files": [
+     "hk_minelayer/se_0.png"
+    ],
+    "muz": [
+     61.9,
+     28.6
+    ],
+    "vents": [
+     [
+      0.5,
+      0.398
+     ],
+     [
+      0.811,
+      0.961
+     ],
+     [
+      0.192,
+      0.961
+     ],
+     [
+      0.859,
+      0.238
+     ],
+     [
+      0.5,
+      0.896
+     ],
+     [
+      0.203,
+      0.481
+     ],
+     [
+      0.724,
+      0.58
+     ],
+     [
+      0.635,
+      0.069
+     ],
+     [
+      0.373,
+      0.649
+     ],
+     [
+      0.365,
+      0.169
+     ],
+     [
+      0.662,
+      0.831
+     ],
+     [
+      0.7,
+      0.316
+     ],
+     [
+      0.87,
+      0.714
+     ],
+     [
+      0.135,
+      0.719
+     ]
+    ]
+   },
+   "s": {
+    "files": [
+     "hk_minelayer/s_0.png"
+    ],
+    "muz": [
+     55.8,
+     29.9
+    ],
+    "vents": [
+     [
+      0.5,
+      0.398
+     ],
+     [
+      0.2,
+      0.974
+     ],
+     [
+      0.8,
+      0.974
+     ],
+     [
+      0.5,
+      0.887
+     ],
+     [
+      0.208,
+      0.494
+     ],
+     [
+      0.789,
+      0.502
+     ],
+     [
+      0.33,
+      0.039
+     ],
+     [
+      0.67,
+      0.039
+     ],
+     [
+      0.378,
+      0.645
+     ],
+     [
+      0.619,
+      0.645
+     ],
+     [
+      0.5,
+      0.113
+     ],
+     [
+      0.338,
+      0.312
+     ],
+     [
+      0.662,
+      0.312
+     ],
+     [
+      0.165,
+      0.732
+     ]
+    ]
+   },
+   "sw": {
+    "files": [
+     "hk_minelayer/sw_0.png"
+    ],
+    "muz": [
+     72.3,
+     27.3
+    ],
+    "vents": [
+     [
+      0.5,
+      0.398
+     ],
+     [
+      0.881,
+      0.957
+     ],
+     [
+      0.214,
+      0.961
+     ],
+     [
+      0.092,
+      0.177
+     ],
+     [
+      0.549,
+      0.926
+     ],
+     [
+      0.803,
+      0.481
+     ],
+     [
+      0.349,
+      0.039
+     ],
+     [
+      0.243,
+      0.532
+     ],
+     [
+      0.643,
+      0.16
+     ],
+     [
+      0.416,
+      0.688
+     ],
+     [
+      0.722,
+      0.771
+     ],
+     [
+      0.927,
+      0.684
+     ],
+     [
+      0.341,
+      0.312
+     ],
+     [
+      0.381,
+      0.974
+     ]
+    ]
+   },
+   "w": {
+    "files": [
+     "hk_minelayer/w_0.png"
+    ],
+    "vents": [
+     [
+      0.5,
+      0.398
+     ],
+     [
+      0.957,
+      0.831
+     ],
+     [
+      0.07,
+      0.195
+     ],
+     [
+      0.238,
+      0.961
+     ],
+     [
+      0.603,
+      0.974
+     ],
+     [
+      0.789,
+      0.45
+     ],
+     [
+      0.243,
+      0.528
+     ],
+     [
+      0.424,
+      0.749
+     ],
+     [
+      0.662,
+      0.16
+     ],
+     [
+      0.292,
+      0.19
+     ],
+     [
+      0.63,
+      0.649
+     ],
+     [
+      0.792,
+      0.974
+     ],
+     [
+      0.811,
+      0.71
+     ],
+     [
+      0.159,
+      0.745
+     ]
+    ]
+   }
+  },
+  "h": 100.0
+ },
  "hk_tank": {
   "dirs": {
    "se": {
@@ -846,6 +1260,62 @@ window.SPRITE_MANIFEST = {
   },
   "h": 56
  },
+ "resistance_demolitions": {
+  "dirs": {
+   "n": {
+    "files": [
+     "resistance_demolitions/n_0.png",
+     "resistance_demolitions/n_1.png",
+     "resistance_demolitions/n_2.png",
+     "resistance_demolitions/n_3.png",
+     "resistance_demolitions/n_4.png",
+     "resistance_demolitions/n_5.png"
+    ],
+    "muz": [
+     -10.3,
+     33.8
+    ]
+   },
+   "ne": {
+    "files": [
+     "resistance_demolitions/ne_0.png",
+     "resistance_demolitions/ne_1.png",
+     "resistance_demolitions/ne_2.png",
+     "resistance_demolitions/ne_3.png",
+     "resistance_demolitions/ne_4.png",
+     "resistance_demolitions/ne_5.png"
+    ],
+    "muz": [
+     9.8,
+     23.2
+    ]
+   },
+   "s": {
+    "files": [
+     "resistance_demolitions/s_0.png"
+    ],
+    "muz": [
+     10.8,
+     32.3
+    ]
+   },
+   "nw": {
+    "files": [
+     "resistance_demolitions/nw_0.png",
+     "resistance_demolitions/nw_1.png",
+     "resistance_demolitions/nw_2.png",
+     "resistance_demolitions/nw_3.png",
+     "resistance_demolitions/nw_4.png",
+     "resistance_demolitions/nw_5.png"
+    ],
+    "muz": [
+     -9.8,
+     25.2
+    ]
+   }
+  },
+  "h": 56.0
+ },
  "resistance_goggles": {
   "dirs": {
    "n": {
@@ -900,6 +1370,117 @@ window.SPRITE_MANIFEST = {
    }
   },
   "h": 56
+ },
+ "resistance_grenadier": {
+  "dirs": {
+   "n": {
+    "files": [
+     "resistance_grenadier/n_0.png",
+     "resistance_grenadier/n_1.png",
+     "resistance_grenadier/n_2.png",
+     "resistance_grenadier/n_3.png",
+     "resistance_grenadier/n_4.png",
+     "resistance_grenadier/n_5.png"
+    ],
+    "muz": [
+     -10.1,
+     33.8
+    ]
+   },
+   "ne": {
+    "files": [
+     "resistance_grenadier/ne_0.png",
+     "resistance_grenadier/ne_1.png",
+     "resistance_grenadier/ne_2.png",
+     "resistance_grenadier/ne_3.png",
+     "resistance_grenadier/ne_4.png"
+    ],
+    "muz": [
+     9.1,
+     33.3
+    ]
+   },
+   "s": {
+    "files": [
+     "resistance_grenadier/s_0.png"
+    ],
+    "muz": [
+     12.1,
+     25.7
+    ]
+   },
+   "nw": {
+    "files": [
+     "resistance_grenadier/nw_0.png",
+     "resistance_grenadier/nw_1.png",
+     "resistance_grenadier/nw_2.png",
+     "resistance_grenadier/nw_3.png",
+     "resistance_grenadier/nw_4.png",
+     "resistance_grenadier/nw_5.png"
+    ],
+    "muz": [
+     -10.6,
+     34.3
+    ]
+   }
+  },
+  "h": 56.0
+ },
+ "resistance_hacker": {
+  "dirs": {
+   "n": {
+    "files": [
+     "resistance_hacker/n_0.png",
+     "resistance_hacker/n_1.png",
+     "resistance_hacker/n_2.png",
+     "resistance_hacker/n_3.png",
+     "resistance_hacker/n_4.png",
+     "resistance_hacker/n_5.png"
+    ],
+    "muz": [
+     -9.8,
+     33.3
+    ]
+   },
+   "ne": {
+    "files": [
+     "resistance_hacker/ne_0.png",
+     "resistance_hacker/ne_1.png",
+     "resistance_hacker/ne_2.png",
+     "resistance_hacker/ne_3.png",
+     "resistance_hacker/ne_4.png",
+     "resistance_hacker/ne_5.png"
+    ],
+    "muz": [
+     10.3,
+     35.3
+    ]
+   },
+   "s": {
+    "files": [
+     "resistance_hacker/s_0.png"
+    ],
+    "muz": [
+     12.9,
+     32.3
+    ]
+   },
+   "nw": {
+    "files": [
+     "resistance_hacker/nw_0.png",
+     "resistance_hacker/nw_1.png",
+     "resistance_hacker/nw_2.png",
+     "resistance_hacker/nw_3.png",
+     "resistance_hacker/nw_4.png",
+     "resistance_hacker/nw_5.png"
+    ],
+    "muz": [
+     -10.8,
+     34.8
+    ]
+   }
+  },
+  "h": 56.0
  },
  "resistance_heavy": {
   "dirs": {
@@ -957,6 +1538,62 @@ window.SPRITE_MANIFEST = {
   },
   "h": 58.0
  },
+ "resistance_medic": {
+  "dirs": {
+   "n": {
+    "files": [
+     "resistance_medic/n_0.png",
+     "resistance_medic/n_1.png",
+     "resistance_medic/n_2.png",
+     "resistance_medic/n_3.png",
+     "resistance_medic/n_4.png",
+     "resistance_medic/n_5.png"
+    ],
+    "muz": [
+     -12.6,
+     30.8
+    ]
+   },
+   "ne": {
+    "files": [
+     "resistance_medic/ne_0.png",
+     "resistance_medic/ne_1.png",
+     "resistance_medic/ne_2.png",
+     "resistance_medic/ne_3.png",
+     "resistance_medic/ne_4.png",
+     "resistance_medic/ne_5.png"
+    ],
+    "muz": [
+     7.1,
+     36.8
+    ]
+   },
+   "s": {
+    "files": [
+     "resistance_medic/s_0.png"
+    ],
+    "muz": [
+     13.6,
+     17.2
+    ]
+   },
+   "nw": {
+    "files": [
+     "resistance_medic/nw_0.png",
+     "resistance_medic/nw_1.png",
+     "resistance_medic/nw_2.png",
+     "resistance_medic/nw_3.png",
+     "resistance_medic/nw_4.png",
+     "resistance_medic/nw_5.png"
+    ],
+    "muz": [
+     -12.1,
+     45.9
+    ]
+   }
+  },
+  "h": 56.0
+ },
  "resistance_rifleman": {
   "dirs": {
    "n": {
@@ -1012,6 +1649,116 @@ window.SPRITE_MANIFEST = {
    }
   },
   "h": 56
+ },
+ "resistance_scavenger": {
+  "dirs": {
+   "n": {
+    "files": [
+     "resistance_scavenger/n_0.png",
+     "resistance_scavenger/n_1.png",
+     "resistance_scavenger/n_2.png",
+     "resistance_scavenger/n_3.png",
+     "resistance_scavenger/n_4.png",
+     "resistance_scavenger/n_5.png"
+    ],
+    "muz": [
+     -10.6,
+     33.3
+    ]
+   },
+   "ne": {
+    "files": [
+     "resistance_scavenger/ne_0.png",
+     "resistance_scavenger/ne_1.png",
+     "resistance_scavenger/ne_2.png",
+     "resistance_scavenger/ne_3.png",
+     "resistance_scavenger/ne_4.png"
+    ],
+    "muz": [
+     10.6,
+     24.2
+    ]
+   },
+   "s": {
+    "files": [
+     "resistance_scavenger/s_0.png"
+    ],
+    "muz": [
+     12.1,
+     22.7
+    ]
+   },
+   "nw": {
+    "files": [
+     "resistance_scavenger/nw_0.png",
+     "resistance_scavenger/nw_1.png",
+     "resistance_scavenger/nw_2.png",
+     "resistance_scavenger/nw_3.png",
+     "resistance_scavenger/nw_4.png"
+    ],
+    "muz": [
+     -11.6,
+     24.2
+    ]
+   }
+  },
+  "h": 56.0
+ },
+ "resistance_scout": {
+  "dirs": {
+   "n": {
+    "files": [
+     "resistance_scout/n_0.png",
+     "resistance_scout/n_1.png",
+     "resistance_scout/n_2.png",
+     "resistance_scout/n_3.png",
+     "resistance_scout/n_4.png",
+     "resistance_scout/n_5.png"
+    ],
+    "muz": [
+     -9.3,
+     34.3
+    ]
+   },
+   "ne": {
+    "files": [
+     "resistance_scout/ne_0.png",
+     "resistance_scout/ne_1.png",
+     "resistance_scout/ne_2.png",
+     "resistance_scout/ne_3.png",
+     "resistance_scout/ne_4.png",
+     "resistance_scout/ne_5.png"
+    ],
+    "muz": [
+     8.8,
+     35.3
+    ]
+   },
+   "s": {
+    "files": [
+     "resistance_scout/s_0.png"
+    ],
+    "muz": [
+     9.8,
+     25.7
+    ]
+   },
+   "nw": {
+    "files": [
+     "resistance_scout/nw_0.png",
+     "resistance_scout/nw_1.png",
+     "resistance_scout/nw_2.png",
+     "resistance_scout/nw_3.png",
+     "resistance_scout/nw_4.png",
+     "resistance_scout/nw_5.png"
+    ],
+    "muz": [
+     -8.8,
+     34.3
+    ]
+   }
+  },
+  "h": 56.0
  },
  "resistance_shotgunner": {
   "dirs": {
@@ -1123,6 +1870,62 @@ window.SPRITE_MANIFEST = {
    }
   },
   "h": 70.0
+ },
+ "resistance_sniper": {
+  "dirs": {
+   "n": {
+    "files": [
+     "resistance_sniper/n_0.png",
+     "resistance_sniper/n_1.png",
+     "resistance_sniper/n_2.png",
+     "resistance_sniper/n_3.png",
+     "resistance_sniper/n_4.png",
+     "resistance_sniper/n_5.png"
+    ],
+    "muz": [
+     -9.6,
+     39.9
+    ]
+   },
+   "ne": {
+    "files": [
+     "resistance_sniper/ne_0.png",
+     "resistance_sniper/ne_1.png",
+     "resistance_sniper/ne_2.png",
+     "resistance_sniper/ne_3.png",
+     "resistance_sniper/ne_4.png",
+     "resistance_sniper/ne_5.png"
+    ],
+    "muz": [
+     9.6,
+     35.3
+    ]
+   },
+   "s": {
+    "files": [
+     "resistance_sniper/s_0.png"
+    ],
+    "muz": [
+     14.6,
+     21.7
+    ]
+   },
+   "nw": {
+    "files": [
+     "resistance_sniper/nw_0.png",
+     "resistance_sniper/nw_1.png",
+     "resistance_sniper/nw_2.png",
+     "resistance_sniper/nw_3.png",
+     "resistance_sniper/nw_4.png",
+     "resistance_sniper/nw_5.png"
+    ],
+    "muz": [
+     -10.6,
+     35.3
+    ]
+   }
+  },
+  "h": 56.0
  },
  "resistance_tech": {
   "dirs": {

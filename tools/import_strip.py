@@ -17,7 +17,7 @@ def main():
     ap = argparse.ArgumentParser(); ap.add_argument('sheet'); ap.add_argument('name')
     ap.add_argument('--dir', default='n'); ap.add_argument('--height', type=int, default=110); ap.add_argument('--bg', default='black')
     ap.add_argument('--tol', type=int, default=14); ap.add_argument('--dilate', type=int, default=8); ap.add_argument('--groups', default=''); ap.add_argument('--rows', type=int, default=1, help='frames laid out in this many rows (read row by row)'); ap.add_argument('--h', type=float, default=56); ap.add_argument('--muz-left', action='store_true', help='muzzle = leftmost point of the figure (slung/pointed left)')
-    ap.add_argument('--fringe', type=int, default=45); ap.add_argument('--split-wide', action='store_true', help='cut cells that touch (a merged blob about twice as wide as the others) at the thinnest column'); o = ap.parse_args(); FR_T = o.fringe
+    ap.add_argument('--keep', type=int, default=0, help='keep only the N biggest blobs (drops stray fragments)'); ap.add_argument('--fringe', type=int, default=45); ap.add_argument('--split-wide', action='store_true', help='cut cells that touch (a merged blob about twice as wide as the others) at the thinnest column'); o = ap.parse_args(); FR_T = o.fringe
     im = Image.open(o.sheet).convert('RGBA'); a = np.asarray(im).copy()
     if o.bg == 'alpha': fg = a[..., 3] > 20
     else:
@@ -37,6 +37,7 @@ def main():
     lab, n = ndi.label(ndi.binary_dilation(fg, iterations=o.dilate) if o.dilate else fg)
     objs = [(s, i + 1) for i, s in enumerate(ndi.find_objects(lab))]
     objs = [(s, i) for s, i in objs if (fg[s] & (lab[s] == i)).sum() > 2000]
+    if o.keep and len(objs) > o.keep: objs = sorted(objs, key=lambda t: -(fg[t[0]] & (lab[t[0]] == t[1])).sum())[:o.keep]
     if o.rows > 1:   # split into rows at the biggest vertical gaps, then left to right within a row
         yc = sorted((t[0][0].start + t[0][0].stop) / 2 for t in objs); gaps = sorted(range(1, len(yc)), key=lambda k: yc[k] - yc[k - 1], reverse=True)[:o.rows - 1]
         cuts = sorted(yc[k] for k in gaps); rowof = lambda t: sum(((t[0][0].start + t[0][0].stop) / 2) >= c for c in cuts)

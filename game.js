@@ -98,10 +98,10 @@ const CLASS = {   // special squad classes: pick up to 3 before a sector (unlock
   shot:   { name: 'SHOTGUNNER', col: '#ffd27a', gate: 'rgba(255,200,90,.6)', spr: 'resistance_shotgunner',  cost: 150, desc: 'Close-range pellet bursts: huge damage up close' },
   mark:   { name: 'MARKSMAN',  col: '#b9a8ff', gate: 'rgba(160,140,255,.6)', spr: 'resistance_goggles', cost: 220, desc: 'Armour-piercing shots that punch through the whole line' },
   officer:{ name: 'OFFICER',   col: '#ff8f8f', gate: 'rgba(255,110,110,.6)', spr: 'resistance_captain', cost: 300, desc: 'Squad fires faster: +5% fire rate per officer (max +30%)' },
-  gren:   { name: 'GRENADIER', col: '#c9d94a', gate: 'rgba(190,210,60,.6)', spr: 'resistance_heavy', cost: 260, desc: '40mm grenades that blow endoskeletons apart: they keep coming as crawlers' },
-  hack:   { name: 'TECH-COM HACKER', col: '#4dffb0', gate: 'rgba(60,255,170,.6)', spr: 'resistance_tech', cost: 350, desc: 'Corrupts machine targeting: 15% of enemy plasma bolts miss, more with extra hackers' },
-  sniper: { name: 'SCOUT SNIPER', col: '#ff9ad0', gate: 'rgba(255,140,200,.6)', spr: 'resistance_goggles', cost: 450, desc: 'Thermal scope: aimed shots hit machine and boss weak points for 2.5x critical damage' },
-  demo:   { name: 'DEMOLITIONS', col: '#ffb347', gate: 'rgba(255,170,60,.6)', spr: 'resistance_captain', cost: 500, desc: 'All splash damage and C4 / mini-nuke blast radius +35%' },
+  gren:   { name: 'GRENADIER', col: '#c9d94a', gate: 'rgba(190,210,60,.6)', spr: 'resistance_grenadier', cost: 260, desc: '40mm grenades that blow endoskeletons apart: they keep coming as crawlers' },
+  hack:   { name: 'TECH-COM HACKER', col: '#4dffb0', gate: 'rgba(60,255,170,.6)', spr: 'resistance_hacker', cost: 350, desc: 'Corrupts machine targeting: 15% of enemy plasma bolts miss, more with extra hackers' },
+  sniper: { name: 'SCOUT SNIPER', col: '#ff9ad0', gate: 'rgba(255,140,200,.6)', spr: 'resistance_sniper', cost: 450, desc: 'Thermal scope: aimed shots hit machine and boss weak points for 2.5x critical damage' },
+  demo:   { name: 'DEMOLITIONS', col: '#ffb347', gate: 'rgba(255,170,60,.6)', spr: 'resistance_demolitions', cost: 500, desc: 'All splash damage and C4 / mini-nuke blast radius +35%' },
   signal: { name: 'SIGNALLER', col: '#8fe8ff', gate: 'rgba(110,220,255,.6)', spr: 'resistance_signaller', cost: 400, desc: 'Calls air strikes on the machines ahead' },
 };
 const FORMS = {   // tactical formations: hitbox width, how wide the fire pattern is, how far rounds curve toward targets, scrap / gate pickup width
@@ -1934,7 +1934,7 @@ function ribcage(x, y, k, c) { // metallic spinal ribcage with sternum pistons
 const SPR_DEF = {
   resistance_rifleman: 56, resistance_goggles: 56, resistance_captain: 56, resistance_shotgunner: 56, resistance_signaller: 70, resistance_heavy: 58, resistance_tech: 56, resistance_medic: 56,
   t800_reprogrammed: 66, t800: 76, t800_infiltrator: 74, t800_minigun: 74, t800_crawler: 44,
-  aerostat: 26, t47: 150, t1: 96, hk_tank: 100, hk_aerial: 140, harvester: 175, ogre: 165,
+  aerostat: 26, hk_drone: 26, hk_minelayer: 100, t47: 150, t1: 96, hk_tank: 100, hk_aerial: 140, harvester: 175, ogre: 165,
 };
 const SPR = {};
 if (typeof Image !== 'undefined') {
@@ -2202,8 +2202,8 @@ const EDRAW = {   // sprite, walk-cycle speed / sway, spotlight beams [spread, l
   grunt: { spr: 't800', walk: 1, amp: 1 }, gunner: { spr: 't800_minigun', walk: 1, amp: .7 }, runner: { spr: 't800_crawler', walk: .5, amp: .8 },
   harvester: { spr: 'harvester', walk: .5, amp: .35 }, behemoth: { spr: 't1', walk: 2, amp: .18, beam: [.14, 130, 16, .22] },
   gunship: { spr: 'hk_aerial', fly: 1, laser: '90,235,255' }, aerostat: { spr: 'aerostat', fly: 1 }, heavy: { spr: 't47', walk: 1, amp: .55 },
-  t700: { spr: 't800_minigun', walk: 1, amp: .6, tint: ['t7', '#5a6270', .4] }, t1000: { spr: 't800_infiltrator', walk: 1.3, amp: .8 }, drone: { spr: 'aerostat', fly: 1, tint: ['dr', '#c8ffd0', .25] },
-  minelayer: { spr: 'hk_tank', walk: 2.5, amp: .2, tint: ['ml', '#6a7a3a', .3] }, t400: { spr: 't800', walk: .8, amp: 1, tint: ['rs', '#9a5a22', .5] }, centurion: { spr: 't47', walk: .6, amp: .25, tint: ['ce', '#8a2a2a', .3], beam: [.16, 140, 22, .24] },
+  t700: { spr: 't800_minigun', walk: 1, amp: .6, tint: ['t7', '#5a6270', .4] }, t1000: { spr: 't800_infiltrator', walk: 1.3, amp: .8 }, drone: { spr: 'hk_drone', fly: 1 },
+  minelayer: { spr: 'hk_minelayer', walk: 2.5, amp: .2 }, t400: { spr: 't800', walk: .8, amp: 1, tint: ['rs', '#9a5a22', .5] }, centurion: { spr: 't47', walk: .6, amp: .25, tint: ['ce', '#8a2a2a', .3], beam: [.16, 140, 22, .24] },
   tank: { spr: 'hk_tank', walk: 2.5, amp: .2, beam: [.12, 120, 24, .24], laser: '255,70,50' }, ogre: { spr: 'ogre', walk: .9, amp: .12, beam: [.16, 140, 22, .24] },
 };
 function drawLaser(e, q, ss, rgb, rel) { // a target designator: the line sharpens as the volley comes
