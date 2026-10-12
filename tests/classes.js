@@ -419,4 +419,7 @@ const arena=(lv,...en)=>{ const G=fresh(lv,[]); G.n=40; G.gates=[]; G.en=[]; G.o
 // the detailed props and the harvester's armoured arm draw cleanly in every state
 { const hv=t.mk('harvester',1,0,1); const G=arena(5,hv); hv.wz=G.dist+200; hv.hp=hv.max=1e6; let err=null; try{ for(const gs of ['idle','aim','lock','slam','recover']){ hv.gs=gs; hv.ext=gs==='idle'?0:.8; hv.tx=.3; hv.cap=3; hv.flash=gs==='slam'?.2:0; t.render(); }
   G.en=[]; G.obs=[]; for(const k of ['jersey','rubble','trap','truck','sandbag','slab']) for(const hp of [20,120,380]) G.obs.push({k,x:(G.obs.length%5-2)*.3,hw:.18,wz:G.dist+120+G.obs.length*10,len:30,hp,max:380,dead:false,sd:3+G.obs.length,hit:G.obs.length%2?.1:0,fall:1}); t.render(); }catch(e){ err=e.message; } check('props and the harvester arm render in every state', err===null, err); }
+// scavengers reel in distant crates; a squad held at a boss still gets crates that drop ahead of it
+{ const G=arena(5); G.en=[]; G.pupPlan=[]; G.cls.scav=1; G.pups=[{k:'rapid',x:-.7,wz:G.dist+900}]; run(G,6); check('a scavenger squad collects a crate 900 px away', G.pups.length===0, JSON.stringify(G.pups));
+  const bs=t.mk('ogre',1,0,1,{boss:true}); const G2=arena(5,bs); G2.pupPlan=[]; G2.cls.scav=0; bs.wz=G2.dist+200; bs.hp=bs.max=1e9; run(G2,4); G2.pups=[{k:'rapid',x:G2.px,wz:G2.dist+300}]; run(G2,8); check('a crate ahead of a held squad rolls down to it', G2.pups.length===0 && G2.od>0, JSON.stringify(G2.pups)+' '+G2.spd); }
 console.log(pass+' passed, '+fail+' failed');
