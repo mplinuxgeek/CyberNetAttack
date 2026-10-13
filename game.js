@@ -162,12 +162,13 @@ function buzz(p, soft) {
   try { navigator.vibrate(p); } catch (e) {}
 }
 // ---------------------------------------------------------------- audio (all synthesised: filtered noise for blasts and impacts, pitched tones for plasma, rings and chimes)
-let AC = null, OUT = null, MUS = null, DL = null, DEST = null, NB = null, live = 0;
+let AC = null, AERR = '', GESTURE = false, OUT = null, MUS = null, DL = null, DEST = null, NB = null, live = 0;
 const gap = {};   // per-sound rate limits (ms)
 function ok(name, ms) { const n = performance.now(); if (n - (gap[name] || 0) < ms) return false; gap[name] = n; return true; }
 function audio() {
   if (save.mute) return null;
   try {
+    if (!AC && !GESTURE) return null;   // a context made before any click or key can be born locked for good in some browsers: wait for the first gesture
     if (!AC) {
       AC = new (window.AudioContext || window.webkitAudioContext)();
       const cp = AC.createDynamicsCompressor(); cp.threshold.value = -16; cp.knee.value = 12; cp.ratio.value = 5; cp.attack.value = .003; cp.release.value = .14;   // stacked shots never clip
@@ -184,22 +185,23 @@ function audio() {
     }
     if (AC.state === 'suspended') AC.resume();
     return AC;
-  } catch (e) { return null; }
+  } catch (e) { AERR = String(e && e.message || e); try { if (AC) AC.close(); } catch (e2) {} AC = OUT = MUS = DL = DEST = NB = null; return null; }   // a half-built graph would stay silent forever: drop it and say why in Settings
 }
 // browsers keep audio locked until the page has had a click / key / touch: unlock (and re-unlock after the tab was hidden) on every such event
-let resuming = false;
+let resuming = false, stuck = 0;
 function audioWake() { if (state === 'menu') musicStart(); else if (state === 'play' && G && !G.paused) ambStart(); }   // whatever should be sounding in this screen starts once the context really runs
-function unlockAudio() { // Safari: a context can be 'suspended' or 'interrupted' and its resume() promise may never settle if called without a gesture; never stack calls, always re-arm
+function unlockAudio(ev) { // Safari: a context can be 'suspended' or 'interrupted' and its resume() promise may never settle if called without a gesture; never stack calls, always re-arm
+  const gest = !!(ev && ev.isTrusted && ['pointerdown', 'touchend', 'click', 'keydown'].includes(ev.type)); if (gest) GESTURE = true;
   const a = audio(); if (!a) return;
   if (a.state === 'running') { audioWake(); return; }
-  if (resuming) return; resuming = true;
-  const done = () => { resuming = false; if (a.state === 'running') audioWake(); };
+  if (resuming && !gest) return; resuming = true;   // (a click always gets its own resume(): an earlier focus-triggered one has no gesture behind it and may never settle)
+  const done = () => { resuming = false; if (a.state === 'running') { stuck = 0; audioWake(); } else if (GESTURE && ++stuck >= 3) { stuck = 0; try { a.close(); } catch (e) {} AC = OUT = MUS = DL = DEST = NB = null; } };   // still locked after three gestures: throw the context away, the next sound builds a fresh one
   try { const p = a.resume(); if (p && p.then) p.then(done, done); else done(); } catch (e) { resuming = false; }
   setTimeout(() => { resuming = false; }, 1200);
 }
 for (const ev of ['pointerdown', 'touchstart', 'touchend', 'click', 'keydown', 'pageshow', 'focus']) window.addEventListener(ev, unlockAudio, true);
 document.addEventListener('visibilitychange', () => { if (document.hidden) { try { if (AC && AC.state === 'running') AC.suspend(); } catch (e) {} } else unlockAudio(); });   // no audio (or battery) spent while the tab is hidden
-function audioStatus() { return !AC ? 'not started yet' : AC.state === 'running' ? 'running (' + AC.sampleRate + ' Hz)' : AC.state + ' - tap or click the page, then try again'; }
+function audioStatus() { return !AC ? (AERR ? 'failed: ' + AERR : GESTURE ? 'not started yet' : 'waiting for a click or key press') : AC.state === 'running' ? 'running (' + AC.sampleRate + ' Hz)' : AC.state + ' - tap or click the page, then try again'; }
 function nz(at, dur, o) { // a burst of filtered noise: the body of gunshots, crunches, explosions and whooshes
   const a = audio(); if (!a || live > 48) return; o = o || {};
   const t = a.currentTime + (at || 0), s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
