@@ -27,7 +27,7 @@ for (let step = 0; step < +(process.argv[4] || 3000); step++) {
     if (!['menu', 'play', 'end'].includes(t.state)) errs.push('bad state ' + t.state);
     if (t.save.scrap < 0 || !Number.isFinite(t.save.scrap)) errs.push('bad scrap ' + t.save.scrap);
     for (const k of Object.keys(t.save.up)) if (t.save.up[k] < 0) errs.push('neg upgrade ' + k);
-    if (t.save.loadout.length > 3) errs.push('loadout > 3');
+    if (t.save.loadout.length > 3) errs.push('loadout > 4');
   } catch (e) { errs.push(String(e.stack).split('\n').slice(0, 3).join(' | ')); if (errs.length > 5) break; }
 }
 console.log('ui fuzz actions', actions, 'state', t.state, 'scrap', t.save.scrap); console.log(errs.length ? errs.join('\n') : 'no ui errors');

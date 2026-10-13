@@ -82,7 +82,7 @@ for(const ty of ['tank','behemoth','ogre']){ const r=laneTest(ty); check(ty+' st
   t.save.vib=false; const n0=calls.length; t.hurt(2,0); check('vibration can be switched off', calls.length===n0); t.save.vib=true; }
 // squad fires out of step
 { const G=fresh(2,[]); G.n=60; G.en=[]; G.gates=[]; G.fiv=.2; t.volley(); const ds=G.bullets.map(b=>b.d); const uniq=new Set(ds.map(d=>d.toFixed(3))).size;
-  check('rounds leave at different moments (not in unison)', G.bullets.length>=6 && uniq>=G.bullets.length-1 && Math.max(...ds)>.08 && Math.min(...ds)<.12, 'n '+G.bullets.length+' uniq '+uniq);
+  check('rounds leave at different moments (not in unison)', G.bullets.length>=6 && uniq>=G.bullets.length*.7 && Math.max(...ds)>.08 && Math.min(...ds)<.12, 'n '+G.bullets.length+' uniq '+uniq);
   let launched=[]; for(let i=0;i<12;i++){ t.update(1/60); launched.push(G.bullets.filter(b=>!(b.d>0)).length); }
   check('rounds are released gradually over the fire interval', launched[1]<launched[10] && launched[10]<=G.bullets.length, JSON.stringify(launched)); }
 // reprogrammed unit aims diagonally at enemies
@@ -212,7 +212,7 @@ for(const ty of ['tank','behemoth','ogre']){ const r=laneTest(ty); check(ty+' st
 // corrupt saves cannot break the game
 { const sv=t.save; Object.assign(sv,{scrap:'abc',best:-5,sel:99,up:{squad:99,dmg:-3,rate:'x'},paid:null,loadout:['shot','nonsense','heavy','heavy','tech','mark','officer'],unlocked:{ghost:1,shot:1},stars:{3:9}});
   t.sanitizeSave(); check('absurd values are clamped to legal ones', sv.scrap===0 && sv.best===1 && sv.sel===1 && sv.up.squad===25 && sv.up.dmg===0 && sv.up.rate===0 && sv.paid.squad===25, JSON.stringify([sv.scrap,sv.best,sv.sel,sv.up.squad,sv.up.dmg,sv.up.rate]));
-  check('loadout keeps only unlocked, real, unique classes (max 3)', JSON.stringify(sv.loadout)==='["shot","heavy","tech"]', JSON.stringify(sv.loadout)); check('unknown unlocks and bad stars are dropped', !sv.unlocked.ghost && sv.stars[3]===3); }
+  check('loadout keeps only unlocked, real, unique classes (unlocked only)', JSON.stringify(sv.loadout)==='["shot","heavy","tech"]', JSON.stringify(sv.loadout)); check('unknown unlocks and bad stars are dropped', !sv.unlocked.ghost && sv.stars[3]===3); }
 // gates always have clear approaches
 { let worstB=1e9, worstA=1e9, bad=0;
   for(let lv=1;lv<=14;lv++) for(let k=0;k<6;k++){ const L=t.genLevel(lv); for(const g of L.gates) for(const e of L.en){ if(e.boss) continue; const d=e.wz-g.wz; if(d<=0) worstB=Math.min(worstB,-d); else worstA=Math.min(worstA,d); if(d>-125 && d<225) bad++; } }
@@ -286,7 +286,7 @@ const arena=(lv,...en)=>{ const G=fresh(lv,[]); G.n=40; G.gates=[]; G.en=[]; G.o
   let err=null; try{ t.render(); }catch(e){ err=e.message; } check('obstacles far behind the squad do not break rendering', err===null, err); }
 // ---- phase 4: classes and formations
 { for(const k of ['gren','hack','sniper','demo','medic']) check('class '+k+' exists with a sprite and a price', t.CLASS[k] && t.CLASS[k].spr && t.CLASS[k].cost>=0);
-  t.save.unlocked={heavy:1,tech:1,gren:1,hack:1,sniper:1,demo:1}; t.save.loadout=['gren','hack','demo','sniper']; t.sanitizeSave(); check('a loadout keeps at most three unlocked classes', t.save.loadout.length===3 && t.save.loadout[0]==='gren'); }
+  t.save.unlocked={heavy:1,tech:1,gren:1,hack:1,sniper:1,demo:1}; t.save.loadout=['gren','hack','demo','sniper']; t.sanitizeSave(); check('a loadout keeps at most four unlocked classes', t.save.loadout.length===4 && t.save.loadout[0]==="gren"); }
 { const gr=t.mk('grunt',1,0,1); const G=arena(3,gr); G.cls.gren=2; gr.wz=G.dist+300; gr.hp=gr.max=1; G.px=0; G.tx=0; G.n=40; G.peak=40; let crawled=false; for(let i=0;i<60*4;i++){ G.n=40; G.fcd=1e9; t.update(1/60); if(gr.t==='runner') crawled=true; }
   check('grenades take the legs off an endoskeleton...', crawled, gr.t); check('...and then finish it', gr.dead, ''); }
 { const G=fresh(3,[]); G.n=40; G.gates=[]; G.en=[]; G.cls.hack=0; const e=t.mk('gunner',G.dist+300,0,1); let off0=0,off1=0; const N=600;

@@ -91,7 +91,7 @@ const ET = {
   centurion:{ plate: .4, hp: 1200, armor: .25, spd: 12, hw: .4, scrap: 450, emp: 0, chase: .06, weave: .25, hold: 230, shoot: 1.15, dmg: 2, block: 1, mg: 1, volley: 4, mortar: 1, name: 'HK-Centurion' },   // quad-legged boss: twin gatlings, side mortar pods
   ogre:     { tracked: 1, plate: .35, hp: 560, spd: 13, hw: .36, scrap: 320, emp: 0,  chase: .08, weave: .3, hold: 200, shoot: 2.0, dmg: 3, block: 1, volley: 3, name: 'The Ogre' },   // final boss: a three-storey tracked fortress
 };
-const CLASS = {   // special squad classes: pick up to 3 before a sector (unlock with scrap); gates then grow only your picks
+const CLASS = {   // special squad classes: pick up to 4 before a sector (unlock with scrap); gates then grow only your picks
   heavy:  { name: 'ORDNANCE',  col: '#ff9a4a', gate: 'rgba(255,140,40,.6)', spr: 'resistance_heavy', cost: 0,   desc: 'Homing rockets (splash) at armoured machines and bosses' },
   tech:   { name: 'TECH OP',   col: '#6ff3ff', gate: 'rgba(40,215,230,.6)', spr: 'resistance_tech',     cost: 0,   desc: 'Supply crates drop more often, wider scrap and gate pickup' },
   medic:  { name: 'FIELD MEDIC', col: '#6dffb5', gate: 'rgba(50,215,120,.6)', spr: 'resistance_medic',     cost: 120, desc: 'Revives fallen soldiers, repairs the reprogrammed unit, drops nanite repair kits when the squad is nearly gone' },
@@ -114,7 +114,7 @@ const FORMS = {   // tactical formations: hitbox width, how wide the fire patter
 const FORM_ORDER = ['free', 'v', 'col', 'wall'];
 const formK = () => FORMS[(G && G.form) || 'free'] || FORMS.free;
 const CLS = Object.keys(CLASS);        // display / sprite order
-const MAXPICK = 3;
+const MAXPICK = 4;
 const SQUAD_CONE = .22;   // how far off its own line (in lane widths) a squad round will curve toward a machine
 const classStart = () => Math.max(2, Math.round((6 + SQUAD_K * save.up.squad) * .15));   // soldiers each picked class starts with: 2, growing with Squad Size upgrades
 const FPS_OPTS = [60, 30, 0];   // 60 (default), 30 (battery saver), 0 = as fast as the display goes
